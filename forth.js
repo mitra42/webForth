@@ -281,7 +281,8 @@ code('UM+', () => {
 //VARIABLE UP; //TODO-VAR figure out how to point VARIABLE UP at UP for high level forth (maybe not reqd) //TODO-MULTITASK think
 
 function USER(name, init) {
-  $USER(name); // Some anonymous
+  Mstore(UPP + _USER, init);
+  $USER(name); // Put into dictionary
   userInit.push((typeof init === 'string') ?  names[init] : init);
 }
 
@@ -317,9 +318,7 @@ USER(undefined, 0); // Always 0 to indicate no more valid Vocabularies
 USER('CURRENT', 0); // Point to the vocabulary to be extended. Default to FORTH.
 USER(undefined, 0); // Vocabulary link uses one cell after CURRENT.
 console.assert(_USER === CPoffset, "CP mismatch offset should be ",_USER); // This is checked because need to know this earlier
-// This next line is complex, it presumes that "USER" will add two cells (4 bytes) to the dict between calculating the
-// initial value, and storing it.
-USER('CP', cpFetch()+CELLL*2); // eForth initializes to CTOP but we have to use this during compilation
+USER('CP', cpFetch()); // eForth initializes to CTOP but we have to use this during compilation
 USER('NP', undefined); // TODO NTOP Point to the bottom of the name dictionary. see pg 106
 USER('LAST', undefined); // TODO LASTN Point to the last name in the name dictionary. see pg 106
 
@@ -338,6 +337,9 @@ function consumeWord() { // TODO-INTERPRET replace this with guts of Forth word 
   return w;
 }
 
+function userVal(name) {
+  return Mfetch(UPP+Mfetch(names[name]+2));
+}
 // Look up a name, return [xt, 1] if immediate, [xt -1] if not, [name, 0] if not found.
 function find(name) { // TODO-INTERPRET merge into Forth word "FIND" - needs counted strings
   const n = names[name];
