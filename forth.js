@@ -350,42 +350,44 @@ function find(name) { // TODO-INTERPRET merge into Forth word "FIND" - needs cou
   }
 }
 
-
-
-function interpret(inp) { // TODO-INTERPRET could rewrite all or parts in Forth
-  input = inp; // Could point at TIB
-  let w;
-  while (input && input.length) {
-    w = consumeWord(input);
-    console.log('>', w); //TODO comment out
-    if (((w[0] >= '0') && (w[0] <= '9')) || ((w[0] === '-') && (w.length > 1))) { // Its a number
-      const base = Mfetch(UPP+baseOffset);
-      const n = parseInt(w, base); // TODO-NUM handle parsing errors // Needs forth to convert word
-      if (compiling) { //TODO-RECODE STATE @ IF
-        // eslint-disable-next-line no-use-before-define
-        $DW('doLIT', n); //TODO-RECODE ['] doLiteral COMPILE, COMPILE,
-      } else {
-        SPpush(n);
-      }
-    } else { // ELSE
-      const [xt, found] = find(w);  //TODO-FIND needs FIND
-      if (!found) { // NOT IF
-        console.error('Not found',w); //TODO handle forth-like errors
-      } else if (found === 1 || !compiling) { // Immediate
-        run(xt);
-      } else {
-        $DW(xt);
-      }
-    }
+function jsNUMBER(w) {
+  const base = userVal("BASE");
+  const n = parseInt(w, base); // TODO-NUM handle parsing errors // Needs forth to convert word
+  if (isNaN(n)) {
+    console.error('Not found', w);
+  } else {
+    return n;
   }
 }
-function NEWinterpret(inp) {
+function jsCOMPILE(w) {
+  const [xt, found] = find(w);
+  if (found === 1) {
+      run(xt);
+  } else if (found) {
+      $DW(xt);
+  } else {
+    $DW('doLIT', jsNUMBER(w));
+  }
+}
+function jsINTERPRET(w) {
+  const [xt, found] = find(w);
+  if (found) {
+    run(xt);
+  } else {
+    SPpush(jsNUMBER(w));
+  }
+}
+function interpret(inp) {
   input = inp; // Could point at TIB
   let w;
   while (input && input.length) {
     w = consumeWord(input);
     console.log('>', w); //TODO comment out
-    interpretOrCompile = m[UBB+offsetEval]<<8
+    if (compiling) {
+      jsCOMPILE(w);
+    } else {
+      jsINTERPRET(w);
+    }
   }
 }
 initRegisters(); //TODO-TEST maybe need to move initRegisters
