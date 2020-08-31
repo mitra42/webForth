@@ -19,16 +19,20 @@ let UP = 0;  // User Area Pointer
 // === Memory Map - pg26
 // TODO-VM TODO-MEM rework this into separate slots and then check if really need ! and @ into some parts of mem
 // EFORTH-ERRATA doesnt define CELLL (and presumes is 2 in multiple places)
+// EFORTH-ERRATA the definitions on pg 26 dont come close to matching the addresses given as the example below. In particular UPP and RPP overlap !
 const CELLL = 2;  // Using Buffers, but needs to be 2 as needs to be big enough for an address (offset into buffer) if change see CELL+ CELL- CELLS ALIGNED $USER
+const US = 64 * CELLL;  // user area size in cells i.e. 64 variables - standard beow is using about 37
+const RTS = 0x80 * CELLL; // return stack/TIB size // eFORTH-DIFF was 64 which is tiny for any kind of string handling TODO review this
+const SPS = 0x80 * CELLL; // Size of data stack 256 bytes for now
+// From top down
 const EM = 0x4000; // top of memory
-const COLDD = 0x100; // cold start vector
-const US = 64 * CELLL;  // user area size in cells i.e. 64 variables
-const RTS = 64 * CELLL; // return stack/TIB size
-const RPP = EM - (8 * CELLL); // start of return stack RP0 // looks really small at depth of 8
+const UPP = EM - US; // start of user area
+const RPP = UPP - (8 * CELLL); // top of return stack RP0 TODO figure out if this 8 celll buffer is used - something about a word buffer
 const TIBB = RPP - RTS; // Terminal input buffer
-const SPP = TIBB - (8 * CELLL); // start of data stack - bottom down, points at top of stack
-const UPP = EM - (256 * CELLL); // start of user area
-const NAMEE = UPP - (8 * CELLL); // name dictionary
+const SPP = TIBB - (8 * CELLL); // start of data stack - bottom down, points at top of stack TODO figure out if this 8 celll buffer is used - something about a word buffer
+const NAMEE = SPP - SPS; // name dictionary
+// And bottom up - gap in middle is code directory
+const COLDD = 0x100; // cold start vector
 const CODEE = COLDD + US; // code dictionary
 
 const m = Buffer.alloc(EM); // Allocate as one big buffer for now. TODO-MEM redo as a struct of some sort or poss u16 array
@@ -46,16 +50,20 @@ function RPpush(u16) { m[--RP] = u16 & 0xFF; m[--RP] = (u16 >> 8); }
 function IPnext() { return (m[IP++] << 8) | m[IP++]; }
 function Mstore(a, v) { m[a++] = v >> 8; m[a] = v & 0xFF; }
 function Mfetch(a) { return (m[a++] << 8) | m[a];}
+function Uaddr(name, offset=0)  { return UPP + (typeof name === "string" ? Mfetch(names[name]+2) : name) + offset; }
+function Ufetch(name, offset=0) { return Mfetch(Uaddr(name, offset)); }
+function Ustore(name, w, offset=0) { Mstore(Uaddr(name, offset), w); }
+
 
 // Handle the Code pointer, which always points after last thing compiled into dictionary - in eForthAndZen this is "$"
 
 const CPoffset = 68; // This value is checked during the sequence of USER below
 
 function cpFetch() {
-  return Mfetch(UPP+CPoffset);
+  return Ufetch(CPoffset);
 }
 function cpStore(w) {
-  Mstore(UPP+CPoffset, w);
+  Ustore(CPoffset, w);
 }
 
 cpStore(CODEE); // Pointer to where compiling into dic TODO-MEM will be code.length
@@ -193,17 +201,26 @@ console.log("exited");
  * This is quite different from eForth as its threaded token
  */
 
+function nameFromXt(xt) {
+  let nn = Object.entries(names).filter(kv => kv[1] === xt);
+  return nn.length ? nn[0][0] : "undefined";
+}
 // == INNER INTERPRETER - loops through nesting
 function threadtoken(xt) {
-  console.log(Object.entries(names).filter(kv => kv[1] === xt)[0][0], "S:",m.slice(SP,SPP),"R:",m.slice(RP,RPP));
+  console.log(nameFromXt(xt), "S:",m.slice(SP,SPP),"R:",m.slice(RP,RPP));
+  console.assert(SPP >= SP && RPP >= RP)
   const tok = ((m[xt++] << 8) + m[xt++]);
   codeSpace[tok](xt);
 }
+let debugRun;
+let debugTIB;
 function run(xt) {
   threadtoken(xt);
   // If this returns without changing program Counter, it will exit
   while (IP) {
     xt = IPnext(); // SEE-OTHER-ENDIAN
+    debugRun = nameFromXt(xt);
+    debugTIB =  m.slice(Ufetch('#TIB',2)+Ufetch('>IN'),Ufetch('#TIB',2)+Ufetch('#TIB')).toString('utf8')
     threadtoken(xt);
   }
 }
@@ -323,23 +340,40 @@ USER('NP', undefined); // TODO NTOP Point to the bottom of the name dictionary. 
 USER('LAST', undefined); // TODO LASTN Point to the last name in the name dictionary. see pg 106
 
 // === JS interpreter - will be discarded when done or built out
-let compiling = false; // TODO-INTERPRET replace with appropriate state flag
+let compiling = false; // TODO-INTERPRET replace with appropriate  state flag
 
 const immediateTokens = []; // TODO-INTERPRET discard this at end
 code('IMMEDIATE', () => immediateTokens.push(lastDefinition)); // TODO-INTERPRETER replace with real IMMEDIATE in lex
 
-let input;
+//TODO-INTERPRETER OBS: let input;
 
-function consumeWord() { // TODO-INTERPRET replace this with guts of Forth word equivalent
-  let w;
-//    [w, this.input] = this.input.trim().split(/\s(.*)/);
-  [w, input] = input.trim().split(/(?<=^\S+)\s/);
-  return w;
+function tibIn() { return Ufetch('#TIB', CELLL) + Ufetch('>IN'); }  // TIB >IN @ +
+const BL = 32;
+function fPARSE() { // returns b (address) and u (length)
+  const c = SPpop();
+  const tib = Ufetch('#TIB', CELLL);
+  const ntib = Ufetch('#TIB');
+  let inoffset = Ufetch('>IN');
+  if (c === BL) {
+    while ((inoffset < ntib) && (m[tib + inoffset] <= BL)) { inoffset++; }  // If blank then skip over leading BL /control chars
+  }
+  // inoffset now points at first non-delimter or #tib
+  const b = tib + inoffset;
+  while ((inoffset < ntib) && ((c === BL) ? (c < m[tib + inoffset]) : (c !== m[tib + inoffset]))) { inoffset++ } // Exit with inoffset at #tib or after delimiter
+  SPpush(b); SPpush(tib + inoffset - b); // Store length not including trailing delimiter
+  Ustore('>IN', inoffset < ntib ? ++inoffset : inoffset); // Skip over delimiter - TODO its not clear this is what FORTH wants. eForth doc is almost certainly wrong
+}
+code('PARSE', fPARSE);
+
+function SPpopWord() {  // b u -- ; return w the JS string
+  u = SPpop(); b = SPpop(); return m.slice(b, b+u).toString('utf8'); }
+
+function consumeWord() { // TODO-INTERPRET replace this with guts of Forth word equivalent - next update >IN THEN look at whether/where copies word
+  SPpush(BL);
+  fPARSE();   // b u (counted string, adjusts >IN)
+  return SPpopWord();      // return Javascript string, could be ""
 }
 
-function userVal(name) {
-  return Mfetch(UPP+Mfetch(names[name]+2));
-}
 // Look up a name, return [xt, 1] if immediate, [xt -1] if not, [name, 0] if not found.
 function find(name) { // TODO-INTERPRET merge into Forth word "FIND" - needs counted strings
   const n = names[name];
@@ -351,10 +385,10 @@ function find(name) { // TODO-INTERPRET merge into Forth word "FIND" - needs cou
 }
 
 function jsNUMBER(w) {
-  const base = userVal("BASE");
+  const base = Ufetch("BASE");
   const n = parseInt(w, base); // TODO-NUM handle parsing errors // Needs forth to convert word
   if (isNaN(n)) {
-    console.error('Not found', w);
+    console.log('Not found', w);
   } else {
     return n;
   }
@@ -377,18 +411,30 @@ function jsINTERPRET(w) {
     SPpush(jsNUMBER(w));
   }
 }
-function interpret(inp) {
-  input = inp; // Could point at TIB
+
+function interpret1line(inp) { //TODO-INTERPRETER - many changes see https://github.com/mitra42/webForth/issues/2
+  //OBS: input = inp; // Could point at TIB
+  console.log(">>", inp)
+  console.assert(inp.length < (RTS - 10));
+  Ustore('>IN',0); // Start at beginning of TIB
+  Ustore('#TIB', m.write(inp, tibIn(), 'utf8')); // copy string to TIB, and store length in #TIB
   let w;
-  while (input && input.length) {
-    w = consumeWord(input);
-    console.log('>', w); //TODO comment out
-    if (compiling) {
-      jsCOMPILE(w);
-    } else {
-      jsINTERPRET(w);
+  //OBS: while (input && input.length) {
+  while(Ufetch('>IN') < Ufetch('#TIB')) {
+    w = consumeWord();
+    if (w && w.length) {
+      console.log('>', w); //TODO comment out
+      if (compiling) {
+        jsCOMPILE(w);
+      } else {
+        jsINTERPRET(w);
+      }
     }
   }
+}
+function interpret(inp) {
+  inp.split('\n').forEach(i => interpret1line(i));
+  console.assert(SPP === SP)
 }
 initRegisters(); //TODO-TEST maybe need to move initRegisters
 
@@ -396,10 +442,8 @@ initRegisters(); //TODO-TEST maybe need to move initRegisters
 code(':', () => { $COLON(consumeWord()); compiling = true; }); // TODO-INTERPRETER Replace with : ':' TOKEN $,n [ ' doLIST ] LITERAL CALL, ] ;
 code(';', () => { $DW(EXIT); compiling = false; }); // TODO-INTERPRETER replace with deftn of ;
 interpret('IMMEDIATE');
-code('(', () => input = input.split(/(?<=^[^\)]+)\)/)[1]); interpret('IMMEDIATE'); //pg74
 code('[', () => compiling = false); interpret('IMMEDIATE'); //pg84 and pg88
 code(']', () => compiling = true); // pg88
-code('CHAR',() => SPpush(consumeWord()[0]))
 
 // === Vocabulary and Sort Order eForthAndZen pg47
 
@@ -414,9 +458,11 @@ $COLON('FORTH'), $DW('doVOC', 0, 0);
 // $DW(tokenDoes, (first word of doVOC), 0, 0);
 
 // === Words moved earlier ....
-
+interpret(': BL 32 ;'); // ( -- 32; the blank character)
+interpret(': CHAR BL PARSE DROP C@ ;'); // -- c; Parse a word and return its first character
+interpret(': 2DROP DROP DROP ;') // w1 w2 -- ; Drop two items pg 49)
 // Comment character - from here on we can use ( xxx) in interpreted strings
-// pg74 : ( [ CHAR ) ] LITERAL PARSE 2DROP ; IMMEDIATE
+interpret(': ( 41 PARSE 2DROP ; IMMEDIATE'); // pg74 : ( [ CHAR ) ] LITERAL PARSE 2DROP ; IMMEDIATE
 
 interpret(`: HERE ( -- a; return top of code dictionary; pg60)
   CP @ ;`);
@@ -441,10 +487,16 @@ code("'", () => { // -- xt; Search for next word in input stream
 interpret(`
 : , HERE ( w --; Compile an integer into the code dictionary. pg 90)
   DUP CELL+ CP ! ! ; 
+`); interpret(`
 : [COMPILE] ( --; <string>; Compile next immediate word into code dictionary; pg90)
   ' , ; IMMEDIATE 
+`); interpret(`
 : COMPILE ( --; Compile the next address in colon list to code dictionary. pg 90)
   R> DUP @ , CELL+ >R ;
+`); interpret(`
+: LITERAL ( w -- ) ( Compile tos to code dictionary as an integer literal.)
+  COMPILE doLIT ( compile doLIT to head lit )
+  , ; IMMEDIATE ( compile literal itself )
 `);
 // == Control structures - were on pg91 but needed earlier pg 91-92 but moved early
 interpret(`
@@ -480,12 +532,12 @@ interpret(`
   DROP            ( discard address left by IF )
   [COMPILE] AHEAD ( compile uncondition jump )
   [COMPILE] BEGIN ( leave HERE on stack )
-  SWAP ;          ( realign jump addresses )
+  SWAP ; IMMEDIATE         ( realign jump addresses )
 `); interpret(`
 : ELSE ( A -- A; False clause of IF ELSE THEN structure pg 92)
   [COMPILE] AHEAD SWAP [COMPILE] THEN ; IMMEDIATE
 `); interpret(`
-: WHILE ( a -- A a ; Conditional branch out of a BEGIN-WHILE-REPEAT loop.) 
+: WHILE ( a -- A a ; Conditional branch out of a BEGIN-WHILE-REPEAT loop.)
   [COMPILE] IF
   SWAP ; IMMEDIATE
 `);
@@ -495,8 +547,8 @@ interpret(`
 interpret(`
 : ?DUP DUP IF DUP THEN ; ( w--ww|0) ( Dup top of stack if its is not zero.)
 : ROT >R SWAP R> SWAP ; ( w1, w2, w3 -- w2 w3 w1; Rotate third item to top)
-: 2DROP DROP DROP ; ( w1 w2 -- ; Drop two items)
 : 2DUP OVER OVER ; ( w1 w2 -- w1 w2 w1 w2;)
+( 2DROP moved earlier )
 `);
 
 // === More Arithetic operators pg50
@@ -540,7 +592,7 @@ interpret(`
     NEXT            ( repeat for 16 bits)
     DROP SWAP EXIT  ( return remainder and quotient)
   THEN DROP 2DROP   ( overflow, return -1's)
-  -1 DUP 
+  -1 DUP
 ;
 : M/MOD ( d n -- r q)
   ( Signed floored divide of double by single. Return mod and quotient.)
@@ -634,8 +686,7 @@ interpret(': ALIGNED ;');
 
 // === Special Characters pg58 BL >CHAR
 interpret(`
-: BL ( -- 32; the blank character)
-  32 ;
+( BL moved earlier)
 
 : >CHAR ( c -- c; filter non printing characters, replace by _)
   127 AND DUP   ( maso off the MSB bit)
@@ -668,7 +719,7 @@ interpret(`
 ( HERE is defined in moved forward words)
 : PAD ( -- a; Return address of a temporary buffer above code dic)
   HERE 80 + ;
-: TIB ( -- a; Return address of terminal input buffer) ( TODO replace "input" with this)
+: TIB ( -- a; Return address of terminal input buffer) ( TODO-INTERPRETER replace "input" with this)
   #TIB CELL+ @ ; ( 1 cell after #TIB)
 : @EXECUTE ( a -- ; excute vector -if any- stored in address a)
   @ ?DUP IF EXECUTE THEN ;
@@ -678,6 +729,7 @@ interpret(`
 interpret(`
 : COUNT ( b -- b+1 +n; return count byte of string and add 1 to byte address)
   DUP 1 + SWAP C@ ;
+`); interpret(`
 : CMOVE ( b1 b2 u -- ; Copy u bytes from b1 to b2)
   FOR             ( repeat u+1 times)
     AFT           ( skip to THEN first time)
@@ -687,7 +739,7 @@ interpret(`
       R> 1 +      ( increment destination address)
     THEN
   NEXT 2DROP ;    ( done discard addresses)
-  
+`); interpret(`
 : FILL ( b u c --; Fill u bytes of character c to area beginning at b.)
   SWAP            ( b c u)
   FOR             ( loop u+1 times)
@@ -695,9 +747,9 @@ interpret(`
     AFT           ( skip to THEN)
       2DUP C!     ( c b; store c to b)
       1 +         ( c b+1; increment b)
-    THEN          
+    THEN
   NEXT 2DROP ;    ( done, discard c and b)
-
+`); interpret(`
 : -TRAILING ( b u -- b u ; Adjust the count to eliminate trailing white space.)
   FOR                 ( scan u+1 characters)
     AFT               ( skip the first loop)
@@ -708,7 +760,7 @@ interpret(`
       THEN
     THEN              ( else continue scanning)
   NEXT 0 ;            ( reach the beginning of b)
-
+`); interpret(`
 : PACK$ ( b u a -- a; Build a counted string with u characters from b. Null fill.)
   DUP >R      ( save address of word buffer )
   2DUP C!     ( store the character count first )
@@ -751,7 +803,7 @@ interpret(`
   WHILE     ( repeat until u is divided to 0)
   REPEAT ;
 
-: SIGN ( n-- ; Add a minus sign to the numeric output string.) 
+: SIGN ( n-- ; Add a minus sign to the numeric output string.)
   0< ( if n is negative)
   IF 45 HOLD THEN ; ( add a - sign to number string)
 
@@ -762,7 +814,7 @@ interpret(`
 `)
 // === More definitions moved up
 interpret(`
-: EMIT ( c--;  Send a character to the output device. pg69) 
+: EMIT ( c--;  Send a character to the output device. pg69)
   'EMIT @EXECUTE ;
 : SPACE ( -- ; Send the blank character to the output device. pg70)
   BL EMIT ; ( send out blank character)
@@ -788,13 +840,13 @@ interpret(`
   >R str            ( convert n to a number string)
   R> OVER - SPACES  ( print leading spaces)
   TYPE ;            ( print number in +n column format)
-  
+
 : U.R ( u+ n -- ; Display an unsigned integer in n column, right justified.)
   >R            ( save column number)
   <# #S #> R>   ( convert unsigned number)
   OVER - SPACES ( print leading spaces)
   TYPE ;        ( print number in +n columns)
-  
+
 : U. ( u -- ; Display an unsigned integer in free format.)
   <# #S #>  ( convert unsigned number)
   SPACE     ( print one leading space)
@@ -804,7 +856,7 @@ interpret(`
   BASE @ 10 XOR     ( if not in decimal mode)
   IF U. EXIT THEN   ( print unsigned number)
   str SPACE TYPE ;  ( print signed number if decimal)
-  
+
 : ? ( a -- ; Display the contents in a memory cell.)
   @ . ; ( very simple but useful command)
 
@@ -812,9 +864,9 @@ interpret(`
 // === Numeric input pg67-68 DIGIT? NUMBER?
 // eFORTH-ERRATA NIP isnt designed
 interpret(`
-: NIP ( x1 x2 -- x2 ) 
+: NIP ( x1 x2 -- x2 )
   SWAP DROP ;
-: DIGIT? ( c base -- u t ; Convert a character to its numeric value. A flag indicates success.) 
+: DIGIT? ( c base -- u t ; Convert a character to its numeric value. A flag indicates success.)
   >R                    ( save radix )
   48 -          ( character offset from digit 0 - would be better as '[ CHAR 0 ] LITERAL' but dont hace "[")
   9 OVER <              ( is offset greater than 9? )
@@ -870,7 +922,7 @@ interpret(`
 
 // === Serial I/O pg69 ?KEY KEY EMIT NUF?
 interpret(`
-: ?KEY ( -- c T | F) ( Return input character and true, or a false if no input.) 
+: ?KEY ( -- c T | F) ( Return input character and true, or a false if no input.)
   '?KEY @EXECUTE ;
 : KEY ( -- c ) ( Wait for and return an input character.)
   BEGIN ?KEY UNTIL ;
@@ -890,7 +942,7 @@ interpret(`
   15 EMIT 11 EMIT ;
 `)
 // === String Literal pg71 do$ $"| ."|
-interpret(` 
+interpret(`
 : do$ ( --a) ( Return the address of a compiled string.)
   R>    ( this return addres must be preserved)
   R@    ( get address of the compiled string)
@@ -901,7 +953,7 @@ interpret(`
 
 : $"| ( -- a) ( Run time routine compiled by $". Return address of a compiled string.)
   do$ ; ( return string address only)
-: ."| ( -- ) ( Run time routine of ." . Output a compiled string.) 
+: ."| ( -- ) ( Run time routine of ." . Output a compiled string.)
   do$           ( get string address)
   COUNT TYPE ;  ( print the compiled string)
 `);
@@ -909,7 +961,8 @@ interpret(`
 interpret(`
 
 : parse ( b u c -- b u delta ; <string> ) ( TODO evaluate control structures here)
-  ( Scan string delimited by c. Return found string and its offset.
+  ( Scan string delimited by c. Return found string and its offset. )
+  ( eFORTH-ERRATA - delta appears to be to end of string, not start )
   temp !            ( save delimiter in temp )
   OVER >R DUP       ( b u u)
   IF                ( if string length u=0, nothing to parse )
@@ -924,7 +977,7 @@ interpret(`
       NEXT            ( b -- , if space, loop back and scan further)
         R> DROP       ( end of buffer, discard count )
         0 DUP EXIT    ( exit with -- b 0 0, end of line)
-     THEN 
+     THEN
      1 -              ( back up the parser pointer to non-space )
      R>               ( retrieve the length of remaining string )
     THEN
@@ -932,9 +985,9 @@ interpret(`
     FOR
       temp @            ( get delimiter )
       OVER C@ -         ( get next character )
-      temp @ BL =       
+      temp @ BL =
       IF 0<
-      ELSE 1 + 
+      ELSE 1 +
       THEN
     WHILE               ( if delimiter, exit the loop )
     NEXT                ( not delimiter, keep on scanning )
@@ -946,17 +999,17 @@ interpret(`
     OVER -              ( length of the parsed string )
     R> R> -             ( and its offset in the buffer )
     EXIT
-  THEN ( b u) 
+  THEN ( b u)
   OVER                  ( buffer length is 0 )
   R> - ;                ( the offset is 0 also )
- 
-: PARSE ( c -- b u ; <string> ) ( Scan input stream and return counted string delimited by c.) 
+
+: PARSE ( c -- b u ; <string> ) ( Scan input stream and return counted string delimited by c.)
   >R              ( save the delimiting character )
   TIB >IN @ +     ( address in TIB to start parsing )
   #TIB @ >IN @ -  ( length of remaining string in TIB )
   R> parse        ( parse the desired string )
   >IN +! ;        ( move parser pointer to end of string )
- 
+
 `);
 /*
 // Parsing Words pg74 .( ( \ CHAR TOKEN WORD
@@ -1010,9 +1063,7 @@ interpret(`
 // Hardware Reset pg106 COLD
 
 // TESTING ===
-const print = code('print', () =>
-  console.log('SPfetch()'));
 run(names['FORTH']);
-console.log('Finished:', SPfetch());
+console.log('Finished:');
 
 //TODO - build JS interpreter from forth_v1.js then interpet all the colon stuff and below

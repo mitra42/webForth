@@ -25,6 +25,7 @@
         "no-underscore-dangle": 0,
         "no-unused-vars": 1,
         "no-restricted-syntax": 1,
+        "prefer-destructuring": 0,
         "spaced-comment": 0
     }
 }
