@@ -133,7 +133,7 @@ function $CODE(lex, name) { //TODO-CELL check this carefully
   const np = npFetch() - ((_LEN + 3) * CELLL); // Drop down from top // CELL I think its _LEN + 3*CELLL
   npStore(np);
   let a = np;
-  a = DOLLARCOMMAN(a, name);
+  a = DOLLARCOMMAN(a, name); // Build the headers that preceed the name
   m[a++] = lex;
   m.write(name, a, 'utf8');
 }
@@ -1008,7 +1008,12 @@ interpret(`
   COUNT TYPE ;  ( print the compiled string)
 `);
 // === Word Parser pg72-73 PARSE parse
+/*
 interpret(`
+// EFORTH-ERRATA this doesnt set >IN past the string, but the callers clearly assume it does.
+// the version in eForthAndZen pg72 is obviously broken as it doesn't even increment the pointer in the FOR loop.
+// The version in eForthOverViewV5 matches the spec, but clearly not what is expected.
+// For now keeping the javascript versions that work
 
 : parse ( b u c -- b u delta ; <string> ) ( TODO evaluate control structures here)
   ( Scan string delimited by c. Return found string and its offset. )
@@ -1024,11 +1029,12 @@ interpret(`
         - 0<          ( is it a space? )
         INVERT
       WHILE
+        1 +           ( eForth errata - correct in eForthOverviewv5.pdf )
       NEXT            ( b -- , if space, loop back and scan further)
         R> DROP       ( end of buffer, discard count )
         0 DUP EXIT    ( exit with -- b 0 0, end of line)
      THEN
-     1 -              ( back up the parser pointer to non-space )
+     ( eFORTH errata - correct in eForthOverview5.pdf: 1 -              ( back up the parser pointer to non-space )
      R>               ( retrieve the length of remaining string )
     THEN
     OVER SWAP           ( b' b' u' -- , start parsing non-space chars )
@@ -1037,9 +1043,10 @@ interpret(`
       OVER C@ -         ( get next character )
       temp @ BL =
       IF 0<
-      ELSE 1 +
+      ( eForhErrata ELSE 1 + )
       THEN
     WHILE               ( if delimiter, exit the loop )
+      1 +
     NEXT                ( not delimiter, keep on scanning )
       DUP >R            ( save a copy of b at the end of the loop)
     ELSE                ( early exit, discard the loop count )
@@ -1059,39 +1066,40 @@ interpret(`
   #TIB @ >IN @ -  ( length of remaining string in TIB )
   R> parse        ( parse the desired string )
   >IN +! ;        ( move parser pointer to end of string )
-
 `);
-/*
+*/
+
 // Parsing Words pg74 .( ( \ CHAR TOKEN WORD
 interpret(`
 : CHAR ( -- c ; Parse next word and return its first character.)
   BL PARSE  ( get the next string )
   DROP C@ ; ( return the code of the 1st character )
-`); interpret(`
+
 : .(  ( -- ) ( Output following string up to next )
-  [ CHAR ) ] LITERAL PARSE ( parse the string until next )
+  [ CHAR ) ] LITERAL PARSE
+   ( parse the string until next )
   TYPE ; IMMEDIATE         ( type the string to terminal )
-`); interpret(`
-: ( ( --) ( Ignore following string up to next. A comment.)
-  [ CHAR ) ] LITERAL PARSE      ( parse the string until )
-  2DROP ; IMMEDIATE             ( and ignore it as a comment )
-`); interpret(`
+
+: (
+  [ CHAR ) ] LITERAL PARSE
+  2DROP ; IMMEDIATE
+
 : \\ ( -- ; Ignore following text till the end of line.)
    #TIB @ >IN ! ( store the length of TIB in >IN )
    ; IMMEDIATE ( in effect ignore the rest of a line )
-`); interpret(`
+
 ( Note there is jsTOKEN which does same thing )
-: TOKEN ( -- a \ <string> ; Parse a word from input stream and copy it to name dictionary.)
+: TOKEN ( -- a ; <string> ; Parse a word from input stream and copy it to name dictionary.)
   BL PARSE            ( parse out next space delimited string )
   31 MIN              ( truncate it to 31 characters = maxNameLength )
   NP @                ( word buffer below name dictionary )
   OVER - 2 - PACK$ ;  ( copy parsed string to word buffer )
-`); interpret(`
-: WORD ( c -- a \\ <string> ) ( Parse a word from input stream and copy it to code dictionary.)
+
+: WORD ( c -- a ; <string> ) ( Parse a word from input stream and copy it to code dictionary.)
   PARSE         ( parse out a string delimited by c )
   HERE PACK$ ;  ( copy the string into the word buffer )
 `)
-*/
+
 // Dictionary Search pg75-77 NAME> SAME? find NAME?
 // Text input from terminal pg 78: ^H TAP kTAP accept EXPECT QUERY
 // Error Handling pg80-82 CATCH THROW NULL$ ABORT abort" ?STACK
