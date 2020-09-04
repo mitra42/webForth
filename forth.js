@@ -52,7 +52,7 @@ function names(name, xt) {
     return jsNameSpace[n];
   }
 }
-// These aren't part of eForth, but are needed when SP is a variable rather than a register
+// These aren't part of eForth, but are here to simplify storing 16 bit words into 8 bit bytes in the Buffer.
 function SPfetch() { return (m[SP] << 8) | m[SP + 1]; }
 function SPpop() { return (m[SP++] << 8) | m[SP++]; }
 function SPpush(u16) { m[--SP] = u16 & 0xFF; m[--SP] = (u16 >> 8); }
@@ -67,7 +67,7 @@ function Ufetch(name, offset = 0) { return Mfetch(Uaddr(name, offset)); }
 function Ustore(name, w, offset = 0) { Mstore(Uaddr(name, offset), w); }
 
 
-// Handle the Code and Namespace pointer, which always points after last thing compiled into dictionary - in eForthAndZen this is "$"
+// Handle the Code and Namespace \pointer, which always points after last thing compiled into dictionary - in eForthAndZen this is "$"
 const CPoffset = 68; // This value is checked during the sequence of USER below
 const NPoffset = 70;
 function cpFetch() { return Ufetch(CPoffset); }
@@ -240,6 +240,7 @@ function threadtoken(xt) {
 }
 let debugRun;
 let debugTIB;
+// This should only be called once, normally its threadtoken you want ....
 function run(xt) {
   threadtoken(xt);
   // If this returns without changing program Counter, it will exit
@@ -366,8 +367,6 @@ USER('NP', npFetch()); // normally set on pg106 but we are using it live.
 USER('LAST', undefined); // TODO LASTN Point to the last name in the name dictionary. see pg 106
 
 // === JS interpreter - will be discarded when done or built out
-let compiling = false; // TODO-INTERPRET replace with appropriate  state flag
-
 const immediateTokens = []; // TODO-INTERPRET discard this at end
 code('IMMEDIATE', () => immediateTokens.push(lastDefinition)); // TODO-INTERPRETER replace with real IMMEDIATE in lex
 
@@ -430,7 +429,7 @@ function jsNUMBER(w) { //TODO-INTERPRETER make this work like things stored in '
   return n;
 }
 
-function jsCOMPILE() {
+const jsCOMPILE = code('jsCOMPILE', () => { // a -- ...;
   const [xt, found] = findName(); // [xt found], or [w 0]
   if (found === 1) {
     run(xt);
@@ -439,17 +438,18 @@ function jsCOMPILE() {
   } else {
     $DW('doLIT', jsNUMBER(xt));
   }
-}
-function jsINTERPRET() { // Based on signature at pg83
+});
+const jsINTERPRET = code('jsINTERPRET', () => { // a -- ...; Based on signature at pg83
   const [xt, found] = findName();  // [xt found], or [w 0]
   if (found) {
     run(xt);
   } else {
     SPpush(jsNUMBER(xt));
   }
-}
+});
+Ustore("'EVAL", jsINTERPRET); // Start off interpreting
 
-function jsEval(inp) { //TODO-INTERPRETER - many changes see https://github.com/mitra42/webForth/issues/2
+function jsEVAL(inp) {
   //OBS: input = inp; // Could point at TIB
   console.log('>>', inp);
   console.assert(inp.length < (RTS - 10));
@@ -458,20 +458,16 @@ function jsEval(inp) { //TODO-INTERPRETER - many changes see https://github.com/
   //OBS: while (input && input.length) {
   while (Ufetch('>IN') < Ufetch('#TIB')) {
     jsTOKEN(); // a ; pointing to word in Name Buffer (NB)
-    // TODO-INTERPRETER handle end of line
+    // There may be case where jsTOKEN returns empty string at end of line or similar.
     if (true) {
       //console.log('>', w); //TODO comment out
-      if (compiling) {
-        jsCOMPILE();
-      } else {
-        jsINTERPRET();
-      }
+      threadtoken(Ufetch("'EVAL"))
     }
     console.assert(SP <= SPP && RP <= RPP); // Side effect of making SP and SPP available to debugger.
   }
 }
 function interpret(inp) {
-  inp.split('\n').forEach(i => jsEval(i));
+  inp.split('\n').forEach(i => jsEVAL(i));
   console.assert((SPP === SP) && (RPP === RP));
 }
 initRegisters(); //TODO-TEST maybe need to move initRegisters
@@ -485,15 +481,15 @@ code(':', () => {
   npStore(a);
   DOLLARCOMMAN(a, name);
   $DW(tokenDoList); // Must be after creating the name and links etc
-  compiling = true;
+  Ustore("'EVAL", jsCOMPILE);
 });
 
 
 // OBS code(':', () => { $COLON(consumeWord()); compiling = true; }); // TODO-INTERPRETER Replace with : ':' TOKEN $,n [ ' doLIST ] LITERAL CALL, ] ; see pg96
-code(';', () => { $DW(EXIT); compiling = false; }); // TODO-INTERPRETER replace with deftn of ;
+code(';', () => { $DW(EXIT); Ustore("'EVAL", jsINTERPRET); }); // TODO-INTERPRETER replace with deftn of ;
 interpret('IMMEDIATE');
-code('[', () => compiling = false); interpret('IMMEDIATE'); //pg84 and pg88
-code(']', () => compiling = true); // pg88
+code('[', () => Ustore("'EVAL", jsINTERPRET)); interpret('IMMEDIATE'); //pg84 and pg88
+code(']', () => Ustore("'EVAL", jsCOMPILE)); // pg88
 
 // === Vocabulary and Sort Order eForthAndZen pg47
 
@@ -782,7 +778,7 @@ interpret(`
 interpret(`
 : COUNT ( b -- b+1 +n; return count byte of string and add 1 to byte address)
   DUP 1 + SWAP C@ ;
-`); interpret(`
+
 : CMOVE ( b1 b2 u -- ; Copy u bytes from b1 to b2)
   FOR             ( repeat u+1 times)
     AFT           ( skip to THEN first time)
@@ -802,7 +798,7 @@ interpret(`
       1 +         ( c b+1; increment b)
     THEN
   NEXT 2DROP ;    ( done, discard c and b)
-`); interpret(`
+
 : -TRAILING ( b u -- b u ; Adjust the count to eliminate trailing white space.)
   FOR                 ( scan u+1 characters)
     AFT               ( skip the first loop)
@@ -813,7 +809,7 @@ interpret(`
       THEN
     THEN              ( else continue scanning)
   NEXT 0 ;            ( reach the beginning of b)
-`); interpret(`
+
 ( Note there is code in jsTOKEN which does this
 : PACK$ ( b u a -- a; Build a counted string with u characters from b. Null fill.)
   DUP >R      ( save address of word buffer )
