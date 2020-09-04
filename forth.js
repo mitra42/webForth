@@ -232,7 +232,7 @@ function nameFromXt(xt) {
 }
 // == INNER INTERPRETER - loops through nesting
 function threadtoken(xt) {
-  console.log(nameFromXt(xt), 'S:', m.slice(SP, SPP), 'R:', m.slice(RP, RPP));
+  console.log('R:', m.slice(RP, RPP), nameFromXt(xt), 'S:', m.slice(SP, SPP));
   console.assert(SPP >= SP && RPP >= RP);
   const tok = ((m[xt++] << 8) + m[xt++]);
   console.assert(tok < codeSpace.length);
