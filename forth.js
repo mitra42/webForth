@@ -2,6 +2,7 @@
 References eForthAndZen 1013_eForthAndZen.pdf -- TODO need URL
  */
 
+let testing = 0x0; // 0x01 display words passed to interpreters; 0x02 each word in tokenthread
 // TODO-VM make this something passed to each function.
 // Standard pointers used (ref eForthAndZen pg22
 let IP = 0;  // Interpreter Pointer
@@ -194,6 +195,12 @@ function code(name, func) {
   $DW(tokenFunction(func));
   return xt;
 }
+function constant(name, val) {  // TODO merge this with CONSTANT once defined
+  const xt = cpFetch();
+  $CODE(name.length, name);
+  $DW(tokenNextVal, val);
+  return xt;
+}
 //User variables initialization eForthAndZen pg33 see pg46
 
 // Basic key I/O eForthAndZen pg 35
@@ -201,6 +208,7 @@ code('BYE', 'TODO-bye');
 code('?RX', () => console.error('TODO ?RX not defined')); //TODO-IO
 code('TX!', () => console.error('TODO TX! not defined')); //TODO-IO
 code('!IO', () => console.error('TODO !IO not defined')); //TODO-IO
+
 /* TODO-IO FAILED attempt to get stdin/stdout IO then code
 var stream = require('stream');
 var s = stream.Duplex()
@@ -232,7 +240,7 @@ function nameFromXt(xt) {
 }
 // == INNER INTERPRETER - loops through nesting
 function threadtoken(xt) {
-  console.log('R:', m.slice(RP, RPP), nameFromXt(xt), 'S:', m.slice(SP, SPP));
+  if (testing & 0x02) console.log('R:', m.slice(RP, RPP), nameFromXt(xt), 'S:', m.slice(SP, SPP));
   console.assert(SPP >= SP && RPP >= RP);
   const tok = ((m[xt++] << 8) + m[xt++]);
   console.assert(tok < codeSpace.length);
@@ -257,7 +265,6 @@ code('EXECUTE', () => threadtoken(SPpop()));
 // === Literals eForthAndZen#37
 // push the value in the next code word
 code('doLIT', () => SPpush(IPnext()));
-
 
 // Address Literals (aka branches and jumps) eForthAndZen#38
 
@@ -294,8 +301,8 @@ code('R@', () => SPpush(RPfetch()));
 code('>R', () => RPpush(SPpop()));
 
 // Data stack initialization eForthAndZen#41
-code('SP@', SPpush(SP));
-code('SP!', SP = SPpop());
+code('SP@', () => SPpush(SP));
+code('SP!', () => SP = SPpop());
 
 // Classic Data stack words eForthAndZen#42
 code('DROP', () => SP += 2);
@@ -304,7 +311,7 @@ code('SWAP', () => { const x = SPpop(); const y = SPpop(); SPpush(x); SPpush(y);
 code('OVER', () => { const x = SPpop(); const y = SPfetch(); SPpush(x); SPpush(y); }); // TODO optimize
 
 // Logical Words eForthAndZen43
-code('0<', () => SPpush((SPpop() < 0) ? -1 : 0));
+code('0<', () => SPpush((SPpop() & 0x8000) ? -1 : 0));
 code('AND', () => SPpush(SPpop() & SPpop()));
 code('OR', () => SPpush(SPpop() | SPpop()));
 code('XOR', () => SPpush(SPpop() ^ SPpop()));
@@ -451,7 +458,7 @@ Ustore("'EVAL", jsINTERPRET); // Start off interpreting
 
 function jsEVAL(inp) {
   //OBS: input = inp; // Could point at TIB
-  console.log('>>', inp);
+  if (testing & 0x01) { console.log(m.slice(SP,SPP), ' >>', inp); }
   console.assert(inp.length < (RTS - 10));
   Ustore('>IN', 0); // Start at beginning of TIB
   Ustore('#TIB', m.write(inp, tibIn(), 'utf8')); // copy string to TIB, and store length in #TIB
@@ -459,7 +466,9 @@ function jsEVAL(inp) {
   while (Ufetch('>IN') < Ufetch('#TIB')) {
     jsTOKEN(); // a ; pointing to word in Name Buffer (NB)
     // There may be case where jsTOKEN returns empty string at end of line or similar.
-    if (true) {
+    if (m[SPfetch()] === 0) { // Skip zero length string
+      SPpop();
+    } else {
       //console.log('>', w); //TODO comment out
       threadtoken(Ufetch("'EVAL"))
     }
@@ -468,12 +477,27 @@ function jsEVAL(inp) {
 }
 function interpret(inp) {
   inp.split('\n').forEach(i => jsEVAL(i));
+}
+
+function padPtr() { return Ufetch('CP')+80; } // Sometimes JS needs the pad pointer
+function test(inp, arr, { pad = undefined} = {}) {
+  interpret(inp);
+  let mm = [m]; // this is just to make sure m is in scope
+  while (arr.length) {
+    if (arr.pop() !== SPpop()) {
+      console.log('Test of:', inp, 'did not leave expected result');
+    }
+  }
+  if (pad) {
+    console.assert(m.slice(padPtr(),padPtr()+pad.length).toString() === pad);
+  }
   console.assert((SPP === SP) && (RPP === RP));
 }
 initRegisters(); //TODO-TEST maybe need to move initRegisters
 
 // === A group of words defined relative to the JS interpreter but will be redefined to the Forth interpreter at pg TODO
 
+// TODO could replace with : ':' TOKEN $,n [ ' doLIST ] LITERAL CALL, ] ; see pg96
 code(':', () => {
   jsTOKEN();  // a; (counted string in named space)
   const a = SPfetch() - 4;
@@ -485,11 +509,31 @@ code(':', () => {
 });
 
 
-// OBS code(':', () => { $COLON(consumeWord()); compiling = true; }); // TODO-INTERPRETER Replace with : ':' TOKEN $,n [ ' doLIST ] LITERAL CALL, ] ; see pg96
 code(';', () => { $DW(EXIT); Ustore("'EVAL", jsINTERPRET); }); // TODO-INTERPRETER replace with deftn of ;
 interpret('IMMEDIATE');
 code('[', () => Ustore("'EVAL", jsINTERPRET)); interpret('IMMEDIATE'); //pg84 and pg88
 code(']', () => Ustore("'EVAL", jsCOMPILE)); // pg88
+
+//TODO-TEST write tests for all earlier definitions here
+//EXIT & EXECUTE tested with '
+// doLIT implicitly tested by all literals
+// next, ?branch, branch implicitly tested by control structues
+test('123 HLD ! HLD @', [123]); // Also tests user variables
+test('111 HLD ! 222 HLD C! HLD C@ 0 HLD C! HLD @', [222, 111]);
+// R> >R R@ SP@ SP! tested after arithmetic operators
+test('1 2 DROP', [1]);
+test('1 2 DUP', [1, 2, 2]);
+test('1 2 SWAP', [2, 1]);
+test('1 2 OVER', [1, 2, 1]);
+test('123 0< -123 0<', [0, 0xFFFF]);
+interpret('16 BASE !');
+test('5050 6060 AND 5050 6060 OR 5050 6060 XOR', [0x4040, 0x7070, 0x3030]);
+interpret('0A BASE !');
+test('12 34 UM+ 60000 60000 UM+', [46, 0, 60000 + 60000 - (2 ** 16), 1]);
+// IMMEDIATE implicitly tested
+test('32 PARSE ABC SWAP DROP', [3]);
+
+
 
 // === Vocabulary and Sort Order eForthAndZen pg47
 
@@ -504,11 +548,18 @@ $COLON('FORTH'); $DW('doVOC', 0, 0);
 // $DW(tokenDoes, (first word of doVOC), 0, 0);
 
 // === Words moved earlier ....
-interpret(': BL 32 ;'); // ( -- 32; the blank character)
+constant('BL', BL)
+test('BL', [ 32 ]);
+
 interpret(': CHAR BL PARSE DROP C@ ;'); // -- c; Parse a word and return its first character
+test('CHAR )', [ 41 ]);
+
 interpret(': 2DROP DROP DROP ;'); // w1 w2 -- ; Drop two items pg 49)
+test('1 2 2DROP', []);
+
 // Comment character - from here on we can use ( xxx) in interpreted strings
 interpret(': ( 41 PARSE 2DROP ; IMMEDIATE'); // pg74 : ( [ CHAR ) ] LITERAL PARSE 2DROP ; IMMEDIATE
+test('1 2 ( 3 )', [ 1, 2]);
 
 // Note failure on this line, can be for three reasons
 // a: its the first execution of an immediate word inside a compilation
@@ -516,12 +567,14 @@ interpret(': ( 41 PARSE 2DROP ; IMMEDIATE'); // pg74 : ( [ CHAR ) ] LITERAL PARS
 // c: its the first use of the comment
 interpret(`: HERE ( -- a; return top of code dictionary; pg60)
   CP @ ;`);
+// test is non-obvious
 
-$CODE(5, 'CELLL'); $DW(tokenNextVal, CELLL); // effectively '2 CONSTANT CELLL' but dont have CONSTANT at this point
+constant('CELLL', CELLL); // effectively '2 CONSTANT CELLL' but dont have CONSTANT at this point
+test('CELLL', [2]); // Assuming small cell, otherwise it should be 2
 
-console.assert(CELLL <= 2); // Assuming small cell, otherwise it should be 2
 // Note eForth has +, but that isn't defined till pa50
 interpret(': CELL+ CELLL UM+ DROP ;');
+test('1 CELL+', [3]);
 
 // pg89 : ' ( -- ca ) TOKEN NAME? IF EXIT THEN THROW ;
 code("'", () => { // -- xt; Search for next word in input stream // TODO-RECODE as WORD FIND NOT IF ERROR THEN needs WORD FIND ERROR reqs FIND
@@ -533,63 +586,73 @@ code("'", () => { // -- xt; Search for next word in input stream // TODO-RECODE 
     console.error(xt, "not found during '");
   }
 });
+test(': FOO 1 EXIT 2 ; FOO', [1]);
+test("' FOO EXECUTE 3", [1, 3]);
+
+
 interpret(`
 : , HERE ( w --; Compile an integer into the code dictionary. pg 90)
   DUP CELL+ CP ! ! ; 
-`); interpret(`
+
 : [COMPILE] ( --; <string>; Compile next immediate word into code dictionary; pg90)
   ' , ; IMMEDIATE 
 `); interpret(`
+
 : COMPILE ( --; Compile the next address in colon list to code dictionary. pg 90)
   R> DUP @ , CELL+ >R ;
-`); interpret(`
+
 : LITERAL ( w -- ) ( Compile tos to code dictionary as an integer literal.)
   COMPILE doLIT ( compile doLIT to head lit )
   , ; IMMEDIATE ( compile literal itself )
 `);
+// test of above group non-obvious as writing to dictionary.
+
 // == Control structures - were on pg91 but needed earlier pg 91-92 but moved early
 interpret(`
 : FOR ( -- a; Start a FOR-NEXT loop structure in a colon definition)
   COMPILE >R HERE ; IMMEDIATE
-`); interpret(`
+
 : BEGIN ( -- a ; Start an infinite or indefinite loop structure)
   HERE ; IMMEDIATE ( push HERE for later ref. )
-`); interpret(`
+
 : NEXT ( a --; Terminate a FOR-NEXT loop structure)
   COMPILE next , ; IMMEDIATE
-`); interpret(`
+
 : UNTIL ( a -- ; Terminate a BEGIN-UNTIL indefinite loop structure )
   COMPILE ?branch , ; IMMEDIATE
-`); interpret(`
+
 : AGAIN ( a -- ; Terminate a BEGIN-AGAIN infinite loop structure )
   COMPILE branch , ; IMMEDIATE
 ( TODO interpret 'COMPILE-ONLY' - how is COMPILE-ONLY used, where does it set flags?)
-`); interpret(`
+
 : IF ( -- A; begin conditional branch structure pg 92)
   COMPILE ?branch HERE 0 , ; IMMEDIATE
-`); interpret(`
+
 : AHEAD ( -- A; compile a forward branch instruction. pg  92)
   COMPILE branch HERE 0 , ; IMMEDIATE
-`); interpret(`
+
 : REPEAT ( A a -- ; Terminate BEGIN-WHILE-REPEAT loop )
   [COMPILE] AGAIN HERE SWAP ! ; IMMEDIATE
-`); interpret(`
+
 : THEN ( A --; terminate conditional branch structure pg 92)
   HERE SWAP ! ; IMMEDIATE
-`); interpret(`
+
 : AFT ( a -- a A ; Jump to THEN in a FOR-AFT-THEN-NEXT loop the first time through. pg92)
   DROP            ( discard address left by IF )
   [COMPILE] AHEAD ( compile unconditional jump )
   [COMPILE] BEGIN ( leave HERE on stack )
   SWAP ; IMMEDIATE         ( realign jump addresses )
-`); interpret(`
+
 : ELSE ( A -- A; False clause of IF ELSE THEN structure pg 92)
   [COMPILE] AHEAD SWAP [COMPILE] THEN ; IMMEDIATE
-`); interpret(`
+
 : WHILE ( a -- A a ; Conditional branch out of a BEGIN-WHILE-REPEAT loop.)
   [COMPILE] IF
   SWAP ; IMMEDIATE
 `);
+// test of above group non-obvious as writing to dictionary.
+// IF-THEN tested in ?DUP;
+
 // === Multitasking pg48 - not implemented in eForth TODO
 
 // === More Stack Words pg49
@@ -599,7 +662,9 @@ interpret(`
 : 2DUP OVER OVER ; ( w1 w2 -- w1 w2 w1 w2;)
 ( 2DROP moved earlier )
 `);
-
+test('1 ?DUP 0 ?DUP', [ 1, 1, 0]);
+test('1 2 3 ROT', [ 2, 3, 1]);
+test('1 2 2DUP', [ 1, 2, 1, 2]);
 // === More Arithmetic operators pg50
 interpret(`
 : + UM+ DROP ; ( w1 w2 -- w1+w2)
@@ -610,7 +675,17 @@ interpret(`
 : DNEGATE INVERT >R INVERT  1 UM+ ;
 : - NEGATE + ; ( n1 n2 -- n1-n2)
 : ABS DUP 0< IF NEGATE THEN ; ( n -- n; Absolute value of w)
+: 0= IF 0 ELSE -1 THEN ;
 `);
+test('1 2 +', [3]);
+test('40000 1 40000 3 D+', [14464, 5] );
+test('257 INVERT', [0xFEFE]); // 257 is 0x101
+test('53 NEGATE 53 +',  [0]);
+test('456 123 - 456 -123 -', [333, 579]);
+test('-456 ABS 456 ABS -', [0]);
+test('111 >R R@ RP@ R> SWAP RP@ SWAP -', [111, 111, 2]);
+test('1 2 SP@ 2 + SP!', [1]);
+
 // More comparison pg51-52
 interpret(`
 : = XOR IF 0 EXIT THEN -1 ; ( w w -- t)
@@ -620,8 +695,15 @@ interpret(`
 : MIN 2DUP SWAP < IF SWAP THEN DROP ;
 : WITHIN OVER - >R - R> U< ;
 `);
-// === More Math Words pg53-55 UM/MOD M/MOD /MOD MOD / UM+ * M*
+const forthTrue = 0xFFFF;
+test('123 123 = 123 124 =', [0xFFFF, 0]);
+test('123 100 U< 100 123 U< 123 -100 U< -100 123 U<', [0, forthTrue, forthTrue, 0]);
+test('123 100 < 100 123 < 123 -100 < -100 123 <', [0, forthTrue, 0, forthTrue]);
+test('100 200 MAX 300 100 MAX', [200, 300]);
+test('100 200 MIN 300 100 MIN', [100, 100]);
+test('200 100 300 WITHIN 300 100 200 WITHIN 100 -100 200 WITHIN', [forthTrue, 0, forthTrue]);
 
+// === More Math Words pg53-55 UM/MOD M/MOD /MOD MOD / UM+ * M*
 interpret(`
 : UM/MOD ( udl udh u -- ur uq ) ( needs FOR-NEXT from 91)
   ( Unsigned divide of a double by a single. Return mod and quotient)
@@ -633,6 +715,7 @@ interpret(`
       >R >R DUP UM+ ( left shift udl)
       R> + DUP      ( add carry to udh)
       R> R@ SWAP    ( retrieve -u)
+      >R UM+        ( subtract u from udh)
       R> OR         ( a borrow?)
       IF >R DROP    ( yes add a bit to quotient)
         1 + R>
@@ -693,6 +776,15 @@ interpret(`
   ABS SWAP ABS UM*  ( multiply absolutes)
   R> IF DNEGATE THEN ;  ( negate if signs are different)
 `);
+function forthNum(n) { return (n < 0) ? 0x10000 + n : n}
+test('1 2 4 UM/MOD', [1, 2 ** 15]);
+test('1 2 4 M/MOD', [1, 2 ** 15]);
+test('9 4 /MOD', [1, 2]);
+test('9 4 MOD', [1]);
+test('9 4 /', [2]);
+test('256 256 UM*', [0, 1]);
+test('3 4 *', [12]);
+test('256 256 M*', [0, 1]); // TODO add a negative test
 
 // Scaling Words pg56 */MOD */
 interpret(`
@@ -705,6 +797,8 @@ interpret(`
   ( Multiple by n1 by n2, then divide by n3. Return quotient only)
   */MOD SWAP DROP ; ( n1*n2/n3 and discard remainder)
 `);
+test('5 7 2 */MOD', [1, 17]);
+test('5 7 2 */', [17]);
 
 // === Memory Alignment words pg57 CELL+ CELL- CELLS ALIGNED
 /*
@@ -722,6 +816,8 @@ interpret(`
   ( Multiply n by cell size in bytes)
   CELLL * ;
 `);
+test('123 CELL-', [121]);
+test('123 CELLS', [246]);
 
 /* EFORTH-ERRATA - pg57 presumes CELLL==2 and need to align, not case with JS and byte Buffer
 : ALIGNED ( b -- a)
@@ -732,6 +828,7 @@ interpret(`
   + ;
 */
 interpret(': ALIGNED ;');
+test('101 ALIGNED', [101]);
 
 // === Special Characters pg58 BL >CHAR
 interpret(`
@@ -742,6 +839,8 @@ interpret(`
   127 BL WITHIN ( if its a control character)
   IF DROP 95 THEN ; ( replace with an underscore)
 `);
+test('41 >CHAR 23 >CHAR BL >CHAR', [41, 95, 32]);
+
 // === Managing Data Stack pg59 DEPTH PICK
 interpret(`
 : DEPTH ( -- n)
@@ -755,6 +854,8 @@ interpret(`
   1 + CELLS     ( bytes below tos)
   SP@ + @ ;     ( fetch directly from stack)
 `);
+test('1 2 3 DEPTH', [1, 2, 3, 3]);
+test('11 22 33 1 PICK', [11, 22, 33, 22]);
 
 // Memory Access pg60 +! 2! 2@ HERE PAD TIB @EXECUTE
 // Note 2! 2@ presume big-endian which is a Forth assumption (high word at low address)
@@ -773,6 +874,10 @@ interpret(`
 : @EXECUTE ( a -- ; execute vector -if any- stored in address a)
   @ ?DUP IF EXECUTE THEN ;
 `);
+test('HLD @ 2 HLD +! HLD @ SWAP -', [2]);
+test('1 2 3 SP@ 4 5 ROT 2!',[1, 4, 5]);
+test('1 2 3 SP@ 2@', [1, 2, 3, 2, 3]);
+test('TIB >R BL PARSE XXX SWAP R> -', [3, 16]);
 
 // Memory Array and String pg61-62: COUNT CMOVE FILL -TRAILING PACK$
 interpret(`
@@ -819,6 +924,11 @@ interpret(`
   SWAP CMOVE  ( copy the string over )
   R> ;        ( leave only word buffer address )
 `);
+test('NP @ 4 + COUNT SWAP DROP', [5]);
+test('NP @ 4 + COUNT PAD SWAP CMOVE',[],{pad: "PACK$"});
+test('PAD 3 + 5 BL FILL', [], {pad: "PAC     "});
+test('PAD 8 -TRAILING >R PAD - R>', [0, 3], {pad: "PAC"});
+test('NP @ 4 + COUNT PAD 1 - PACK$', [padPtr()-1], {pad: "PACK$"});
 // === TEXT INTERPRETER ===  pg63
 
 // === Numeric Output pg64 DIGIT EXTRACT
@@ -831,6 +941,7 @@ interpret(`
   0 SWAP UM/MOD   ( divide n by base)
   SWAP DIGIT ;    ( convert remainder to a digit)
 `);
+test('123 10 EXTRACT', [12, 51]);
 
 // Number formatting pg65 <# HOLD #S SIGN #>
 interpret(`
@@ -862,6 +973,9 @@ interpret(`
   HLD @         ( address of last digit)
   PAD OVER - ;  ( return address of 1st digit and length)
 `);
+test('123 <# DUP SIGN #S #>', [padPtr()-3, 3], "123");
+test('-123 DUP ABS <# #S SWAP SIGN #>', [padPtr()-4, 4], "-123");
+
 // === More definitions moved up
 interpret(`
 : EMIT ( c--;  Send a character to the output device. pg69)
@@ -873,6 +987,8 @@ interpret(`
 : TYPE ( b u -- ; Output u characters from b)
   FOR AFT DUP C@ EMIT 1 + THEN NEXT DROP ;
 `);
+// TODO-TEST TODO-OUTPUT EMIT, SPACE SPACES TYPE
+
 // === Number output pg66 str HEX DECIMAL .R U.R U. . ?
 interpret(`
 : str ( n -- b u ; Convert a signed integer to a numeric string)
@@ -909,8 +1025,9 @@ interpret(`
 
 : ? ( a -- ; Display the contents in a memory cell.)
   @ . ; ( very simple but useful command)
-
 `);
+//TODO-TEST TODO-OUTPUT .R U.R U. . ?
+
 // === Numeric input pg67-68 DIGIT? NUMBER?
 // eFORTH-ERRATA NIP is not designed
 interpret(`
@@ -929,6 +1046,7 @@ interpret(`
   R> U< ;               ( if n=/>radix, the digit is not valid )
 
 ( TODO evaluate control structures here)
+( EFORTH-ERRATA it doesnt return 'n T' it returns 'n a' on success
 : NUMBER? ( a -- n T, a F ; Convert a number string to integer. Push a flag on tos.)
   BASE @ >R         ( save the current radix in BASE )
   0 OVER COUNT      ( a 0 a+1 n --, get length of the string )
@@ -969,6 +1087,10 @@ interpret(`
   R> BASE ! ;       ( restore radix )
 
 `);
+test('1 2 NIP', [2]);
+test('50 10 DIGIT?', [2, forthTrue])
+test('BL PARSE 1234 PAD PACK$ NUMBER? DROP',[1234]);
+//TODO Note the errata in the docs v. code for NUMBER? means we drop testing the flag will reconsider when see how used
 
 // === Serial I/O pg69 ?KEY KEY EMIT NUF?
 interpret(`
@@ -983,6 +1105,8 @@ interpret(`
     13 = ( return true if key is CR)
   THEN ;
 `);
+//TODO-TEST TODO-INPUT then test ?KEY KEY NUF?
+
 // === Derived I/O pg70 PACE SPACE SPACES TYPE CR
 interpret(`
 : PACE ( --) ( Send a pace character for the file downloading process.)
@@ -991,6 +1115,8 @@ interpret(`
 : CR ( --) ( Output carriage return line feed)
   15 EMIT 11 EMIT ;
 `);
+//TODO-TEST TODO-INPUT then test PACE, CR
+
 // === String Literal pg71 do$ $"| ."|
 interpret(`
 : do$ ( --a) ( Return the address of a compiled string.)
@@ -1007,6 +1133,9 @@ interpret(`
   do$           ( get string address)
   COUNT TYPE ;  ( print the compiled string)
 `);
+//TODO-TEST check $"| tested by $"
+//TODO-TEST TODO-OUTPUT then check ."| tested by ."
+
 // === Word Parser pg72-73 PARSE parse
 /*
 interpret(`
@@ -1071,9 +1200,7 @@ interpret(`
 
 // Parsing Words pg74 .( ( \ CHAR TOKEN WORD
 interpret(`
-: CHAR ( -- c ; Parse next word and return its first character.)
-  BL PARSE  ( get the next string )
-  DROP C@ ; ( return the code of the 1st character )
+( CHAR is moved earlier )
 
 : .(  ( -- ) ( Output following string up to next )
   [ CHAR ) ] LITERAL PARSE
@@ -1098,7 +1225,11 @@ interpret(`
 : WORD ( c -- a ; <string> ) ( Parse a word from input stream and copy it to code dictionary.)
   PARSE         ( parse out a string delimited by c )
   HERE PACK$ ;  ( copy the string into the word buffer )
-`)
+`);
+//TODO-TEST TODO-OUTPUT test .(
+test('1 2 ( 3 ) 4 \\ commenting', [1, 2, 4]);
+test('TOKEN xxx C@', [3]);
+test('BL WORD yyyy DUP C@ SWAP CP @ -', [4, 0]);
 
 // Dictionary Search pg75-77 NAME> SAME? find NAME?
 // Text input from terminal pg 78: ^H TAP kTAP accept EXPECT QUERY

@@ -1,6 +1,6 @@
 # FORTH language and links
 
-Forth is an odd language, but if you are here the chances are you know that. 
+Forth is a fun, but odd language, but if you are here the chances are you know that. 
 There are also not many people using it, and the ANSI standard is pretty poor 
 (for example it doesn't appear to define counted strings).
 
@@ -10,6 +10,10 @@ the same as the final version.
 * http://forth.org/ Forth Interest Group - now defunct 
 * https://www.forth.com/ Forth Inc - 
 * 1013_eForthAndZen.pdf - eForth, I'm going to switch to this version
+
+Errata: There are quite a few bugs in eForthAndZen, 
+* some are fixed in [eForthOverviewv5.pdf](http://www.exemark.com/FORTH/eForthOverviewv5.pdf)
+* others in [staapl](http://planet.racket-lang.org/package-source/zwizwa/staapl.plt/1/9/mcf/eforth/eforth.f)
 
 And some links I have still to research.
 
