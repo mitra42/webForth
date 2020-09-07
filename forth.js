@@ -41,6 +41,7 @@ const NAMEE = SPP - SPS; // name dictionary
 const COLDD = 0x100; // cold start vector
 const CODEE = COLDD + US; // code dictionary
 const bitsIMED = 0x80; // bit in first char of name field to indicate 'immediate'
+const bitsMASK = 0x1FFF; // bits to mask out of a call with count and first char
 
 // TODO-VM make this something passed to each function.
 // Standard pointers used (ref eForthAndZen pg22
@@ -75,18 +76,61 @@ function Uaddr(name, offset = 0)  { return UPP + (typeof name === 'string' ? Mfe
 function Ufetch(name, offset = 0) { return Mfetch(Uaddr(name, offset)); }
 function Ustore(name, w, offset = 0) { Mstore(Uaddr(name, offset), w); }
 
+function countedToJS(a) {
+  const c = m[a] & 0x1f;
+  return m.slice(a + 1, a + c + 1).toString('utf8');
+}
 
-// The jsNameSpace structure may change, and even be removed make sure to only access through functions defined here
-const jsNameSpace = {}; // array of truncated strings, TODO-INTERPRETER make sure to empty this after no longer need $COLON $CODE etc
+function _find(va, name, cell1, xt) {
+  //console.log("NAME=", name) // TODO-FIND comment out
+  let p = va;
+  while (p = Mfetch(p)) {
+    //console.log("NAME to compare=", countedToJS(p)) // TODO-FIND comment out
+    const c1 = Mfetch(p);
+    if (xt && (na2xt(p) === xt)) {
+      return p;
+    }
+    if (!cell1 || (cell1 === (c1 & bitsMASK))) { // first cell matches (if cell1 not passed then does slow compare
+      if (countedToJS(p) === name) { // This is what SAME? does
+        return p;
+      }
+    }
+    p -= CELLL; // point at link address and loop for next word
+  }
+  // Drop through not found
+  return 0;
+}
+
+function name2na(name) {
+  return _find(currentFetch(), name);
+}
+
+function find() { // a va -- ca na | a 0
+  const va = SPpop();
+  const a = SPpop();
+  const cell1 = Mfetch(a);
+  const name = countedToJS(a);
+  //console.log("NAME=", name) // TODO-FIND comment out
+  const na = _find(va, name, cell1);
+  if (na) {
+    SPpush(na2xt(na));
+    SPpush(na);
+  } else {
+    SPpush(a);
+    SPpush(0);
+  }
+}
+function xt2na(xt) {
+  return _find(currentFetch(), undefined, undefined, xt);
+}
+
 const nameMaxLength = 31;
-function nameOK(name) { return name.slice(0, nameMaxLength); }
-function nameSet(name, na) { jsNameSpace[name] = na; }
 function na2xt(na) { return Mfetch(na - 2 * CELLL); }
-function name2na(name) { return jsNameSpace[name]; }
 function name2xt(name) { return na2xt(name2na(name)); }
+
 function xt2name(xt) {
-  const nn = Object.entries(jsNameSpace).map(kv => [kv[0], na2xt(kv[1])]).find(kv => kv[1] === xt);
-  return nn ? nn[0] : 'undefined';
+  const na = xt2na(xt);
+  return na ? countedToJS(na) : 'undefined';
 }
 
 
@@ -145,18 +189,16 @@ function DOLLARCOMMAN(a, name) { // Same function as $,n on pg94 common between 
   return a;
 }
 
-function countedToJS(a) {
-  const c = m[a] & 0x1f;
-  return m.slice(a + 1, a + c + 1).toString('utf8');
-}
-
 function dollarCommaN() { // na -- )
   let a = SPpop();            //            ; a = na
   if (m[a]) {                // DUP C@ IF  ; test for no word
-    const name = countedToJS(a);
-    if (name2na(name)) {
-      console.log('Duplicate definition of', name); // Catch duplicates - probably an error
+    SPpush(a);
+    SPpush(currentFetch());
+    find();                   // xt na | a F
+    if (SPpop()) {
+      console.log('Duplicate definition of', countedToJS(a)); // Catch duplicates - probably an error
     }
+    SPpop(); // remove xt of previous definition or a if not found.
     lastStore(a);             // DUP LAST ! ; a=na  ; LAST=na
     a -= CELLL;               // CELL-      ; a=la
     // Link address points to previous NA (prev value of LAST)
@@ -176,7 +218,6 @@ function OVERT() {
   Mstore(currentFetch(), last); // LAST @ CURRENT @ !
   // Store in name for access before can search dictionary
   const name = countedToJS(last);
-  nameSet(name, last);  // To allow compiling of names before have "FIND"
 }
 //code('OVERT',OVERT); TODO may or may not be needed
 
@@ -278,6 +319,8 @@ currentStore(cpFetch()); // Initialize Current. Context & Current+2 initialized 
 $DW(0, 0);
 OVERT(); // Uses the initialization done by currentStore above.
 
+// === Add some functions defined earlier prior to dictionary being available
+code('find', find);
 
 // Basic key I/O eForthAndZen pg 35
 code('BYE', 'TODO-bye');
@@ -507,17 +550,11 @@ function jsTOKEN() { // -- a; <string>; copy blank delimited string to name buff
   SPpush(np); // Note that NP is not updated, the same buffer will be used for each word until hit ':'
 }
 
-// Look up a name, return [xt, 1] if immediate, [xt -1] if not, [name, 0] if not found.
-function find(name) { // TODO-IMMEDIATE-6 merge into Forth word "FIND" - needs counted strings
-  const na = name2na(name); //TODO-IMMEDIATE-6 check usage, maybe switch to (ca na|a 0)
-  if (na) {
-    return [na2xt(na), ((m[na] & bitsIMED) ? 1 : -1)]
-  } else {
-    return [name, 0];
-  }
-}
-function findName() { // a  -- xt f or name f; points into NP at a truncated string with count first
-  return find(countedToJS(SPpop()));
+
+function findName() { // a -- xt na | a F
+  SPpush(Ufetch('CONTEXT'));  // a va
+  find();                           // xt na | a F
+  // TODO-FIND was returning ( xt 1|-1 | a 0 ) now on stack ca na
 }
 
 function jsNUMBER(w) { //TODO-INTERPRETER make this work like things stored in 'NUMBER
@@ -529,23 +566,31 @@ function jsNUMBER(w) { //TODO-INTERPRETER make this work like things stored in '
   return n;
 }
 
-const jsCOMPILE = code('jsCOMPILE', () => { // a -- ...;
-  const [xt, found] = findName(); // [xt found], or [w 0]
-  if (testing & 0x02) console.log("COMPILING:", xt2name(xt)); // TODO-COMMENT OUT
-  if (found === 1) {
-    run(xt);
-  } else if (found) {
-    $DW(xt);
-  } else {
-    $DW('doLIT', jsNUMBER(xt));
+const jsCOMPILE = code('jsCOMPILE', () => { // a -- ...; similar to $COMPILE at pg96
+  findName(); // xt na | a F
+  const na = SPpop();
+  if (na) { // ca
+    const xt = SPpop();
+    const c = m[na];
+    if (c & bitsIMED) {
+      run(xt);
+    } else {
+      if (testing & 0x02) console.log('COMPILING:', countedToJS(na)); // TODO-COMMENT OUT
+      $DW(xt);
+    }
+  } else { // a
+    $DW('doLIT', jsNUMBER(countedToJS(SPpop())));
   }
 });
+
 const jsINTERPRET = code('jsINTERPRET', () => { // a -- ...; Based on signature at pg83
-  const [xt, found] = findName();  // [xt found], or [w 0]
-  if (found) {
+  findName(); // xt na | a F
+  const na = SPpop();
+  if (na) { // ca
+    const xt = SPpop();
     run(xt);
   } else {
-    SPpush(jsNUMBER(xt));
+    SPpush(jsNUMBER(countedToJS(SPpop())));
   }
 });
 Ustore("'EVAL", jsINTERPRET); // Start off interpreting
@@ -668,12 +713,9 @@ test('1 CELL+', [3]);
 // pg89 : ' ( -- ca ) TOKEN NAME? IF EXIT THEN THROW ;
 code("'", () => { // -- xt; Search for next word in input stream // TODO-RECODE as WORD FIND NOT IF ERROR THEN needs WORD FIND ERROR reqs FIND
   jsTOKEN(); // -- a; String with count in first byte
-  const [xt, found] = findName();
-  // TODO-IMMEDIATE-6 test gets it right.
-  if (found) { // immediate or not
-    SPpush(xt);
-  } else {
-    console.error(xt, "not found during '");
+  findName(); // xt na | a 0
+  if (! SPpop()) {
+    console.error(countedToJS(SPpop()), "not found during '");
   }
 });
 test(': FOO 1 EXIT 2 ; FOO', [1]);
@@ -682,10 +724,10 @@ test("' FOO EXECUTE 3", [1, 3]);
 
 interpret(`
 : , HERE ( w --; Compile an integer into the code dictionary. pg 90)
-  DUP CELL+ CP ! ! ; 
+  DUP CELL+ CP ! ! ;
 
 : [COMPILE] ( --; <string>; Compile next immediate word into code dictionary; pg90)
-  ' , ; IMMEDIATE 
+  ' , ; IMMEDIATE
 `); interpret(`
 
 : COMPILE ( --; Compile the next address in colon list to code dictionary. pg 90)
@@ -1006,9 +1048,9 @@ interpret(`
   NEXT 0 ;            ( reach the beginning of b)
 
 ( Note there is code in jsTOKEN which does this )
-( Note that PACK$ has very different definition in eForthOverviewv5 which I've used) 
+( Note that PACK$ has very different definition in eForthOverviewv5 which I've used)
 : PACK$ ( b u a -- a; Build a counted string with u characters from b. Null fill.)
-  ALIGNED             ( noop on JS celll=2 where not requiring alignment) 
+  ALIGNED             ( noop on JS celll=2 where not requiring alignment)
   DUP >R OVER         ( b u a u ; save address of word buffer )
   DUP 0 CELLL UM/MOD DROP ( b y a u r; find remainder of chars if not exact number of cells)
   - OVER + 0 SWAP !   ( b y a ; Store 0 in last cell)
@@ -1326,12 +1368,14 @@ test('BL WORD yyyy DUP C@ SWAP CP @ -', [4, 0]);
 // Dictionary Search pg75-77 NAME> SAME? find NAME?
 constant('=COMP', 0x40); // Compile only word - TODO figure out how used EFORTH-ERRATA used but not defined
 constant('=IMED', bitsIMED); // Immediate word - interpreted during compilation EFORTH-ERRATA not used but defined
-constant('=MASK', 0x1FFF); // TODO check this in use in find, it might be wrong EFORTH-ERRATA not used but defined
+constant('=MASK', bitsMASK); // TODO check this in use in find, it might be wrong EFORTH-ERRATA not used but defined
 
+interpret('BL WORD TOKEN CONTEXT @ find SWAP'); const testFind = [SPpop(), SPpop()]; // Get results from old find
 interpret(`
 : NAME> ( na -- ca )
   ( Return a code address given a name address.)
-  2 CELLS - ( move to code pointer field ) @ ; ( get code field address )
+  2 CELLS - ( move to code pointer field ) 
+  @ ; ( get code field address )
 
 : SAME? ( a1 a2 u -- a1 a2 f \\ -0+ )
   ( Compare u cells in two strings. Return 0 if identical.)
@@ -1359,6 +1403,7 @@ interpret(`
   CELL+ SWAP          ( a' va -- , compare string with names )
   BEGIN               ( fast test, compare only 1st cells )
     @ DUP             ( a' na na -- )
+    debugNA
     IF                ( na=0 at the end of a vocabulary )
       DUP @           ( not end of vocabulary, test 1st cell )
       [ =MASK ] LITERAL AND ( mask off lexicon bits )
@@ -1390,7 +1435,7 @@ interpret(`
     1 CELLS -   ( backup the vocab address for looping )
   THEN
   >R            ( save the prior vocabulary address )
-  BEGIN         
+  BEGIN
     R> CELL+    ( get the next vocabulary address )
     DUP >R      ( save it for next vocabulary )
     @ ?DUP      ( is this a valid vocabulary? )
@@ -1407,7 +1452,7 @@ interpret(`
 test('BL WORD xxx DUP C@ 1 + PAD SWAP CMOVE PAD BL WORD xxx 4 SAME? >R 2DROP R>', [0] );
 test('BL WORD xxx DUP C@ 1 + PAD SWAP CMOVE PAD BL WORD xzx 4 SAME? >R 2DROP R> 0=', [0] );
 test('FORTH',[]);
-test('BL WORD NAME? CONTEXT @ find',[name2xt('NAME?'), name2na('NAME?')])
+test('BL WORD TOKEN CONTEXT @ find', testFind) // Compare with results from old find
 
 // Text input from terminal pg 78: ^H TAP kTAP accept EXPECT QUERY
 // Error Handling pg80-82 CATCH THROW NULL$ ABORT abort" ?STACK
