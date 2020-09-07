@@ -3,14 +3,6 @@ References eForthAndZen 1013_eForthAndZen.pdf -- TODO need URL
  */
 
 let testing = 0x0; // 0x01 display words passed to interpreters; 0x02 each word in tokenthread
-// TODO-VM make this something passed to each function.
-// Standard pointers used (ref eForthAndZen pg22
-let IP = 0;  // Interpreter Pointer
-let SP = 0;  // Data Stack Pointer
-let RP = 0;  // Return Stack Pointer (aka BP in 8086)
-let WP = 0;  // Word or Work Pointer
-let UP = 0;  // User Area Pointer
-
 // EFORTH-DIFF difference to eForth in using indirect threaded code as makes more sense in JS
 
 // TODO review eForth Word Set at eForthAndZen pg 25 and check all implemented
@@ -36,7 +28,18 @@ const NAMEE = SPP - SPS; // name dictionary
 const COLDD = 0x100; // cold start vector
 const CODEE = COLDD + US; // code dictionary
 
+// TODO-VM make this something passed to each function.
+// Standard pointers used (ref eForthAndZen pg22
+let IP = 0;  // Interpreter Pointer
+let SP = SPP;  // Data Stack Pointer
+let RP = RPP;  // Return Stack Pointer (aka BP in 8086)
+//let WP = 0;  // Word or Work Pointer
+//let UP = 0;  // User Area Pointer
+
+
 const m = Buffer.alloc(EM); // Allocate as one big buffer for now. TODO-MEM redo as a struct of some sort or poss u16 array
+
+// Javascript structures
 const codeSpace = []; // Maps tokens to executable functions
 const userInit = [0, 0, 0, 0]; // Used for initialization of user variables - for now not in m as would be in ROM normally
 const jsNameSpace = {}; // array of truncated strings, TODO-INTERPRETER make sure to empty this after no longer need $COLON $CODE etc
@@ -69,19 +72,23 @@ function Ustore(name, w, offset = 0) { Mstore(Uaddr(name, offset), w); }
 
 
 // Handle the Code and Namespace \pointer, which always points after last thing compiled into dictionary - in eForthAndZen this is "$"
+const CURRENToffset = 64;
 const CPoffset = 68; // This value is checked during the sequence of USER below
 const NPoffset = 70;
+const LASToffset = 72;
+function currentFetch() { return Ufetch(CURRENToffset); }
 function cpFetch() { return Ufetch(CPoffset); }
 function cpStore(w) { Ustore(CPoffset, w); }
 function npFetch() { return Ufetch(NPoffset); }
 function npStore(w) { Ustore(NPoffset, w); }
+function lastStore(w) { Ustore(LASToffset, w); }
+function lastFetch() { return Ufetch(LASToffset); }
 
 cpStore(CODEE); // Pointer to where compiling into dic TODO-MEM will be code.length
 npStore(NAMEE); // Pointer to where writing name stack TODO-MEM will move
 
 // === ASSEMBLY MACROS (or JS equivalent) pg 30
 // TODO_VM will prob need to be inside "vm"
-let _LINK = 0; // force null link
 //OBS uses NB user variable: let _NAME = NAMEE; // initialize name pointer
 //OBS uses CP user variable let _CODE = CODEE; // initialize code pointer - points at start of last word defined (CP points to top of dict)
 let _USER = 4 * CELLL; // first user variable offset, skips 4 variables used by multitasking
@@ -106,8 +113,6 @@ function $DW(...words) { // Forth presumes big-endian, high word stored at low m
   });
 }
 
-let lastDefinition;
-
 console.assert(CELLL === 2); // Presuming its 2
 
 function DOLLARCOMMAN(a, name) { // Same function as $,n on pg94 common between $CODE and ':'
@@ -117,26 +122,58 @@ function DOLLARCOMMAN(a, name) { // Same function as $,n on pg94 common between 
   m[a++] = _LINK >> 8;
   m[a++] = _LINK & 0xFF;
   _LINK = a; // Pointer for next word in dic
-  lastDefinition = cp; //TODO rework when have lex
-  if (names(name)) {
-    console.log('Duplicate definition of', name); // Catch duplicates - probably an error
-  }
-  names(name, cp);  // To allow compiling of names before have "FIND"
   return a;
 }
 
+function countedToJS(a) {
+  return m.slice(a + 1, a + m[a] + 1).toString('utf8');
+}
+
+function dollarCommaN() { // na -- )
+  let a = SPpop();            //            ; a = na
+  if (m[a]) {                // DUP C@ IF  ; test for no word
+    const name = countedToJS(a);
+    if (names(name)) {
+      console.log('Duplicate definition of', name); // Catch duplicates - probably an error
+    }
+    lastStore(a);             // DUP LAST ! ; a=na  ; LAST=na
+    a -= CELLL;               // CELL-      ; a=la
+    // Link address points to previous NA (prev value of LAST)
+    // TODO-FIND-5 check that first time this is called it works to get 0
+    Mstore(a, Mfetch(currentFetch())); // CURRENT @ @ OVER ! ; la = top of current dic
+    a -= CELLL;               // CELL-      ; a=ca
+    npStore(a);               // DUP NP !   ; NP=ca // adjust name pointer
+    Mstore(a, cpFetch())      // ! EXIT     ; ca=CP ; code field to where will build in dictionary
+  } else { // THEN $" name" THROW ;
+    console.log("name error");
+  }
+}
+// code('$,n', dollarCommaN)
+
+function OVERT() {
+  const last = lastFetch();
+  // TODO-FIND-5 check what happens first time through when defining FORTH
+  Mstore(currentFetch(), last); // LAST @ CURRENT @ !
+  // Store in name for access before can search dictionary
+  const name = countedToJS(last);
+  names(name, Mfetch(npFetch()));  // To allow compiling of names before have "FIND"
+}
+//code('OVERT',OVERT); TODO may or may not be needed
+
 function $CODE(lex, name) { //TODO-CELL check this carefully
+  console.assert(name.length <= 31);
   //TODO-EPRECORE extract name baking part of this
   // <NP-after>CPh CPl <_LINK> LINKh LINKl count name... <NP-BEFORE>
   $ALIGN();
+  const np = npFetch();
   // Note this is going to give the name string an integral number of cells.
-  const _LEN = (lex & 0x01F) / CELLL; // Truncate name length in cells TODO-CELL probably in bytes not cells
-  const np = npFetch() - ((_LEN + 3) * CELLL); // Drop down from top // CELL I think its _LEN + 3*CELLL
-  npStore(np);
-  let a = np;
-  a = DOLLARCOMMAN(a, name); // Build the headers that preceed the name
+  const len = (((lex & 0x01F) / CELLL) + 1) * CELLL;
+  let a = np - len;
+  npStore(a);
+  SPpush(a); // so dollarCommaN can find it
   m[a++] = lex;
   m.write(name, a, 'utf8');
+  dollarCommaN(); // Build the headers that preceed the name
 }
 
 // eForthAndZen 31
@@ -156,6 +193,7 @@ function $COLON(name) {
   $CODE(name.length, name);
   // Now writing in code dictionary
   $DW(tokenDoList);
+  OVERT();
   return xt;
 }
 
@@ -165,6 +203,7 @@ function $USER(name) { // Note unlike eForth we use Token threading see USER() w
   if (name) {
     $CODE(name.length, name);
     $DW(tokenUser, _USER);
+    OVERT();
   }
   _USER += CELLL; // Need to skip to next _USER in either case
 }
@@ -193,15 +232,27 @@ function code(name, func) {
   const xt = cpFetch();
   $CODE(name.length, name);
   $DW(tokenFunction(func));
+  OVERT();
   return xt;
 }
 function constant(name, val) {  // TODO merge this with CONSTANT once defined
   const xt = cpFetch();
   $CODE(name.length, name);
   $DW(tokenNextVal, val);
+  OVERT();
   return xt;
 }
 //User variables initialization eForthAndZen pg33 see pg46
+
+
+//TODO define VOCABULARY as CREATE DOES> word
+
+const tokenVocabulary = tokenFunction((payload) => {
+  // : doVOC R> CONTEXT ! ;
+  Ustore('CONTEXT', payload);
+});
+$CODE(5, 'FORTH'); $DW(tokenVocabulary, 0, 0); OVERT();
+
 
 // Basic key I/O eForthAndZen pg 35
 code('BYE', 'TODO-bye');
@@ -365,17 +416,20 @@ USER(undefined, 0);
 USER(undefined, 0);
 USER(undefined, 0);
 USER(undefined, 0); // Always 0 to indicate no more valid Vocabularies
-USER('CURRENT', 0); // Point to the vocabulary to be extended. Default to FORTH.
+console.assert(_USER === CURRENToffset, 'CURRENT mismatch offset should be ', _USER); // This is checked because need to know this earlier
+USER('CURRENT', currentFetch()); // Point to the vocabulary to be extended. Default to FORTH.
 USER(undefined, 0); // Vocabulary link uses one cell after CURRENT.
 console.assert(_USER === CPoffset, 'CP mismatch offset should be ', _USER); // This is checked because need to know this earlier
 USER('CP', cpFetch()); // eForth initializes to CTOP but we have to use this during compilation
 console.assert(_USER === NPoffset, 'NP mismatch offset should be ', _USER); // This is checked because need to know this earlier
-USER('NP', npFetch()); // normally set on pg106 but we are using it live.
-USER('LAST', undefined); // TODO LASTN Point to the last name in the name dictionary. see pg 106
+USER('NP', npFetch()); // normally set on pg106 but we are using it live. Its the bottom of what compiled in name space.
+console.assert(_USER === LASToffset, 'LAST mismatch offset should be ', _USER); // This is checked because need to know this earlier
+USER('LAST', lastFetch()) // normally set on pg106 but using live
 
 // === JS interpreter - will be discarded when done or built out
-const immediateTokens = []; // TODO-INTERPRET discard this at end
-code('IMMEDIATE', () => immediateTokens.push(lastDefinition)); // TODO-INTERPRETER replace with real IMMEDIATE in lex
+const immediateTokens = []; // TODO-INTERPRET discard this at end, and/or use Lex
+code('IMMEDIATE', () =>
+  immediateTokens.push(Mfetch(npFetch()))); // TODO-INTERPRETER replace with real IMMEDIATE in lex
 
 function tibIn() { return Ufetch('#TIB', CELLL) + Ufetch('>IN'); }  // TIB >IN @ +
 const BL = 32;
@@ -397,10 +451,6 @@ code('PARSE', fPARSE);
 
 function SPpopWord() {  // b u -- ; return w the JS string
   const u = SPpop(); const b = SPpop(); return m.slice(b, b + u).toString('utf8');
-}
-function SPpopCounted() { // a -- ; return w the JS string
-  const a = SPpop();
-  return m.slice(a + 1, a + m[a] + 1).toString('utf8');
 }
 function jsTOKEN() { // -- a; <string>; copy blank delimited string to name buffer, immediately below name dictionary (location is important as ':' take a shortcut in eForth.
   SPpush(BL);
@@ -424,7 +474,7 @@ function find(name) { // TODO-INTERPRET merge into Forth word "FIND" - needs cou
   }
 }
 function findName() { // a  -- xt f or name f; points into NP at a truncated string with count first
-  return find(SPpopCounted());
+  return find(countedToJS(SPpop()));
 }
 
 function jsNUMBER(w) { //TODO-INTERPRETER make this work like things stored in 'NUMBER
@@ -493,23 +543,25 @@ function test(inp, arr, { pad = undefined} = {}) {
   }
   console.assert((SPP === SP) && (RPP === RP));
 }
-initRegisters(); //TODO-TEST maybe need to move initRegisters
 
 // === A group of words defined relative to the JS interpreter but will be redefined to the Forth interpreter at pg TODO
 
 // TODO could replace with : ':' TOKEN $,n [ ' doLIST ] LITERAL CALL, ] ; see pg96
 code(':', () => {
   jsTOKEN();  // a; (counted string in named space)
-  const a = SPfetch() - 4;
-  const name = SPpopCounted();
-  npStore(a);
-  DOLLARCOMMAN(a, name);
+  const name =  countedToJS(SPfetch());
+  dollarCommaN();
+  if (names(name)) {
+    console.log('Duplicate definition of', name); // Catch duplicates - probably an error
+  }
+  names(name, cpFetch());  // To allow compiling of names before have "FIND"
   $DW(tokenDoList); // Must be after creating the name and links etc
   Ustore("'EVAL", jsCOMPILE);
 });
 
 
-code(';', () => { $DW(EXIT); Ustore("'EVAL", jsINTERPRET); }); // TODO-INTERPRETER replace with deftn of ;
+code(';', () => {
+  $DW(EXIT); OVERT(); Ustore("'EVAL", jsINTERPRET); }); // TODO-INTERPRETER replace with deftn of ;
 interpret('IMMEDIATE');
 code('[', () => Ustore("'EVAL", jsINTERPRET)); interpret('IMMEDIATE'); //pg84 and pg88
 code(']', () => Ustore("'EVAL", jsCOMPILE)); // pg88
@@ -538,19 +590,16 @@ test('32 PARSE ABC SWAP DROP', [3]);
 // === Vocabulary and Sort Order eForthAndZen pg47
 
 // EFORTH-DIFF with direct threaded code makes sense to put function, prefer here to use a tokenized Does>
-
 //TODO doesnt belong here as not used for FORTH - move to definition of CREATE DOES>
 //tokenDoes = tokenFunction(payload => { RPpush(IP); IP = (m[payload++]<<8)+m[payload++]; SPpush(payload++); ); // Almost same as tokenDoList
 
-//TODO define VOCABULARY as CREATE DOES> word
-interpret(': doVOC R> CONTEXT ! ;');
-$COLON('FORTH'); $DW('doVOC', 0, 0);
-// $DW(tokenDoes, (first word of doVOC), 0, 0);
+// doVOC is not used; and 'FORTH' is moved earlier to be the first word defined
 
 // === Words moved earlier ....
 constant('BL', BL)
 test('BL', [ 32 ]);
 
+// Note this is the first colon definition so there is a lot that can go wrong with it.
 interpret(': CHAR BL PARSE DROP C@ ;'); // -- c; Parse a word and return its first character
 test('CHAR )', [ 41 ]);
 
@@ -1232,9 +1281,91 @@ test('TOKEN xxx C@', [3]);
 test('BL WORD yyyy DUP C@ SWAP CP @ -', [4, 0]);
 
 // Dictionary Search pg75-77 NAME> SAME? find NAME?
+constant('=MASK', 0x7F1F); // TODO check this in use in find, it might be wrong
+interpret(`
+: NAME> ( na -- ca )
+  ( Return a code address given a name address.)
+  2 CELLS - ( move to code pointer field ) @ ; ( get code field address )
+
+: SAME? ( a1 a2 u -- a1 a2 f \\ -0+ )
+  ( Compare u cells in two strings. Return 0 if identical.)
+  FOR               ( scan u+1 cells )
+    AFT             ( skip the loop the first time )
+      OVER          ( copy a1 )
+      R@ CELLS + @  ( fetch one cell from a1)
+      OVER          ( copy a2 )
+      R@ CELLS + @  ( fetch one cell from a2)
+      -             ( compare two cells )
+      ?DUP
+      IF            ( if they are not equal )
+        R> DROP     ( drop loop count )
+        EXIT        ( and exit with the difference as a flag )
+      THEN
+    THEN
+  NEXT              ( loop u times if strings are the same )
+  0 ;               ( then push the 0 flag on the stack )
+
+: find ( a va -- ca na, a F )
+  ( Search a vocabulary for a string. Return ca and na if succeeded.)
+  SWAP                ( va a )
+  DUP C@ CELLL / temp !   ( va a -- , get cell count ) ( EFORTH-ERRATA was "2 /"
+  DUP @ >R            ( va a -- , save 1st cell of string )
+  CELL+ SWAP          ( a' va -- , compare string with names )
+  BEGIN               ( fast test, compare only 1st cells )
+    @ DUP             ( a' na na -- )
+    IF                ( na=0 at the end of a vocabulary )
+      DUP @           ( not end of vocabulary, test 1st cell )
+      [ =MASK ] LITERAL AND ( mask off lexicon bits )
+      R@ XOR          ( comparewith 1st cell in string )
+      IF              ( 1st cells do not match )
+        CELL+ -1      ( try the next name in the vocabulary )
+      ELSE CELL+      ( get address of the 2nd cell )
+        temp @        ( get the length of string )
+        SAME?         ( string=name? )
+      THEN
+    ELSE              ( end of vocabulary )
+      R> DROP         ( discard the 1st cell )
+      SWAP CELL- SWAP ( restore the string address )
+      EXIT            ( exit with ca na, na=0 is false flag )
+    THEN
+  WHILE               ( if the name does not match the string )
+    CELL- CELL-       ( a' la --, move to next word in vocab)
+  REPEAT              ( repeat until vocabulary is exhausted )
+  R> DROP NIP         ( a match is found, discard 1st and va )
+  CELL-               ( restore name field address )
+  DUP NAME>           ( find code field address )
+  SWAP ;              ( reorder and return.  -- ca na )
+
+: NAME? ( a -- ca na, a F )
+  ( Search all context vocabularies for a string.)
+  CONTEXT       ( address of context vocabulary stack )
+  DUP 2@ XOR    ( are two top vocabularies the same? )
+  IF            ( if not same )
+    1 CELLS -   ( backup the vocab address for looping )
+  THEN
+  >R            ( save the prior vocabulary address )
+  BEGIN         
+    R> CELL+    ( get the next vocabulary address )
+    DUP >R      ( save it for next vocabulary )
+    @ ?DUP      ( is this a valid vocabulary? )
+  WHILE         ( yes)
+    find        ( find the word in this vocabulary )
+    ?DUP        ( word found here? )
+  UNTIL         ( if not, go searching next vocabulary )
+    R> DROP EXIT ( word is found, exit with ca and na )
+  THEN
+  R> DROP       ( word is not found in all vocabularies )
+  0 ;           ( exit with a false flag )
+`);
+//TODO-TEST unclear now used so unclear how to test NAME> and SAME?
+code('testing3', () => testing |= 3);
+test('BL WORD xxx DUP C@ 1 + PAD SWAP CMOVE PAD BL WORD xxx 4 SAME? >R 2DROP R>', [0] );
+test('BL WORD xxx DUP C@ 1 + PAD SWAP CMOVE PAD BL WORD xzx 4 SAME? >R 2DROP R> 0=', [0] );
+test('BL WORD NAME? CONTEXT @ ( testing3) find',[names['TOKEN']])
+
 // Text input from terminal pg 78: ^H TAP kTAP accept EXPECT QUERY
 // Error Handling pg80-82 CATCH THROW NULL$ ABORT abort" ?STACK
-// Text Interpreter loop pg83-84 $INTERPRET [ .OK ?STACK EVAL //TODO good place to model JS interpreter on
+// Text Interpreter loop pg83-84 $INTERPRET [ .OK ?STACK EVAL
 // Operating System pg85-86 PRESET XIO FILE HAND I/O CONSOLE QUIT
 // eForth Compiler pg 87
 // Interpreter and Compiler pg 88-90: [ ] ' ALLOT , [COMPILE] COMPILE LITERAL $," RECURSE
