@@ -14,11 +14,12 @@
  */
 
 let testing = 0x0; // 0x01 display words passed to interpreters; 0x02 each word in tokenthread
-const testingDepth = 2;
+let testingDepth = 4;
+let padTestLength = 0; // Display pad length
 // == Some debugging routines, can all be commented out (as long as their calls are)
 let debugName; // Set in run()
 let debugTIB;
-const debugStack = [];
+let debugStack = [];
 function debugPush() { debugStack.push(debugName); } // in tokenDoList
 function debugPop() { debugStack.pop(); } // in EXIT
 
@@ -362,10 +363,11 @@ function threadtoken(xt) {
   if (testing & 0x02) {
     debugName = xt2name(xt); // Expensive so only done when testing
     if (testingDepth > debugStack.length) {
-      console.log('R:', RPP === RP ? '' : m.slice(RP, RPP), debugStack, xt2name(xt), 'S:', SPP === SP ? '' : m.slice(SP, SPP));
+      console.log('R:', RPP === RP ? '' : m.slice(RP, RPP), debugStack, xt2name(xt), 'S:', SPP === SP ? '' : m.slice(SP, SPP),
+        padTestLength ? ('pad: '+ (padTestLength > 0 ? m.slice(padPtr(), padPtr() + padTestLength) : m.slice(padPtr()+padTestLength, padPtr())).toString()) : '');
     }
   }
-  console.assert(SPP >= SP && RPP >= RP);
+  //console.assert(SPP >= SP && RPP >= RP);
   const tok = ((m[xt++] << 8) + m[xt++]);
   console.assert(tok < codeSpace.length);
   codeSpace[tok](xt);
@@ -608,7 +610,8 @@ function interpret(inp) {
 }
 
 function padPtr() { return UfetchName('CP') + 80; } // Sometimes JS needs the pad pointer
-function test(inp, arr, { pad = undefined } = {}) {
+function test(inp, arr, { pad = undefined, hold = undefined } = {}) {
+  console.assert((SPP === SP) && (RPP === RP) && (debugStack.length === 0));
   interpret(inp);
   const mm = m; // this is just to make sure m is in scope for debugging
   while (arr.length) {
@@ -721,9 +724,9 @@ interpret(`
   COMPILE doLIT ( compile doLIT to head lit )
   , ; IMMEDIATE ( compile literal itself )
 `);
-// test of above group non-obvious as writing to dictionary.
+// TODO-TEST test of above group non-obvious as writing to dictionary.
 
-// == Control structures - were on pg91 but needed earlier pg 91-92 but moved early
+// === Control structures - were on pg91 but needed earlier pg 91-92 but moved early
 interpret(`
 : FOR ( -- a; Start a FOR-NEXT loop structure in a colon definition)
   COMPILE >R HERE ; IMMEDIATE
