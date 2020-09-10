@@ -372,10 +372,14 @@ function threadtoken(xt) {
   //console.assert(SPP >= SP && RPP >= RP);
   const tok = ((m[xt++] << 8) + m[xt++]);
   console.assert(tok < codeSpace.length);
-  codeSpace[tok](xt);
+  codeSpace[tok](xt); // Run the token function - like tokenDoList or tokenVar
 }
-// This should only be called once, normally its threadtoken you want ....
+// This is not re-entrant, normally its threadtoken you want ....
+// In particular you cannot use this to nest forth in code in forth
+// TODO-THREADING If that becomes necessary, it MIGHT work to save IP (where?) and restore after while loop
+// Cant use R or S for it as words use that across calls to the 'EVAL
 function run(xt) {
+  console.assert(IP === 0); // Cant nest run()
   threadtoken(xt);
   // If this returns without changing program Counter, it will exit
   while (IP) {
@@ -390,6 +394,11 @@ const EXIT = code('EXIT', () => {
   debugPop(); // Pushed in tokenDoList
   IP = RPpop();
 });
+
+// EXECUTE runs the word on the stack,
+// TODO-THREADING it works because it itself is a code word, incuded in colon words
+// and because there is nothing after the return from threadtoken which would get executed out of order
+// it may or may not work in other situations.
 code('EXECUTE', () => threadtoken(SPpop()));
 
 // === Literals eForthAndZen#37
@@ -577,13 +586,13 @@ const jsCOMPILE = code('jsCOMPILE', () => { // a -- ...; similar to $COMPILE at 
     const xt = SPpop();
     const c = m[na];
     if (c & bitsIMED) {
-      run(xt);
+      run(xt); //TODO-THREADING maybe should be threadToken - but that won't work if this isn't running inside run already
     } else {
       if (testing & 0x02) console.log('COMPILING:', countedToJS(na)); // TODO-EFFICIENCY comment out
       $DW(xt);
     }
   } else { // a
-    threadtoken(UfetchName("'NUMBER")); // n T | a F
+    threadtoken(UfetchName("'NUMBER")); // n T | a F //TODO-THREADING this might not work, if NUMBER is colon word
     if (SPpop()) {
       $DW('doLIT', SPpop());
     } else {
@@ -597,9 +606,9 @@ const jsINTERPRET = code('jsINTERPRET', () => { // a -- ...; Based on signature 
   const na = SPpop();
   if (na) { // ca
     const xt = SPpop();
-    run(xt);
+    run(xt); //TODO-THREADING maybe should be threadToken - but that won't work if this isn't running inside run already
   } else {
-    threadtoken(UfetchName("'NUMBER")); // n T | a F
+    threadtoken(UfetchName("'NUMBER")); // n T | a F //TODO-THREADING this might not work, if NUMBER is colon word
     if (!SPpop()) {
       console.log("Number conversion of",w,"failed"); // TODO handle error in Forth-ish way (via Throw)
     }
@@ -621,7 +630,7 @@ function jsEVAL(inp) { // equivalent to Forth EVAL with few things wrapped aroun
       SPpop();
     } else {
       //console.log('>', w); //TODO-EFFICIENCY comment out
-      run(UfetchName("'EVAL"));
+      run(UfetchName("'EVAL"));  //TODO-THREADING this is probably problematic as will nest "run"
     }
     console.assert(SP <= SPP && RP <= RPP); // Side effect of making SP and SPP available to debugger.
   }
@@ -1656,7 +1665,7 @@ interpret(`
   ; IMMEDIATE               ( must be done even while compiling )
 `);
 test('[ 1 2 3 ROT', [2, 3, 1]);
-// TODO - need to check places do EXECUTE and then anywhere else does threadtoken as won't work with colon words
+
 // Operating System pg85-86 PRESET XIO FILE HAND I/O CONSOLE QUIT
 // eForth Compiler pg 87
 // Interpreter and Compiler pg 88-90: [ ] ' ALLOT , [COMPILE] COMPILE LITERAL $," RECURSE
