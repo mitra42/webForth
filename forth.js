@@ -47,6 +47,7 @@ const NAMEE = SPP - SPS; // name dictionary
 // And bottom up - gap in middle is code directory
 const COLDD = 0x100; // cold start vector
 const CODEE = COLDD + US; // code dictionary
+const bitsCOMP = 0x40; // bit in first char of name field to indicate 'compile-only'
 const bitsIMED = 0x80; // bit in first char of name field to indicate 'immediate'
 const bitsMASK = 0x1FFF; // bits to mask out of a call with count and first char
 
@@ -75,8 +76,8 @@ function RPpush(u16) { m[--RP] = u16 & 0xFF; m[--RP] = (u16 >> 8); }
 function IPnext() { return (m[IP++] << 8) | m[IP++]; }
 function Mstore(a, v) { m[a++] = v >> 8; m[a] = v & 0xFF; }
 function Mfetch(a) { return (m[a++] << 8) | m[a]; }
-function Ufetch(userindex, offset) { return Mfetch(UPP + userindex + offset); }
-function Ustore(userindex, w, offset) { return Mstore(UPP + userindex + offset); }
+function Ufetch(userindex, offset = 0) { return Mfetch(UPP + userindex + offset); }
+function Ustore(userindex, w, offset = 0) { return Mstore(UPP + userindex + offset, w); }
 
 // Handle the Code and Namespace \pointer, which always points after last thing compiled into dictionary - in eForthAndZen this is '$'
 const CURRENToffset = 64;
@@ -207,13 +208,11 @@ function dollarCommaN() { // na -- ; Same function as $,n on pg94 common between
     console.log('name error');
   }
 }
-// code('$,n', dollarCommaN)
 
 function OVERT() {
   const last = lastFetch();
   Mstore(currentFetch(), last); // LAST @ CURRENT @ !
 }
-//code('OVERT',OVERT);
 
 function $CODE(lex, name) { //TODO-CELLL check this carefully
   console.assert(name.length <= 31);
@@ -266,6 +265,7 @@ function $USER(name) { // Note unlike eForth we use Token threading see USER() w
 }
 // tokenNextVal TODO define VARIABLE and CONSTANT to use this
 const tokenNextVal = tokenFunction(payload => SPpush(Mfetch(payload)));
+const tokenVar = tokenFunction(payload => SPpush(payload));
 
 /* No longer used - not sure if it was ever used in eForth
 function D$(funct, string) {
@@ -320,6 +320,8 @@ OVERT(); // Uses the initialization done by currentStore above.
 
 // === Add some functions defined earlier prior to dictionary being available
 code('find', find);
+code('OVERT', OVERT);
+code('$,n', dollarCommaN);
 
 // == Debugging code words
 code('debugNA', () => console.log('NAME=', countedToJS(SPfetch()))); // Print the NA on console
@@ -506,14 +508,18 @@ USER('LAST', lastFetch()); // normally set on pg106 but using live
 // === JS interpreter - will be discarded when done or built out
 // IMMEDIATE sets a word to be interpreted, even when compiling - most useful for control loops but also pre-calculating a literal.
 // It is moved early from pg96: : IMMEDIATE [ =IMED ] LITERAL LAST @ C@ OR LAST @ C! ; where IMED
-// EFORTH-ERRATA =IMED is not defined, in EFORTHv5 its defined as 0x80
-code('IMMEDIATE', () => {
+// EFORTH-ERRATA IMMEDIATE COMPILE-ONLY =COMP =IMED is not defined , in EFORTHv5 its defined as 0x80
+function setHeaderBits(b) {
   const lastNA = lastFetch(); // LAST points at the name field of the last defined word
-  m[lastNA] |= bitsIMED;
-});
+  m[lastNA] |= b;
+}
+code('IMMEDIATE', () => setHeaderBits(bitsIMED));
+code('COMPILE-ONLY', () => setHeaderBits(bitsCOMP));
 
 function tibIn() { return UfetchName('#TIB', CELLL) + UfetchName('>IN'); }  // TIB >IN @ +
 const BL = 32;
+const forthTrue = 0xFFFF;
+
 function fPARSE() { // returns b (address) and u (length)
   const c = SPpop();
   const tib = UfetchName('#TIB', CELLL);
@@ -541,21 +547,28 @@ function jsTOKEN() { // -- a; <string>; copy blank delimited string to name buff
   m[np + u + 1] = 0;  // eFORTH errata  pg62 - PACK$ does `0 !` which I think will overwrite bottom value of name dict as NP is last byte used
   SPpush(np); // Note that NP is not updated, the same buffer will be used for each word until hit ':'
 }
-
+code('TOKEN', jsTOKEN);
 
 function findName() { // a -- xt na | a F
   SPpush(UfetchName('CONTEXT'));  // a va
   find();                           // xt na | a F
 }
 
-function jsNUMBER(w) { //TODO-INTERPRETER-5 make this work like things stored in 'NUMBER
+function NUMBER() { //TODO-INTERPRETER-5 make this work like things stored in 'NUMBER
+  const a = SPpop();
+  const w = countedToJS(a);
   const base = UfetchName('BASE');
   const n = parseInt(w, base); // TODO-NUM handle parsing errors // Needs forth to convert word
   if (isNaN(n)) {
-    console.log('Not found', w);
+    SPpush(a);
+    SPpush(0);
+  } else {
+    SPpush(n);
+    SPpush(forthTrue)
   }
-  return n;
 }
+// Define NUMBER and store its xt in 'NUMBER
+UstoreName("'NUMBER", code('NUMBER', NUMBER));
 
 const jsCOMPILE = code('jsCOMPILE', () => { // a -- ...; similar to $COMPILE at pg96
   findName(); // xt na | a F
@@ -570,23 +583,31 @@ const jsCOMPILE = code('jsCOMPILE', () => { // a -- ...; similar to $COMPILE at 
       $DW(xt);
     }
   } else { // a
-    $DW('doLIT', jsNUMBER(countedToJS(SPpop())));
+    threadtoken(UfetchName("'NUMBER")); // n T | a F
+    if (SPpop()) {
+      $DW('doLIT', SPpop());
+    } else {
+      console.log("Number conversion of",countedToJS(SPpop()),"failed"); // TODO handle error in Forth-ish way (via Throw)
+    }
   }
 });
 
-const jsINTERPRET = code('jsINTERPRET', () => { // a -- ...; Based on signature at pg83
+const jsINTERPRET = code('jsINTERPRET', () => { // a -- ...; Based on signature of $INTERPRET at pg83
   findName(); // xt na | a F
   const na = SPpop();
   if (na) { // ca
     const xt = SPpop();
     run(xt);
   } else {
-    SPpush(jsNUMBER(countedToJS(SPpop())));
+    threadtoken(UfetchName("'NUMBER")); // n T | a F
+    if (!SPpop()) {
+      console.log("Number conversion of",w,"failed"); // TODO handle error in Forth-ish way (via Throw)
+    }
   }
 });
 UstoreName("'EVAL", jsINTERPRET); // Start off interpreting
 
-function jsEVAL(inp) {
+function jsEVAL(inp) { // equivalent to Forth EVAL with few things wrapped around it - so not exact same TODO align it
   //OBS: input = inp; // Could point at TIB
   if (testing & 0x01) { console.log(m.slice(SP, SPP), ' >>', inp); }
   console.assert(inp.length < (RTS - 10));
@@ -600,7 +621,7 @@ function jsEVAL(inp) {
       SPpop();
     } else {
       //console.log('>', w); //TODO-EFFICIENCY comment out
-      threadtoken(UfetchName("'EVAL"));
+      run(UfetchName("'EVAL"));
     }
     console.assert(SP <= SPP && RP <= RPP); // Side effect of making SP and SPP available to debugger.
   }
@@ -622,6 +643,9 @@ function test(inp, arr, { pad = undefined, hold = undefined } = {}) {
   if (pad) {
     console.assert(m.slice(padPtr(), padPtr() + pad.length).toString() === pad);
   }
+  if (hold) {
+    console.assert(m.slice(padPtr() - hold.length, padPtr()).toString() === hold);
+  }
   console.assert((SPP === SP) && (RPP === RP));
 }
 
@@ -640,6 +664,9 @@ code(';', () => { $DW(EXIT); OVERT(); UstoreName("'EVAL", jsINTERPRET); }); // T
 interpret('IMMEDIATE');
 code('[', () => UstoreName("'EVAL", jsINTERPRET)); interpret('IMMEDIATE'); //pg84 and pg88
 code(']', () => UstoreName("'EVAL", jsCOMPILE)); // pg88
+// Create a new word that doesnt allocate any space, but will push address of that space. )
+// : CREATE TOKEN $,n OVERT COMPILE tokenVar ; // except tokenVar isn't an accessible value
+code('CREATE', () => { jsTOKEN(); dollarCommaN(); OVERT(); $DW(tokenVar); });
 
 //EXIT & EXECUTE tested with '
 // doLIT implicitly tested by all literals
@@ -672,11 +699,18 @@ constant('BL', BL);
 test('BL', [32]);
 
 // Note this is the first colon definition so there is a lot that can go wrong with it.
-interpret(': CHAR BL PARSE DROP C@ ;'); // -- c; Parse a word and return its first character
-test('CHAR )', [41]);
-
 interpret(': 2DROP DROP DROP ;'); // w1 w2 -- ; Drop two items pg 49)
 test('1 2 2DROP', []);
+
+// CHAR: Parse a word and return its first character
+// CTRL: Parse a word, return first character as a control
+interpret(`
+: CHAR BL PARSE DROP C@ ;
+: CTRL CHAR 31 AND ;
+`);
+test('CHAR )', [41]);
+test('CTRL H', [08]);
+
 
 // Comment character - from here on we can use ( xxx) in interpreted strings
 interpret(': ( 41 PARSE 2DROP ; IMMEDIATE'); // pg74 : ( [ CHAR ) ] LITERAL PARSE 2DROP ; IMMEDIATE
@@ -814,7 +848,6 @@ interpret(`
 : MIN 2DUP SWAP < IF SWAP THEN DROP ;
 : WITHIN OVER - >R - R> U< ;
 `);
-const forthTrue = 0xFFFF;
 test('123 123 = 123 124 =', [0xFFFF, 0]);
 test('123 100 U< 100 123 U< 123 -100 U< -100 123 U<', [0, forthTrue, forthTrue, 0]);
 test('123 100 < 100 123 < 123 -100 < -100 123 <', [0, forthTrue, 0, forthTrue]);
@@ -1094,8 +1127,9 @@ interpret(`
   HLD @         ( address of last digit)
   PAD OVER - ;  ( return address of 1st digit and length)
 `);
-test('123 <# DUP SIGN #S #>', [padPtr() - 3, 3], { pad: '123' });
-test('-123 DUP ABS <# #S SWAP SIGN #>', [padPtr() - 4, 4], { pad: '-123'});
+
+test('123 <# DUP SIGN #S #>', [padPtr() - 3, 3], { hold: '123' });
+test('-123 DUP ABS <# #S SWAP SIGN #>', [padPtr() - 4, 4], { hold: '-123'});
 
 // === More definitions moved up
 interpret(`
@@ -1319,7 +1353,7 @@ interpret(`
 `);
 */
 
-// Parsing Words pg74 .( ( \ CHAR TOKEN WORD
+// === Parsing Words pg74 .( ( \ CHAR TOKEN WORD
 interpret(`
 ( CHAR is moved earlier )
 
@@ -1352,8 +1386,8 @@ test('1 2 ( 3 ) 4 \\ commenting', [1, 2, 4]);
 test('TOKEN xxx C@', [3]);
 test('BL WORD yyyy DUP C@ SWAP CP @ -', [4, 0]);
 
-// Dictionary Search pg75-77 NAME> SAME? find NAME?
-constant('=COMP', 0x40); // Compile only word - TODO figure out how used EFORTH-ERRATA used but not defined
+// === Dictionary Search pg75-77 NAME> SAME? find NAME?
+constant('=COMP', bitsCOMP); // Compile only word - TODO figure out how used EFORTH-ERRATA used but not defined
 constant('=IMED', bitsIMED); // Immediate word - interpreted during compilation EFORTH-ERRATA used but not defined
 constant('=MASK', bitsMASK); // EFORTH-ERRATA used but not defined
 
@@ -1390,7 +1424,7 @@ interpret(`
   CELL+ SWAP          ( a' va -- , compare string with names )
   BEGIN               ( fast test, compare only 1st cells )
     @ DUP             ( a' na na -- )
-    debugNA
+    ( debugNA )       ( uncomment for debugging find - will report each name as checked)
     IF                ( na=0 at the end of a vocabulary )
       DUP @           ( not end of vocabulary, test 1st cell )
       [ =MASK ] LITERAL AND ( mask off lexicon bits )
@@ -1439,16 +1473,195 @@ interpret(`
 test('BL WORD xxx DUP C@ 1 + PAD SWAP CMOVE PAD BL WORD xxx 4 SAME? >R 2DROP R>', [0]);
 test('BL WORD xxx DUP C@ 1 + PAD SWAP CMOVE PAD BL WORD xzx 4 SAME? >R 2DROP R> 0=', [0]);
 test('FORTH', []);
-test('BL WORD TOKEN CONTEXT @ find', testFind); // Compare with results from old version of find
+test('BL WORD TOKEN CONTEXT @ find', testFind.map(k=>k)); // Compare with results from old version of find
+test('BL WORD TOKEN NAME?', testFind); // Name searches all vocabs
 
-// Text input from terminal pg 78: ^H TAP kTAP accept EXPECT QUERY
+// === Text input from terminal pg 78: ^H TAP kTAP accept EXPECT QUERY
+// EFORTH-ERRATA CTRL used here but not defined.
+interpret(`
+: ^H ( bot eot cur -- bot eot cur)
+  ( Backup the cursor by one character.)
+  >R OVER     ( bot eot bot --)
+  R@ < DUP    ( bot<cur ? )
+  IF [ CTRL H ] LITERAL ( yes, echo backspace )
+    'ECHO @EXECUTE 
+  THEN        ( bot eot cur 0|-1 -- )
+  R> + ;      ( decrement cur, but not passing bot )
+
+: TAP ( bottom eot currrent key -- bottom eot current )
+  ( Accept and echo the key stroke and bump the cursor.)
+  DUP         ( duplicate character )
+  'ECHO @EXECUTE ( echo it to display )
+  OVER C!     ( store at current location )
+  1 + ;       ( increment current pointer )
+
+: kTAP ( bot eot cur key -- bot eot cur )
+  ( Process a key stroke, CR or backspace.)
+  DUP 13 XOR        ( is key a return?)
+  IF [ CTRL H ] LITERAL ( is key a backspace? )
+    XOR IF BL TAP   ( none of above, replace by space )
+    ELSE ^H         ( backup current pointer )
+    THEN
+    EXIT            ( done this part )
+  THEN              ( key is a return)
+  DROP              ( discard bot and eot )
+  NIP DUP ;         ( duplicate cur )
+
+: accept ( b u -- b u )
+  ( Accept characters to input buffer. Return with actual count.)
+  OVER + OVER       ( b b+u b;  EFORTH-ERRATA fixed in v5 and STAAPL)
+  BEGIN 
+    2DUP XOR        ( b b+u b b=b+u = current pointer? )
+  WHILE
+    KEY             ( b b+u b c; get one more character )
+    DUP BL - 95 U<  ( b b+u b c f; is it printable? ) 
+    IF TAP          ( b b+u b+1 ; yes, accept and echo it )
+    ELSE 'TAP @EXECUTE ( no, process control code )
+    THEN
+  REPEAT            ( b b+u b'; repeat until buffer full )
+  DROP              ( b b+u ; drop current pointer
+  OVER - ;          ( b u; leave actual count)
+
+: EXPECT ( b u -- ) 
+  ( Accept input stream and store count in SPAN.)
+  'EXPECT @EXECUTE  ( execute accept )
+  SPAN !            ( store character count in SPAN )
+  DROP ;            ( discard eot address )
+
+: QUERY ( -- )
+  ( Accept input stream to terminal input buffer.)
+  TIB 80          ( addr and size of terminal input buffer)
+  'EXPECT @EXECUTE ( execute 'accept' )
+  #TIB !          ( store number of characters received )
+  DROP            ( discard buffer address )
+  0 >IN ! ;       ( initialized parsing pointer )
+`);
+// TODO-TEST TODO-IO input handlign needs EXPECT etc
+
 // Error Handling pg80-82 CATCH THROW NULL$ ABORT abort" ?STACK
-// Text Interpreter loop pg83-84 $INTERPRET [ .OK ?STACK EVAL
+interpret(`
+: CATCH ( ca -- err#/0 )
+  ( Execute word at ca and set up an error frame for it.)
+  SP@ >R          ( save current stack pointer on return stack )
+  HANDLER @ >R    ( save the handler pointer on return stack )
+  RP@ HANDLER !   ( save the handler frame pointer in HANDLER )
+  ( ca ) EXECUTE  ( execute the assigned word over this safety net )
+  R> HANDLER !    ( normal return from the executed word )
+                  ( restore HANDLER from the return stack )
+  R> DROP         ( discard the saved data stack pointer )
+  0 ;             ( push a no-error flag on data stack )
+
+: THROW ( err# -- err# )
+  ( Reset system to current local error frame and update error flag.)
+  HANDLER @ RP! ( expose latest error handler frame on return stack )
+  R> HANDLER !  ( restore previously saved error handler frame )
+  R> SWAP >R    ( retrieve the data stack pointer saved )
+  SP!           ( restore the data stack )
+  DROP 
+  R> ;          ( retrieved err# )
+                        
+CREATE NULL$ 0 , ( EFORTH-ERRATA inserts a string "coyote" after this, no idea why! )
+
+: ABORT ( -- ) 
+  ( Reset data stack and jump to QUIT.)
+  NULL$   ( take address of NULL$ )
+  THROW ; ( and give it to current CATCH )
+
+: abort" ( f -- )
+  ( Run time routine of ABORT" . Abort with a message.)
+  IF        ( if flag is true, abort ) 
+    do$     ( take address of next string )
+    THROW   ( and give it to CATCH )
+  THEN      ( if flag is false, continue )
+  do$ DROP  ( skip over the next string ) 
+  ;  COMPILE-ONLY
+  
+: $," ( --) ( Moved earlier from pg90)
+  ( Compile a literal string up to next " .)
+  34 WORD ( move string to code dictionary)
+  COUNT + ALIGNED ( calculate aligned end of string)
+  CP ! ; ( adjust the code pointer)
+
+( Moved earlier from pg93 )
+: ABORT" ( -- ; <string> )
+  ( Conditional abort with an error message.)
+  COMPILE abort"  ( compile runtime abort code ) 
+  $," ; IMMEDIATE ( compile abort message )
+
+( Moved earlier from pg93 )
+: ." ( -- ; <string> )
+  ( Compile an inline string literal to be typed out at run time.) 
+  COMPILE ."| ( compile print string code )
+  $," ; IMMEDIATE ( compile print string )
+`);
+// Test is tricky - the "3" in bar is thrown away during hte "THROW" while 5 is argument to THROW
+test(`: bar 3 5 THROW 4 ; : foo 1 [ ' bar ] LITERAL CATCH 2 ; foo`, [1, 5, 2]); debugStack=[];
+test(`: bar 3 ; : foo 1 [ ' bar ] LITERAL CATCH 2 ; foo`, [1, 3, 0, 2]);
+// Note that abort restores the stack, so shouldn't have consumed something else will have random noise on stack
+test(`: bar ?DUP ABORT" test" 3 ; : foo [ ' bar ] LITERAL CATCH ; 1 foo C@ 0 foo`, [1, 4, 3, 0]); debugStack=[];
+//$," and abort" are implicitly tested by ABORT"
+//TODO-TEST TODO-IO test ."
+
+// === Text Interpreter loop pg83-84 $INTERPRET [ .OK ?STACK EVAL
+interpret(`
+
+: $INTERPRET ( a -- )
+  ( Note jsINTERPRET has same signature as this except for THROW
+  ( Interpret a word. If failed, try to convert it to an integer.)
+  NAME?                   ( search dictionary for word just parsed )
+  ?DUP                    ( is it a defined word? )
+  IF C@                    ( yes. examine the lexicon ) ( EFORTH-ERRATA it should be C@ not @)
+    [ =COMP ] LITERAL AND ( is it a compile-only word? )
+    ABORT" compile ONLY"  ( if so, abort with the proper message )
+    EXECUTE EXIT          ( not compile-only, execute it and exit ) 
+  THEN                    ( not defined in the dictionary )
+  'NUMBER @EXECUTE        ( convert it to a number ) ( TODO-NUMBER-5 merge with number in js)
+  IF EXIT THEN            ( exit if conversion is successful )
+  THROW ;                 ( else generated the error condition )
+
+: .OK ( -- ) 
+  ( Display 'ok' only while interpreting.)
+  [ ' $INTERPRET ] LITERAL
+  'EVAL @ = 
+  IF ."  ok" THEN CR ;
+
+: ?STACK ( -- ) 
+  ( Abort if the data stack underflows.)
+  DEPTH 0< ABORT" underflow" ; ( Note staapl uses $" THROW, v5 uses ABORT)
+
+: EVAL ( -- )
+  ( Interpret the input stream.)
+  BEGIN 
+    TOKEN ( -- a)   ( parse a word and leave its address )
+    DUP C@          ( is the character count 0? )
+  WHILE             ( no )
+    'EVAL @EXECUTE  ( evaluate it )
+    ?STACK          ( any stack error? overflow or underflow )
+  REPEAT            ( repeat until TOKEN gets a null string )
+  DROP              ( discard the string address )
+  'PROMPT @EXECUTE ;  ( display the proper prompt, if any )
+`);
+//TODO-TEST TODO-IO .OK EVAL
+
+test('BL PARSE 123 PAD PACK$ $INTERPRET', [123]);
+test('123 BL PARSE DUP PAD PACK$ $INTERPRET', [123, 123]);
+test(`: foo 1 2DROP ?STACK ; : bar [ ' foo ] LITERAL CATCH ; bar C@`, [9]); debugStack=[]; // "underflow"
+
+// This switches to use new interpreter, its still using old jsCOMPILE
+interpret(`
+: [ ( -- )
+  ( Start the text interpreter.) ( Replaces JS version )
+  [ ' $INTERPRET ] LITERAL 
+  'EVAL !                   ( store $INTERPRET in 'EVAL )
+  ; IMMEDIATE               ( must be done even while compiling )
+`);
+test('[ 1 2 3 ROT', [2, 3, 1]);
+// TODO - need to check places do EXECUTE and then anywhere else does threadtoken as won't work with colon words
 // Operating System pg85-86 PRESET XIO FILE HAND I/O CONSOLE QUIT
 // eForth Compiler pg 87
 // Interpreter and Compiler pg 88-90: [ ] ' ALLOT , [COMPILE] COMPILE LITERAL $," RECURSE
 // Control Structures pg91-92: FOR BEGIN NEXT UNTIL AGAIN IF AHEAD REPEAT THEN AFT ELSE WHILE
-// String Literals pg93: ABORT" $" ."
+// String Literals pg93: ABORT" $" ." ( ABORT" ." moved to pg84 where used )
 // Name Dictionary Compiler pg94-96: ?UNIQUE $,n $COMPILE OVERT ; ] call, : IMMEDIATE  (see dollarCommaN)
 // Defining Words pg97: USER CREATE VARIABLE
 // Utilities pg98
