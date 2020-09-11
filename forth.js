@@ -2,6 +2,7 @@
  * References see FORTH.md
 */
 
+// TODO-ZEN-V5-STAAPL - COMPARE BELOW HERE
 /* Naming conventions and abbreviations
  * xt: execution token, points at the token field of a definition
  * na: Name Address, points to the name, (first byte count+flags, then that number of characters, max 31)
@@ -31,8 +32,8 @@ function debugPop() { debugStack.pop(); } // in EXIT
 
 // === Memory Map - pg26
 // TODO-VM TODO-MEM rework this into separate slots and then check if really need ! and @ into some parts of mem
-// EFORTH-ERRATA doesnt define CELLL (and presumes is 2 in multiple places)
-// EFORTH-ERRATA the definitions on pg 26 dont come close to matching the addresses given as the example below. In particular UPP and RPP overlap !
+// EFORTH-ZEN-ERRATA doesnt define CELLL (and presumes is 2 in multiple places)
+// EFORTH-ZEN-ERRATA the definitions on pg 26 dont come close to matching the addresses given as the example below. In particular UPP and RPP overlap !
 const CELLL = 2;  // Using Buffers, but needs to be 2 as needs to be big enough for an address (offset into buffer) if change see CELL+ CELL- CELLS ALIGNED $USER
 const US = 64 * CELLL;  // user area size in cells i.e. 64 variables - standard beow is using about 37
 const RTS = 0x80 * CELLL; // return stack/TIB size // eFORTH-DIFF was 64 which is tiny for any kind of string handling TODO review this
@@ -318,6 +319,13 @@ currentStore(cpFetch()); // Initialize Current. Context & Current+2 initialized 
 $DW(0, 0);
 OVERT(); // Uses the initialization done by currentStore above.
 
+// === Add some constants defined earlier prior to dictionary being available
+constant('CELLL', CELLL); // effectively '2 CONSTANT CELLL' but dont have CONSTANT at this point
+constant('=TIB', TIBB);
+constant('=COMP', bitsCOMP); // Compile only word - TODO figure out how used EFORTH-ZEN-ERRATA used but not defined
+constant('=IMED', bitsIMED); // Immediate word - interpreted during compilation EFORTH-ZEN-ERRATA used but not defined
+constant('=MASK', bitsMASK); // EFORTH-ZEN-ERRATA used but not defined
+
 // === Add some functions defined earlier prior to dictionary being available
 code('find', find);
 code('OVERT', OVERT);
@@ -485,7 +493,7 @@ USER("'TAP", undefined); // TODO KTAP Execution vector of TAP. Default the kTAP.
 USER("'ECHO", 'TX!'); // Execution vector of ECHO. Default to tx!.
 USER("'PROMPT", undefined); // TODO DOTOK Execution vector of PROMPT.  Default to '.ok'.
 USER('BASE', 10);
-USER('temp', 0); // A temporary storage location used in parse and find. EFORTH-ERRATA its uses as 'temp', listing says 'tmp'
+USER('temp', 0); // A temporary storage location used in parse and find. EFORTH-ZEN-ERRATA its uses as 'temp', listing says 'tmp'
 USER('SPAN', 0); // Hold character count received by EXPECT.
 USER('>IN', 0); // Hold the character pointer while parsing input stream.
 USER('#TIB', 0); // Hold the current count and address of the terminal input buffer.
@@ -517,7 +525,7 @@ USER('LAST', lastFetch()); // normally set on pg106 but using live
 // === JS interpreter - will be discarded when done or built out
 // IMMEDIATE sets a word to be interpreted, even when compiling - most useful for control loops but also pre-calculating a literal.
 // It is moved early from pg96: : IMMEDIATE [ =IMED ] LITERAL LAST @ C@ OR LAST @ C! ; where IMED
-// EFORTH-ERRATA IMMEDIATE COMPILE-ONLY =COMP =IMED is not defined , in EFORTHv5 its defined as 0x80
+// EFORTH-ZEN-ERRATA IMMEDIATE COMPILE-ONLY =COMP =IMED is not defined , in EFORTHv5 its defined as 0x80
 function setHeaderBits(b) {
   const lastNA = lastFetch(); // LAST points at the name field of the last defined word
   m[lastNA] |= b;
@@ -553,7 +561,7 @@ function jsTOKEN() { // -- a; <string>; copy blank delimited string to name buff
   const np = UfetchName('NP') - u - 2;
   m.copy(m, np + 1, b, b + u);
   m[np] = u;  // 1 byte count
-  m[np + u + 1] = 0;  // eFORTH errata  pg62 - PACK$ does `0 !` which I think will overwrite bottom value of name dict as NP is last byte used
+  m[np + u + 1] = 0;  // EFORTH-ZEN-ERRATA  pg62 - PACK$ does `0 !` which I think will overwrite bottom value of name dict as NP is last byte used
   SPpush(np); // Note that NP is not updated, the same buffer will be used for each word until hit ':'
 }
 code('TOKEN', jsTOKEN);
@@ -580,6 +588,10 @@ function NUMBER() { //TODO-INTERPRETER-5 make this work like things stored in 'N
 UstoreName("'NUMBER", code('NUMBER', NUMBER));
 
 const jsCOMPILE = code('jsCOMPILE', () => { // a -- ...; similar to $COMPILE at pg96
+  // TODO-EFFICIENCY - remove next check once have checked all code
+  // note expecting immediate words '(', '[', [COMPILE]
+  if (['TOKEN', 'find', "'", '$,'].includes(countedToJS(SPfetch())))
+    console.log("Compiling", countedToJS(SPfetch()), "in", countedToJS(lastFetch()), "that gets redefined");
   findName(); // xt na | a F
   const na = SPpop();
   if (na) { // ca
@@ -680,6 +692,7 @@ code('CREATE', () => { jsTOKEN(); dollarCommaN(); OVERT(); $DW(tokenVar); });
 //EXIT & EXECUTE tested with '
 // doLIT implicitly tested by all literals
 // next, ?branch, branch implicitly tested by control structures
+test('CELLL', [2]); // Assuming small cell, otherwise it should be 2
 test('123 HLD ! HLD @', [123]); // Also tests user variables
 test('111 HLD ! 222 HLD C! HLD C@ 0 HLD C! HLD @', [222, 111]);
 // R> >R R@ SP@ SP! tested after arithmetic operators
@@ -733,9 +746,6 @@ interpret(`: HERE ( -- a; return top of code dictionary; pg60)
   CP @ ;`);
 // test is non-obvious
 
-constant('CELLL', CELLL); // effectively '2 CONSTANT CELLL' but dont have CONSTANT at this point
-test('CELLL', [2]); // Assuming small cell, otherwise it should be 2
-
 // Note eForth has +, but that isn't defined till pa50
 interpret(': CELL+ CELLL UM+ DROP ;');
 test('1 CELL+', [3]);
@@ -743,6 +753,12 @@ test('1 CELL+', [3]);
 // pg89 : ' ( -- ca ) TOKEN NAME? IF EXIT THEN THROW ;
 code("'", () => { // -- xt; Search for next word in input stream // TODO-RECODE as WORD FIND NOT IF ERROR THEN needs WORD FIND ERROR reqs FIND
   jsTOKEN(); // -- a; String with count in first byte
+
+  // TODO-EFFICIENCY - remove next check once have checked all code
+  // note expecting immediate words '(',
+  if (['TOKEN', 'find', '[', "'", 'LITERAL', '$,'].includes(countedToJS(SPfetch())))
+    console.log("Pushing on stack", countedToJS(SPfetch()), "in", countedToJS(lastFetch()), "that gets redefined");
+
   findName(); // xt na | a 0
   if (!SPpop()) {
     console.error(countedToJS(SPpop()), "not found during '");
@@ -751,17 +767,29 @@ code("'", () => { // -- xt; Search for next word in input stream // TODO-RECODE 
 test(': FOO 1 EXIT 2 ; FOO', [1]);
 test("' FOO EXECUTE 3", [1, 3]);
 
+/* EFORTH-ZEN-ERRATA - pg57 presumes CELLL==2 and need to align, not case with JS and byte Buffer
+: ALIGNED ( b -- a)
+  ( Align address to the cell boundary)
+  DUP 0 CELLL UM/MOD    ( divide b by 2)
+  DROP DUP          ( save remainder)
+  IF CELLL SWAP - THEN  ( add 1 if remainder is 1)
+  + ;
+*/
+interpret(': ALIGNED ;');
+test('101 ALIGNED', [101]);
 
 interpret(`
+
+( ERRATA v5 does not have ALIGNED ) 
 : , HERE ( w --; Compile an integer into the code dictionary. pg 90)
-  DUP CELL+ CP ! ! ;
+  ALIGNED DUP CELL+ CP ! ! ;
 
 : [COMPILE] ( --; <string>; Compile next immediate word into code dictionary; pg90)
   ' , ; IMMEDIATE
 `); interpret(`
 
 : COMPILE ( --; Compile the next address in colon list to code dictionary. pg 90)
-  R> DUP @ , CELL+ >R ;
+  R> DUP @ , CELL+ >R ; COMPILE-ONLY
 
 : LITERAL ( w -- ) ( Compile tos to code dictionary as an integer literal.)
   COMPILE doLIT ( compile doLIT to head lit )
@@ -980,17 +1008,6 @@ interpret(`
 test('123 CELL-', [121]);
 test('123 CELLS', [246]);
 
-/* EFORTH-ERRATA - pg57 presumes CELLL==2 and need to align, not case with JS and byte Buffer
-: ALIGNED ( b -- a)
-  ( Align address to the cell boundary)
-  DUP 0 CELLL UM/MOD    ( divide b by 2)
-  DROP DUP          ( save remainder)
-  IF CELLL SWAP - THEN  ( add 1 if remainder is 1)
-  + ;
-*/
-interpret(': ALIGNED ;');
-test('101 ALIGNED', [101]);
-
 // === Special Characters pg58 BL >CHAR
 interpret(`
 ( BL moved earlier)
@@ -1150,6 +1167,7 @@ interpret(`
   SWAP 0 MAX FOR AFT SPACE THEN NEXT DROP ;
 : TYPE ( b u -- ; Output u characters from b)
   FOR AFT DUP C@ EMIT 1 + THEN NEXT DROP ;
+: .$ ( a -- ) COUNT TYPE ; ( from Staapl, not in eForth)
 `);
 // TODO-TEST TODO-OUTPUT EMIT, SPACE SPACES TYPE
 
@@ -1193,7 +1211,7 @@ interpret(`
 //TODO-TEST TODO-OUTPUT .R U.R U. . ?
 
 // === Numeric input pg67-68 DIGIT? NUMBER?
-// eFORTH-ERRATA NIP is not designed
+// EFORTH-ZEN-ERRATA NIP is not designed
 interpret(`
 : NIP ( x1 x2 -- x2 )
   SWAP DROP ;
@@ -1210,7 +1228,7 @@ interpret(`
   R> U< ;               ( if n=/>radix, the digit is not valid )
 
 ( TODO evaluate control structures here)
-( EFORTH-ERRATA it doesnt return 'n T' it returns 'n a' on success
+( EFORTH-ZEN-ERRATA it doesnt return 'n T' it returns 'n a' on success
 : NUMBER? ( a -- n T, a F ; Convert a number string to integer. Push a flag on tos.)
   BASE @ >R         ( save the current radix in BASE )
   0 OVER COUNT      ( a 0 a+1 n --, get length of the string )
@@ -1254,7 +1272,7 @@ interpret(`
 test('1 2 NIP', [2]);
 test('50 10 DIGIT?', [2, forthTrue]);
 test('BL PARSE 1234 PAD PACK$ NUMBER? DROP', [1234]);
-//TODO Note the errata in the docs v. code for NUMBER? means we drop testing the flag will reconsider when see how used
+//TODO Note the EFORTH-ZEN-ERRATA in the docs v. code for NUMBER? means we drop testing the flag will reconsider when see how used
 
 // === Serial I/O pg69 ?KEY KEY EMIT NUF?
 interpret(`
@@ -1276,6 +1294,7 @@ interpret(`
 : PACE ( --) ( Send a pace character for the file downloading process.)
   11 EMIT ; ( 11 is the pace character)
 ( SPACE and SPACES and TYPE moved earlier)
+: CHARS ( +n c -- ) SWAP 0 MAX FOR AFT DUP EMIT THEN NEXT DROP ; ( From Staapl, not in eForth)
 : CR ( --) ( Output carriage return line feed)
   15 EMIT 11 EMIT ;
 `);
@@ -1303,31 +1322,31 @@ interpret(`
 // === Word Parser pg72-73 PARSE parse
 /*
 interpret(`
-// EFORTH-ERRATA this doesnt set >IN past the string, but the callers clearly assume it does.
+// EFORTH-ZEN-ERRATA this doesnt set >IN past the string, but the callers clearly assume it does.
 // the version in eForthAndZen pg72 is obviously broken as it doesn't even increment the pointer in the FOR loop.
 // The version in eForthOverViewV5 matches the spec, but clearly not what is expected.
 // For now keeping the javascript versions that work TODO come back and get this working
 
 : parse ( b u c -- b u delta ; <string> ) ( TODO evaluate control structures here)
   ( Scan string delimited by c. Return found string and its offset. )
-  ( eFORTH-ERRATA - delta appears to be to end of string, not start )
+  ( EFORTH-ZEN-ERRATA - delta appears to be to end of string, not start )
   temp !            ( save delimiter in temp )
   OVER >R DUP       ( b u u)
   IF                ( if string length u=0, nothing to parse )
     1 -             ( u>0, decrement it for FOR-NEXT loop )
     temp @ BL =     ( is delimiter a space? )
     IF              ( b u' --, skip over leading spaces )
-      FOR BL        ( eFORTH-ERRATA says BLANK )
+      FOR BL        ( EFORTH-ZEN-ERRATA says BLANK )
         OVER C@       ( get the next character )
         - 0<          ( is it a space? )
         INVERT
       WHILE
-        1 +           ( eForth errata - correct in eForthOverviewv5.pdf )
+        1 +           ( EFORTH-ZEN-ERRATA - correct in eForthOverviewv5.pdf )
       NEXT            ( b -- , if space, loop back and scan further)
         R> DROP       ( end of buffer, discard count )
         0 DUP EXIT    ( exit with -- b 0 0, end of line)
      THEN
-     ( eFORTH errata - correct in eForthOverview5.pdf: 1 -              ( back up the parser pointer to non-space )
+     ( EFORTH-ZEN-ERRATA - correct in eForthOverview5.pdf: 1 -              ( back up the parser pointer to non-space )
      R>               ( retrieve the length of remaining string )
     THEN
     OVER SWAP           ( b' b' u' -- , start parsing non-space chars )
@@ -1336,7 +1355,7 @@ interpret(`
       OVER C@ -         ( get next character )
       temp @ BL =
       IF 0<
-      ( EFORTH-ERRATA ELSE 1 + )
+      ( EFORTH-ZEN-ERRATA ELSE 1 + )
       THEN
     WHILE               ( if delimiter, exit the loop )
       1 +
@@ -1396,9 +1415,6 @@ test('TOKEN xxx C@', [3]);
 test('BL WORD yyyy DUP C@ SWAP CP @ -', [4, 0]);
 
 // === Dictionary Search pg75-77 NAME> SAME? find NAME?
-constant('=COMP', bitsCOMP); // Compile only word - TODO figure out how used EFORTH-ERRATA used but not defined
-constant('=IMED', bitsIMED); // Immediate word - interpreted during compilation EFORTH-ERRATA used but not defined
-constant('=MASK', bitsMASK); // EFORTH-ERRATA used but not defined
 
 interpret('BL WORD TOKEN CONTEXT @ find SWAP'); const testFind = [SPpop(), SPpop()]; // Get results from old find
 interpret(`
@@ -1428,7 +1444,7 @@ interpret(`
 : find ( a va -- ca na, a F )
   ( Search a vocabulary for a string. Return ca and na if succeeded.)
   SWAP                ( va a )
-  DUP C@ CELLL / temp !   ( va a -- , get cell count ) ( EFORTH-ERRATA was '2 /'
+  DUP C@ CELLL / temp !   ( va a -- , get cell count ) ( EFORTH-ZEN-ERRATA was '2 /'
   DUP @ >R            ( va a -- , save 1st cell of string )
   CELL+ SWAP          ( a' va -- , compare string with names )
   BEGIN               ( fast test, compare only 1st cells )
@@ -1486,7 +1502,7 @@ test('BL WORD TOKEN CONTEXT @ find', testFind.map(k=>k)); // Compare with result
 test('BL WORD TOKEN NAME?', testFind); // Name searches all vocabs
 
 // === Text input from terminal pg 78: ^H TAP kTAP accept EXPECT QUERY
-// EFORTH-ERRATA CTRL used here but not defined.
+// EFORTH-ZEN-ERRATA CTRL used here but not defined.
 interpret(`
 : ^H ( bot eot cur -- bot eot cur)
   ( Backup the cursor by one character.)
@@ -1518,7 +1534,7 @@ interpret(`
 
 : accept ( b u -- b u )
   ( Accept characters to input buffer. Return with actual count.)
-  OVER + OVER       ( b b+u b;  EFORTH-ERRATA fixed in v5 and STAAPL)
+  OVER + OVER       ( b b+u b;  EFORTH-ZEN-ERRATA fixed in v5 and STAAPL)
   BEGIN 
     2DUP XOR        ( b b+u b b=b+u = current pointer? )
   WHILE
@@ -1569,7 +1585,7 @@ interpret(`
   DROP 
   R> ;          ( retrieved err# )
                         
-CREATE NULL$ 0 , ( EFORTH-ERRATA inserts a string "coyote" after this, no idea why! )
+CREATE NULL$ 0 , ( EFORTH-ZEN-ERRATA inserts a string "coyote" after this, no idea why! )
 
 : ABORT ( -- ) 
   ( Reset data stack and jump to QUIT.)
@@ -1584,7 +1600,10 @@ CREATE NULL$ 0 , ( EFORTH-ERRATA inserts a string "coyote" after this, no idea w
   THEN      ( if flag is false, continue )
   do$ DROP  ( skip over the next string ) 
   ;  COMPILE-ONLY
-  
+
+
+( Staapl has alternate definition: : $," [ CHAR " ] LITERAL PARSE HERE PACK$ C@ 1 + ALLOT ;)
+( ERRATA v5 has obvious errata missing the + after COUNT
 : $," ( --) ( Moved earlier from pg90)
   ( Compile a literal string up to next " .)
   34 WORD ( move string to code dictionary)
@@ -1619,7 +1638,7 @@ interpret(`
   ( Interpret a word. If failed, try to convert it to an integer.)
   NAME?                   ( search dictionary for word just parsed )
   ?DUP                    ( is it a defined word? )
-  IF C@                    ( yes. examine the lexicon ) ( EFORTH-ERRATA it should be C@ not @)
+  IF C@                    ( yes. examine the lexicon ) ( EFORTH-ZEN-ERRATA it should be C@ not @)
     [ =COMP ] LITERAL AND ( is it a compile-only word? )
     ABORT" compile ONLY"  ( if so, abort with the proper message )
     EXECUTE EXIT          ( not compile-only, execute it and exit ) 
@@ -1666,9 +1685,98 @@ interpret(`
 `);
 test('[ 1 2 3 ROT', [2, 3, 1]);
 
-// Operating System pg85-86 PRESET XIO FILE HAND I/O CONSOLE QUIT
-// eForth Compiler pg 87
-// Interpreter and Compiler pg 88-90: [ ] ' ALLOT , [COMPILE] COMPILE LITERAL $," RECURSE
+// TODO-ZEN-V5-STAAPL - COMPARE ABOVE HERE
+
+// === Operating System pg85-86 PRESET XIO FILE HAND I/O CONSOLE QUIT
+
+interpret(`
+( EFORTH-V5-ERRATA uses TIB #TIB CELL+ ! which since ' TIB #TIB CELL+ @' is a NOOP )
+( EFORTH-ZEN-ERRATA uses =TIB but doesnt define =TIB which is TIBB)
+: PRESET ( -- )
+  ( Reset data stack pointer and the terminal input buffer. )
+  SP0 @ SP!   ( initialize data stack )
+  [ =TIB ] LITERAL #TIB CELL+ ! ; ( initialize terminal input buffer )
+
+: XIO ( prompt echo tap -- )
+  ( Reset the I/O vectors 'EXPECT, 'TAP, 'ECHO and 'PROMPT.)
+  [ ' accept ] LITERAL 'EXPECT !  ( vector EXPECT )
+  'TAP !                          ( init kTAP )
+  'ECHO !                         ( init ECHO ) 
+  'PROMPT ! ;                     ( init system prompt )
+
+: FILE ( -- )
+  ( Select I/O vectors for file download.)
+  [ ' PACE ] LITERAL  ( send 11 for acknowledge )
+  [ ' DROP ] LITERAL  ( do not echo characters )
+  [ ' kTAP ] LITERAL  ( ignore control characters )
+  XIO ;
+
+
+: HAND ( -- )
+  ( Select I/O vectors for terminal interface.)
+  [ ' .OK  ] LITERAL  ( say 'ok' if all is well)
+  [ ' EMIT ] LITERAL  ( echo characters ) ( EFORTH-ZEN-ERRATA EFORTH-STAPPL-ERRATTA uses EMIT which is 'EMIT @', V5's use of EMIT is better because respects changes to 'EMIT 
+  [ ' kTAP ] LITERAL  ( ignore control characters )
+  XIO ;
+
+( EFORTH-ZEN-ERRATA has 'RX?' should be '?RX'
+CREATE I/O  ' ?RX , ' TX! , ( Array to store default I/O vectors. )
+
+: CONSOLE ( -- )
+  ( Initiate terminal interface.)
+  I/O 2@ '?KEY 2!   ( get defaults from I/O ) ( EFORTH-STAAPL EFORTH-ZEN errata has 'KEY?. V5 fixes )
+  HAND ;            ( keyboard input )
+
+: que ( -- ) 
+  QUERY ( get a line of commands from )
+  EVAL ; ( Evaluate it)
+
+: QUIT ( -- )
+ ( Reset return stack pointer and start text interpreter. )
+  RP0 @ RP!           ( initialize the return stack )
+  BEGIN
+    [COMPILE] [       ( start text interpreter )
+    BEGIN
+      [ ' que ] LITERAL ( get a line and evaluate it) 
+      CATCH             ( execute commands with error handler)
+      ?DUP
+    UNTIL ( a)          ( exit if an error occurred )
+    ( 'PROMPT @ SWAP )  ( EFORTH-ZEN and EFORTH-V5 save current prompt address, Staapl doesnt)
+    CONSOLE             ( Initialize for terminal interaction)
+    NULL$ OVER XOR      ( is error address=NULL$ ? )
+    ( V5, ZEN and Staapl differ, prefer Staapl I think)
+    IF                  ( its not NULL$ )
+      CR TIB #TIB @ TYPE ( Display line in TIB )
+      CR >IN @ [ CHAR ^ ] LITERAL CHARS ( ^ under offending word )
+      CR .$ ."  ? "     ( followed by error message and "?" )
+    THEN 
+    PRESET              ( reset the data stack )
+    ( V5 and ZEN also send "ERR" to file handler if prompt is not OK which is a little off )
+  AGAIN ;               ( go back get another command line )
+`);
+//TODO-IO test PRESET HAND CONSOLE QUIT
+
+// TODO-ZEN-V5-STAAPL - COMPARE BELOW HERE
+
+// === eForth Compiler pg 87 ======
+
+// === Interpreter and Compiler pg 88-90: [ ] ' ALLOT , [COMPILE] COMPILE LITERAL $," RECURSE
+interpret(`
+( "," COMPILE LITERAL $," are moved earlier, redefinition of ] is moved later as needs $COMPILE ) 
+: ' ( -- ca ) TOKEN NAME? IF EXIT THEN THROW ;
+
+: ALLOT ( n -- ) CP +! ; ( ERRATA Zen has +1 instead of +! fixed in V5 and Staapl) 
+
+: [COMPILE] ( -- ; <string> ) ' , ; IMMEDIATE ( Needs redefining to use new "'" )
+
+( ERRATA Staapl & Zen do 'CURRENT @ !', v5 does 'NAME> ,' this is fundamentally different usage, ANS matches latter )
+: RECURSE ( -- ) LAST @ NAME> , ; IMMEDIATE
+`);
+test("1 ' DUP EXECUTE", [1, 1]);
+test("HERE 2 ALLOT HERE SWAP -", [2]);
+test(': foo [COMPILE] ( ; foo 2 )', []);
+test(': foo ?DUP IF DUP 1 - RECURSE THEN ; 3 foo', [ 3, 2, 1]);
+
 // Control Structures pg91-92: FOR BEGIN NEXT UNTIL AGAIN IF AHEAD REPEAT THEN AFT ELSE WHILE
 // String Literals pg93: ABORT" $" ." ( ABORT" ." moved to pg84 where used )
 // Name Dictionary Compiler pg94-96: ?UNIQUE $,n $COMPILE OVERT ; ] call, : IMMEDIATE  (see dollarCommaN)
