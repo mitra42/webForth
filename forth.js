@@ -15,7 +15,7 @@
  */
 
 let testing = 0x0; // 0x01 display words passed to interpreters; 0x02 each word in tokenthread
-let testingDepth = 4;
+let testingDepth = 6;
 let padTestLength = 0; // Display pad length
 // == Some debugging routines, can all be commented out (as long as their calls are)
 let debugName; // Set in run()
@@ -40,7 +40,7 @@ const RTS = 0x80 * CELLL; // return stack/TIB size // eFORTH-DIFF was 64 which i
 const SPS = 0x80 * CELLL; // Size of data stack 256 bytes for now
 // From top down
 const EM = 0x4000; // top of memory
-const UPP = EM - US; // start of user area
+const UPP = EM - US; // start of user area // TODO-MULTI UP should be a variable, and used in most places UPP is
 const RPP = UPP - (8 * CELLL); // top of return stack RP0 TODO figure out if this 8 celll buffer is used - something about a word buffer
 const TIBB = RPP - RTS; // Terminal input buffer
 const SPP = TIBB - (8 * CELLL); // start of data stack - bottom down, points at top of stack TODO figure out if this 8 celll buffer is used - something about a word buffer
@@ -58,7 +58,7 @@ let IP = 0;  // Interpreter Pointer
 let SP = SPP;  // Data Stack Pointer
 let RP = RPP;  // Return Stack Pointer (aka BP in 8086)
 //let WP = 0;  // Word or Work Pointer
-//let UP = 0;  // User Area Pointer
+let UP = UPP;  // User Area Pointer // TODO-MULTI will move this around
 
 
 const m = Buffer.alloc(EM); // Allocate as one big buffer for now. TODO-MEM redo as a struct of some sort or poss u16 array
@@ -77,8 +77,8 @@ function RPpush(u16) { m[--RP] = u16 & 0xFF; m[--RP] = (u16 >> 8); }
 function IPnext() { return (m[IP++] << 8) | m[IP++]; }
 function Mstore(a, v) { m[a++] = v >> 8; m[a] = v & 0xFF; }
 function Mfetch(a) { return (m[a++] << 8) | m[a]; }
-function Ufetch(userindex, offset = 0) { return Mfetch(UPP + userindex + offset); }
-function Ustore(userindex, w, offset = 0) { return Mstore(UPP + userindex + offset, w); }
+function Ufetch(userindex, offset = 0) { return Mfetch(UP + userindex + offset); }
+function Ustore(userindex, w, offset = 0) { return Mstore(UP + userindex + offset, w); }
 
 // Handle the Code and Namespace \pointer, which always points after last thing compiled into dictionary - in eForthAndZen this is '$'
 const CURRENToffset = 64;
@@ -187,16 +187,21 @@ function $DW(...words) { // Forth presumes big-endian, high word stored at low m
 
 console.assert(CELLL === 2); // Presuming its 2
 
+function qUnique() { // a -- a; Check if unique and display warning
+  SPpush(SPfetch());      // DUP
+  SPpush(currentFetch()); // dictionary to search
+  find();                 // a xt na | a a F
+  if (SPpop()) {
+    SPpop(); // Discard xt
+    console.log('Duplicate definition of', countedToJS(SPfetch())); // Catch duplicates - report, but allow
+  } else {
+    SPpop();                // DROP a
+  }
+}
 function dollarCommaN() { // na -- ; Same function as $,n on pg94 common between $CODE and ':'
-  let a = SPpop();            //            ; a = na
-  if (m[a]) {                 // DUP C@ IF  ; test for no word
-    SPpush(a);
-    SPpush(currentFetch());
-    find();                   // xt na | a F
-    if (SPpop()) {
-      console.log('Duplicate definition of', countedToJS(a)); // Catch duplicates - probably an error
-    }
-    SPpop();                  // remove xt of previous definition or a if not found.
+  if (m[SPfetch()]) {                 // DUP C@ IF  ; test for no word
+    qUnique();
+    a = SPpop();
     lastStore(a);             // DUP LAST ! ; a=na  ; LAST=na
     a -= CELLL;               // CELL-      ; a=la
     // Link address points to previous NA (prev value of LAST)
@@ -206,13 +211,12 @@ function dollarCommaN() { // na -- ; Same function as $,n on pg94 common between
     npStore(a);               // DUP NP !   ; NP=ca // adjust name pointer
     Mstore(a, cpFetch());     // ! EXIT     ; ca=CP ; code field to where will build in dictionary
   } else {                    // THEN $" name" THROW ;
-    console.log('name error');
+    console.log('name error'); // This is an error - is a THROW when in FORTH
   }
 }
 
 function OVERT() {
-  const last = lastFetch();
-  Mstore(currentFetch(), last); // LAST @ CURRENT @ !
+  Mstore(currentFetch(), lastFetch()); // LAST @ CURRENT @ !
 }
 
 function $CODE(lex, name) { //TODO-CELLL check this carefully
@@ -254,7 +258,7 @@ function $COLON(name) {
 }
 */
 
-const tokenUser = tokenFunction(payload => SPpush(Mfetch(payload) + UPP));
+const tokenUser = tokenFunction(payload => SPpush(Mfetch(payload) + UP));
 
 function $USER(name) { // Note unlike eForth we use Token threading see USER() which also initialized
   if (name) {
@@ -285,6 +289,7 @@ function $NEXT() {
 function initRegisters() {
   SP = SPP;
   RP = RPP;
+  IP = 0;
 }
 function doCOLDD() {
   initRegisters();
@@ -325,11 +330,19 @@ constant('=TIB', TIBB);
 constant('=COMP', bitsCOMP); // Compile only word - TODO figure out how used EFORTH-ZEN-ERRATA used but not defined
 constant('=IMED', bitsIMED); // Immediate word - interpreted during compilation EFORTH-ZEN-ERRATA used but not defined
 constant('=MASK', bitsMASK); // EFORTH-ZEN-ERRATA used but not defined
+constant('tokenDoList', tokenDoList);
+constant('tokenUser', tokenUser);
+constant('tokenVar', tokenVar);
+constant('tokenNextVal', tokenNextVal);
+constant('=US', US ); // Size of user area
 
 // === Add some functions defined earlier prior to dictionary being available
+code('initRegisters', initRegisters);
 code('find', find);
-code('OVERT', OVERT);
-code('$,n', dollarCommaN);
+// code('OVERT', OVERT);  // Note redefined below in FORTH but not used prior to that
+// code('?UNIQUE', qUnique); // Note redefined below in FORTH but not used prior to that
+// code('$,n', dollarCommaN); // Note redefined below in FORTH but not used prior to that
+// code('$COMPILE', jsCOMPILE); // Note redefined below in FORTH but not used prior to that
 
 // == Debugging code words
 code('debugNA', () => console.log('NAME=', countedToJS(SPfetch()))); // Print the NA on console
@@ -339,7 +352,7 @@ code('testing3', () => testing |= 3); // this word can be slotted in a definitio
 // Basic key I/O eForthAndZen pg 35
 code('BYE', 'TODO-bye');
 code('?RX', () => console.error('TODO ?RX not defined')); //TODO-IO
-code('TX!', () => console.error('TODO TX! not defined')); //TODO-IO
+code('TX!', () => console.error('TODO TX! not defined', SPpop())); //TODO-IO
 code('!IO', () => console.error('TODO !IO not defined')); //TODO-IO
 
 /* TODO-IO FAILED attempt to get stdin/stdout IO then code see issue #14
@@ -479,7 +492,7 @@ code('UM+', () => {
 //VARIABLE UP; //TODO-VAR figure out how to point VARIABLE UP at UP for high level forth (maybe not reqd) //TODO-MULTITASK think
 
 function USER(name, init) {
-  Mstore(UPP + _USER, init);
+  Mstore(UP + _USER, init);
   $USER(name); // Put into dictionary
   userInit.push((typeof init === 'string') ?  name2xt(init) : init);
 }
@@ -524,13 +537,13 @@ USER('LAST', lastFetch()); // normally set on pg106 but using live
 
 // === JS interpreter - will be discarded when done or built out
 // IMMEDIATE sets a word to be interpreted, even when compiling - most useful for control loops but also pre-calculating a literal.
-// It is moved early from pg96: : IMMEDIATE [ =IMED ] LITERAL LAST @ C@ OR LAST @ C! ; where IMED
+// It is moved early from pg96: : IMMEDIATE =IMED LITERAL LAST @ C@ OR LAST @ C! ; where IMED
 // EFORTH-ZEN-ERRATA IMMEDIATE COMPILE-ONLY =COMP =IMED is not defined , in EFORTHv5 its defined as 0x80
 function setHeaderBits(b) {
   const lastNA = lastFetch(); // LAST points at the name field of the last defined word
   m[lastNA] |= b;
 }
-code('IMMEDIATE', () => setHeaderBits(bitsIMED));
+code('IMMEDIATE', () => setHeaderBits(bitsIMED)); // pg96
 code('COMPILE-ONLY', () => setHeaderBits(bitsCOMP));
 
 function tibIn() { return UfetchName('#TIB', CELLL) + UfetchName('>IN'); }  // TIB >IN @ +
@@ -586,11 +599,13 @@ function NUMBER() { //TODO-INTERPRETER-5 make this work like things stored in 'N
 }
 // Define NUMBER and store its xt in 'NUMBER
 UstoreName("'NUMBER", code('NUMBER', NUMBER));
+const redefined = ['TOKEN', 'find', "'", '$,', '$,n', ']', ':', 'IMMEDIATE']; // Have to be careful about use of these as will use old version
+const redefinedImmediate = ['[', ';']; // Don't care about these as being immediate they are not left around
 
 const jsCOMPILE = code('jsCOMPILE', () => { // a -- ...; similar to $COMPILE at pg96
   // TODO-EFFICIENCY - remove next check once have checked all code
   // note expecting immediate words '(', '[', [COMPILE]
-  if (['TOKEN', 'find', "'", '$,'].includes(countedToJS(SPfetch())))
+  if (redefined.includes(countedToJS(SPfetch())))
     console.log("Compiling", countedToJS(SPfetch()), "in", countedToJS(lastFetch()), "that gets redefined");
   findName(); // xt na | a F
   const na = SPpop();
@@ -604,7 +619,7 @@ const jsCOMPILE = code('jsCOMPILE', () => { // a -- ...; similar to $COMPILE at 
       $DW(xt);
     }
   } else { // a
-    threadtoken(UfetchName("'NUMBER")); // n T | a F //TODO-THREADING this might not work, if NUMBER is colon word
+    run(UfetchName("'NUMBER")); // n T | a F //TODO-THREADING this might not work, if NUMBER is colon word
     if (SPpop()) {
       $DW('doLIT', SPpop());
     } else {
@@ -620,13 +635,12 @@ const jsINTERPRET = code('jsINTERPRET', () => { // a -- ...; Based on signature 
     const xt = SPpop();
     run(xt); //TODO-THREADING maybe should be threadToken - but that won't work if this isn't running inside run already
   } else {
-    threadtoken(UfetchName("'NUMBER")); // n T | a F //TODO-THREADING this might not work, if NUMBER is colon word
+    run(UfetchName("'NUMBER")); // n T | a F //TODO-THREADING this might not work, if NUMBER is colon word
     if (!SPpop()) {
-      console.log("Number conversion of",w,"failed"); // TODO handle error in Forth-ish way (via Throw)
+      console.log("Number conversion of", countedToJS(SPfetch()),"failed"); // TODO handle error in Forth-ish way (via Throw)
     }
   }
 });
-UstoreName("'EVAL", jsINTERPRET); // Start off interpreting
 
 function jsEVAL(inp) { // equivalent to Forth EVAL with few things wrapped around it - so not exact same TODO align it
   //OBS: input = inp; // Could point at TIB
@@ -673,18 +687,23 @@ function test(inp, arr, { pad = undefined, hold = undefined } = {}) {
 // === A group of words defined relative to the JS interpreter but will be redefined to the Forth interpreter at pg TODO
 
 // TODO could replace with : ':' TOKEN $,n [ ' doLIST ] LITERAL CALL, ] ; see pg96
+function openBracket() { UstoreName("'EVAL", jsINTERPRET); }
+openBracket(); // Start off interpreting
+code('[', openBracket); interpret('IMMEDIATE'); //pg84 and pg88
+
+
+function closeBracket() { UstoreName("'EVAL", jsCOMPILE); }
+code(']', closeBracket); // pg88 and pg95
+
 code(':', () => {
   jsTOKEN();  // a; (counted string in named space)
   dollarCommaN();
   $DW(tokenDoList); // Must be after creating the name and links etc
-  UstoreName("'EVAL", jsCOMPILE);
+  closeBracket();
 });
 
 
-code(';', () => { $DW(EXIT); OVERT(); UstoreName("'EVAL", jsINTERPRET); }); // TODO-INTERPRETER replace with definition of ;
-interpret('IMMEDIATE');
-code('[', () => UstoreName("'EVAL", jsINTERPRET)); interpret('IMMEDIATE'); //pg84 and pg88
-code(']', () => UstoreName("'EVAL", jsCOMPILE)); // pg88
+code(';', () => { $DW(EXIT); OVERT(); openBracket(); }); interpret('IMMEDIATE'); // pg95
 // Create a new word that doesnt allocate any space, but will push address of that space. )
 // : CREATE TOKEN $,n OVERT COMPILE tokenVar ; // except tokenVar isn't an accessible value
 code('CREATE', () => { jsTOKEN(); dollarCommaN(); OVERT(); $DW(tokenVar); });
@@ -733,6 +752,8 @@ interpret(`
 test('CHAR )', [41]);
 test('CTRL H', [08]);
 
+interpret(': NIP SWAP DROP ;'); // x1 x2 -- x2
+test('1 2 NIP', [2]);
 
 // Comment character - from here on we can use ( xxx) in interpreted strings
 interpret(': ( 41 PARSE 2DROP ; IMMEDIATE'); // pg74 : ( [ CHAR ) ] LITERAL PARSE 2DROP ; IMMEDIATE
@@ -756,7 +777,7 @@ code("'", () => { // -- xt; Search for next word in input stream // TODO-RECODE 
 
   // TODO-EFFICIENCY - remove next check once have checked all code
   // note expecting immediate words '(',
-  if (['TOKEN', 'find', '[', "'", 'LITERAL', '$,'].includes(countedToJS(SPfetch())))
+  if (redefined.includes(countedToJS(SPfetch())))
     console.log("Pushing on stack", countedToJS(SPfetch()), "in", countedToJS(lastFetch()), "that gets redefined");
 
   findName(); // xt na | a 0
@@ -798,49 +819,29 @@ interpret(`
 // TODO-TEST test of above group non-obvious as writing to dictionary.
 
 // === Control structures - were on pg91 but needed earlier pg 91-92 but moved early
+// this version comes from EFORTH-V5 which introduced MARK> >MARK
 interpret(`
-: FOR ( -- a; Start a FOR-NEXT loop structure in a colon definition)
-  COMPILE >R HERE ; IMMEDIATE
-
-: BEGIN ( -- a ; Start an infinite or indefinite loop structure)
-  HERE ; IMMEDIATE ( push HERE for later ref. )
-
-: NEXT ( a --; Terminate a FOR-NEXT loop structure)
-  COMPILE next , ; IMMEDIATE
-
-: UNTIL ( a -- ; Terminate a BEGIN-UNTIL indefinite loop structure )
-  COMPILE ?branch , ; IMMEDIATE
-
-: AGAIN ( a -- ; Terminate a BEGIN-AGAIN infinite loop structure )
-  COMPILE branch , ; IMMEDIATE
-( TODO interpret 'COMPILE-ONLY' - how is COMPILE-ONLY used, where does it set flags?)
-
-: IF ( -- A; begin conditional branch structure pg 92)
-  COMPILE ?branch HERE 0 , ; IMMEDIATE
-
-: AHEAD ( -- A; compile a forward branch instruction. pg  92)
-  COMPILE branch HERE 0 , ; IMMEDIATE
-
-: REPEAT ( A a -- ; Terminate BEGIN-WHILE-REPEAT loop )
-  [COMPILE] AGAIN HERE SWAP ! ; IMMEDIATE
-
-: THEN ( A --; terminate conditional branch structure pg 92)
-  HERE SWAP ! ; IMMEDIATE
-
-: AFT ( a -- a A ; Jump to THEN in a FOR-AFT-THEN-NEXT loop the first time through. pg92)
-  DROP            ( discard address left by IF )
-  [COMPILE] AHEAD ( compile unconditional jump )
-  [COMPILE] BEGIN ( leave HERE on stack )
-  SWAP ; IMMEDIATE         ( realign jump addresses )
-
-: ELSE ( A -- A; False clause of IF ELSE THEN structure pg 92)
-  [COMPILE] AHEAD SWAP [COMPILE] THEN ; IMMEDIATE
-
-: WHILE ( a -- A a ; Conditional branch out of a BEGIN-WHILE-REPEAT loop.)
-  [COMPILE] IF
-  SWAP ; IMMEDIATE
+( FOR-NEXT FOR-AFT-THEN-NEXT BEGIN-AGAIN BEGIN-WHILE-REPEAT BEGIN-UNTIL AHEAD-THEN IF-ELSE-THEN ?WHEN)
+: <MARK ( -- a ) HERE ;
+: <RESOLVE ( a -- ) , ;
+: >MARK ( -- A ) HERE 0 , ;
+: >RESOLVE ( A -- ) <MARK SWAP ! ;
+: FOR ( -- a ) COMPILE >R <MARK ; IMMEDIATE
+: BEGIN ( -- a ) <MARK ; IMMEDIATE
+: NEXT ( a -- ) COMPILE next <RESOLVE ; IMMEDIATE
+: UNTIL ( a -- ) COMPILE ?branch <RESOLVE ; IMMEDIATE
+: AGAIN ( a -- ) COMPILE branch <RESOLVE ; IMMEDIATE
+: IF ( -- A )   COMPILE ?branch >MARK ; IMMEDIATE
+: AHEAD ( -- A ) COMPILE branch >MARK ; IMMEDIATE
+: REPEAT ( A a -- ) [COMPILE] AGAIN >RESOLVE ; IMMEDIATE
+: THEN ( A -- ) >RESOLVE ; IMMEDIATE
+( ERRATA ZEN - doesnt mark this as immediate)
+: AFT ( a -- a A ) DROP [COMPILE] AHEAD [COMPILE] BEGIN SWAP ; IMMEDIATE
+: ELSE ( A -- A )  [COMPILE] AHEAD SWAP [COMPILE] THEN ; IMMEDIATE
+: WHEN ( a A -- a A a ) [COMPILE] IF OVER ; IMMEDIATE
+: WHILE ( a -- A a )    [COMPILE] IF SWAP ; IMMEDIATE
 `);
-// test of above group non-obvious as writing to dictionary.
+// TODO-TEST of above group non-obvious as writing to dictionary.
 // IF-THEN tested in ?DUP;
 
 // === Multitasking pg48 - not implemented in eForth TODO
@@ -849,6 +850,7 @@ interpret(`
 interpret(`
 : ?DUP DUP IF DUP THEN ; ( w--ww|0) ( Dup top of stack if its is not zero.)
 : ROT >R SWAP R> SWAP ; ( w1, w2, w3 -- w2 w3 w1; Rotate third item to top)
+: -ROT SWAP >R SWAP R> ; ( w1, w2, w3 -- w3 w1 w2; Rotate top item to third)
 : 2DUP OVER OVER ; ( w1 w2 -- w1 w2 w1 w2;)
 ( 2DROP moved earlier )
 `);
@@ -879,7 +881,7 @@ test('1 2 SP@ 2 + SP!', [1]);
 // More comparison pg51-52
 interpret(`
 : = XOR IF 0 EXIT THEN -1 ; ( w w -- t)
-: U< 2DUP XOR 0< IF SWAP DROP 0< EXIT THEN - 0< ;
+: U< 2DUP XOR 0< IF NIP 0< EXIT THEN - 0< ;
 : < 2DUP XOR 0< IF DROP 0< EXIT THEN - 0< ;
 : MAX 2DUP < IF SWAP THEN DROP ;
 : MIN 2DUP SWAP < IF SWAP THEN DROP ;
@@ -939,7 +941,7 @@ interpret(`
 
 : / ( n n -- q)
   ( Signed divide. Return quotient only)
-  /MOD SWAP DROP ; ( discard remainder)
+  /MOD NIP ; ( discard remainder)
 
 : UM* ( u1 u2 -- ud)
   ( Unsigned multiply. Return double product.)
@@ -984,7 +986,7 @@ interpret(`
 
 : */ ( n1 n2 n3 -- q )
   ( Multiple by n1 by n2, then divide by n3. Return quotient only)
-  */MOD SWAP DROP ; ( n1*n2/n3 and discard remainder)
+  */MOD NIP ; ( n1*n2/n3 and discard remainder)
 `);
 test('5 7 2 */MOD', [1, 17]);
 test('5 7 2 */', [17]);
@@ -1104,7 +1106,7 @@ interpret(`
   1 + SWAP CMOVE      ( ; store characters in cells - 0 padded to end of cell)
   R> ;        ( leave only word buffer address )
 `);
-test('NP @ 4 + COUNT SWAP DROP', [5]);
+test('NP @ 4 + COUNT NIP', [5]);
 test('NP @ 4 + COUNT PAD SWAP CMOVE', [], { pad: 'PACK$' });
 test('PAD 3 + 5 BL FILL', [], { pad: 'PAC     ' });
 test('PAD 8 -TRAILING >R PAD - R>', [0, 3], { pad: 'PAC' });
@@ -1167,8 +1169,9 @@ interpret(`
   SWAP 0 MAX FOR AFT SPACE THEN NEXT DROP ;
 : TYPE ( b u -- ; Output u characters from b)
   FOR AFT DUP C@ EMIT 1 + THEN NEXT DROP ;
-: .$ ( a -- ) COUNT TYPE ; ( from Staapl, not in eForth)
 `);
+//TODO-IO : .$ ( a -- ) COUNT TYPE ; ( from Staapl, not in eForth)
+code('.$', () => console.log(countedToJS(SPpop())));
 // TODO-TEST TODO-OUTPUT EMIT, SPACE SPACES TYPE
 
 // === Number output pg66 str HEX DECIMAL .R U.R U. . ?
@@ -1213,8 +1216,6 @@ interpret(`
 // === Numeric input pg67-68 DIGIT? NUMBER?
 // EFORTH-ZEN-ERRATA NIP is not designed
 interpret(`
-: NIP ( x1 x2 -- x2 )
-  SWAP DROP ;
 : DIGIT? ( c base -- u t ; Convert a character to its numeric value. A flag indicates success.)
   >R                    ( save radix )
   48 -          ( character offset from digit 0 - would be better as '[ CHAR 0 ] LITERAL' but dont have '[')
@@ -1269,9 +1270,12 @@ interpret(`
   R> BASE ! ;       ( restore radix )
 
 `);
-test('1 2 NIP', [2]);
 test('50 10 DIGIT?', [2, forthTrue]);
 test('BL PARSE 1234 PAD PACK$ NUMBER? DROP', [1234]);
+interpret(`
+' NUMBER? 'NUMBER !
+`);
+test('123', [123]);
 //TODO Note the EFORTH-ZEN-ERRATA in the docs v. code for NUMBER? means we drop testing the flag will reconsider when see how used
 
 // === Serial I/O pg69 ?KEY KEY EMIT NUF?
@@ -1302,19 +1306,21 @@ interpret(`
 
 // === String Literal pg71 do$ $"| ."|
 interpret(`
-: do$ ( --a) ( Return the address of a compiled string.)
-  R>    ( this return address must be preserved)
-  R@    ( get address of the compiled string)
-  R>    ( get another copy)
-  COUNT + ALIGNED >R  ( replace it with addr after string)
-  SWAP  ( get saved address to top)
-  >R ;  ( restore the saved return address)
+: do$ ( --a) 
+  ( Return the address of a compiled string.)
+  ( Relies on assumption that do$ is part of definition of something e.g. $"| or ."|  that is run time code for the string )
+  R>                  ( this return address must be preserved S: R0; R: R1... )
+  R@                  ( get address of the compiled string S: R0 R1; R: R1... )
+  R>                  ( get another copy S: R0 R1 R1; R: R2... )
+  COUNT + ALIGNED >R  ( replace it with addr after string; S: R0 R1; R: R1' R2... )
+  SWAP  ( get saved address to top; S: R1 R0; R: R1' R2...)
+  >R ;  ( restore the saved return address S: R1; R: R0 R1' R2 ...)
 
 : $"| ( -- a) ( Run time routine compiled by $". Return address of a compiled string.)
   do$ ; ( return string address only)
 : ."| ( -- ) ( Run time routine of ." . Output a compiled string.)
-  do$           ( get string address)
-  COUNT TYPE ;  ( print the compiled string)
+  do$        ( get string address)
+  .$ ;       ( print the compiled string)
 `);
 //TODO-TEST check $"| tested by $" once that is defined
 //TODO-TEST TODO-OUTPUT then check ."| tested by ."
@@ -1420,7 +1426,7 @@ interpret('BL WORD TOKEN CONTEXT @ find SWAP'); const testFind = [SPpop(), SPpop
 interpret(`
 : NAME> ( na -- ca )
   ( Return a code address given a name address.)
-  2 CELLS - ( move to code pointer field ) 
+  2 CELLS - ( move to code pointer field )
   @ ; ( get code field address )
 
 : SAME? ( a1 a2 u -- a1 a2 f \\ -0+ )
@@ -1509,7 +1515,7 @@ interpret(`
   >R OVER     ( bot eot bot --)
   R@ < DUP    ( bot<cur ? )
   IF [ CTRL H ] LITERAL ( yes, echo backspace )
-    'ECHO @EXECUTE 
+    'ECHO @EXECUTE
   THEN        ( bot eot cur 0|-1 -- )
   R> + ;      ( decrement cur, but not passing bot )
 
@@ -1535,11 +1541,11 @@ interpret(`
 : accept ( b u -- b u )
   ( Accept characters to input buffer. Return with actual count.)
   OVER + OVER       ( b b+u b;  EFORTH-ZEN-ERRATA fixed in v5 and STAAPL)
-  BEGIN 
+  BEGIN
     2DUP XOR        ( b b+u b b=b+u = current pointer? )
   WHILE
     KEY             ( b b+u b c; get one more character )
-    DUP BL - 95 U<  ( b b+u b c f; is it printable? ) 
+    DUP BL - 95 U<  ( b b+u b c f; is it printable? )
     IF TAP          ( b b+u b+1 ; yes, accept and echo it )
     ELSE 'TAP @EXECUTE ( no, process control code )
     THEN
@@ -1547,7 +1553,7 @@ interpret(`
   DROP              ( b b+u ; drop current pointer
   OVER - ;          ( b u; leave actual count)
 
-: EXPECT ( b u -- ) 
+: EXPECT ( b u -- )
   ( Accept input stream and store count in SPAN.)
   'EXPECT @EXECUTE  ( execute accept )
   SPAN !            ( store character count in SPAN )
@@ -1582,23 +1588,23 @@ interpret(`
   R> HANDLER !  ( restore previously saved error handler frame )
   R> SWAP >R    ( retrieve the data stack pointer saved )
   SP!           ( restore the data stack )
-  DROP 
+  DROP
   R> ;          ( retrieved err# )
-                        
+
 CREATE NULL$ 0 , ( EFORTH-ZEN-ERRATA inserts a string "coyote" after this, no idea why! )
 
-: ABORT ( -- ) 
+: ABORT ( -- )
   ( Reset data stack and jump to QUIT.)
   NULL$   ( take address of NULL$ )
   THROW ; ( and give it to current CATCH )
 
 : abort" ( f -- )
   ( Run time routine of ABORT" . Abort with a message.)
-  IF        ( if flag is true, abort ) 
+  IF        ( if flag is true, abort )
     do$     ( take address of next string )
     THROW   ( and give it to CATCH )
   THEN      ( if flag is false, continue )
-  do$ DROP  ( skip over the next string ) 
+  do$ DROP  ( skip over the next string )
   ;  COMPILE-ONLY
 
 
@@ -1613,12 +1619,12 @@ CREATE NULL$ 0 , ( EFORTH-ZEN-ERRATA inserts a string "coyote" after this, no id
 ( Moved earlier from pg93 )
 : ABORT" ( -- ; <string> )
   ( Conditional abort with an error message.)
-  COMPILE abort"  ( compile runtime abort code ) 
+  COMPILE abort"  ( compile runtime abort code )
   $," ; IMMEDIATE ( compile abort message )
 
 ( Moved earlier from pg93 )
 : ." ( -- ; <string> )
-  ( Compile an inline string literal to be typed out at run time.) 
+  ( Compile an inline string literal to be typed out at run time.)
   COMPILE ."| ( compile print string code )
   $," ; IMMEDIATE ( compile print string )
 `);
@@ -1641,25 +1647,25 @@ interpret(`
   IF C@                    ( yes. examine the lexicon ) ( EFORTH-ZEN-ERRATA it should be C@ not @)
     [ =COMP ] LITERAL AND ( is it a compile-only word? )
     ABORT" compile ONLY"  ( if so, abort with the proper message )
-    EXECUTE EXIT          ( not compile-only, execute it and exit ) 
+    EXECUTE EXIT          ( not compile-only, execute it and exit )
   THEN                    ( not defined in the dictionary )
   'NUMBER @EXECUTE        ( convert it to a number ) ( TODO-NUMBER-5 merge with number in js)
   IF EXIT THEN            ( exit if conversion is successful )
   THROW ;                 ( else generated the error condition )
 
-: .OK ( -- ) 
+: .OK ( -- )
   ( Display 'ok' only while interpreting.)
   [ ' $INTERPRET ] LITERAL
-  'EVAL @ = 
+  'EVAL @ =
   IF ."  ok" THEN CR ;
 
-: ?STACK ( -- ) 
+: ?STACK ( -- )
   ( Abort if the data stack underflows.)
   DEPTH 0< ABORT" underflow" ; ( Note staapl uses $" THROW, v5 uses ABORT)
 
 : EVAL ( -- )
   ( Interpret the input stream.)
-  BEGIN 
+  BEGIN
     TOKEN ( -- a)   ( parse a word and leave its address )
     DUP C@          ( is the character count 0? )
   WHILE             ( no )
@@ -1679,7 +1685,7 @@ test(`: foo 1 2DROP ?STACK ; : bar [ ' foo ] LITERAL CATCH ; bar C@`, [9]); debu
 interpret(`
 : [ ( -- )
   ( Start the text interpreter.) ( Replaces JS version )
-  [ ' $INTERPRET ] LITERAL 
+  [ ' $INTERPRET ] LITERAL
   'EVAL !                   ( store $INTERPRET in 'EVAL )
   ; IMMEDIATE               ( must be done even while compiling )
 `);
@@ -1701,7 +1707,7 @@ interpret(`
   ( Reset the I/O vectors 'EXPECT, 'TAP, 'ECHO and 'PROMPT.)
   [ ' accept ] LITERAL 'EXPECT !  ( vector EXPECT )
   'TAP !                          ( init kTAP )
-  'ECHO !                         ( init ECHO ) 
+  'ECHO !                         ( init ECHO )
   'PROMPT ! ;                     ( init system prompt )
 
 : FILE ( -- )
@@ -1715,7 +1721,7 @@ interpret(`
 : HAND ( -- )
   ( Select I/O vectors for terminal interface.)
   [ ' .OK  ] LITERAL  ( say 'ok' if all is well)
-  [ ' EMIT ] LITERAL  ( echo characters ) ( EFORTH-ZEN-ERRATA EFORTH-STAPPL-ERRATTA uses EMIT which is 'EMIT @', V5's use of EMIT is better because respects changes to 'EMIT 
+  [ ' EMIT ] LITERAL  ( echo characters ) ( EFORTH-ZEN-ERRATA EFORTH-STAPPL-ERRATTA uses EMIT which is 'EMIT @', V5's use of EMIT is better because respects changes to 'EMIT
   [ ' kTAP ] LITERAL  ( ignore control characters )
   XIO ;
 
@@ -1727,7 +1733,7 @@ CREATE I/O  ' ?RX , ' TX! , ( Array to store default I/O vectors. )
   I/O 2@ '?KEY 2!   ( get defaults from I/O ) ( EFORTH-STAAPL EFORTH-ZEN errata has 'KEY?. V5 fixes )
   HAND ;            ( keyboard input )
 
-: que ( -- ) 
+: que ( -- )
   QUERY ( get a line of commands from )
   EVAL ; ( Evaluate it)
 
@@ -1737,7 +1743,7 @@ CREATE I/O  ' ?RX , ' TX! , ( Array to store default I/O vectors. )
   BEGIN
     [COMPILE] [       ( start text interpreter )
     BEGIN
-      [ ' que ] LITERAL ( get a line and evaluate it) 
+      [ ' que ] LITERAL ( get a line and evaluate it)
       CATCH             ( execute commands with error handler)
       ?DUP
     UNTIL ( a)          ( exit if an error occurred )
@@ -1749,7 +1755,7 @@ CREATE I/O  ' ?RX , ' TX! , ( Array to store default I/O vectors. )
       CR TIB #TIB @ TYPE ( Display line in TIB )
       CR >IN @ [ CHAR ^ ] LITERAL CHARS ( ^ under offending word )
       CR .$ ."  ? "     ( followed by error message and "?" )
-    THEN 
+    THEN
     PRESET              ( reset the data stack )
     ( V5 and ZEN also send "ERR" to file handler if prompt is not OK which is a little off )
   AGAIN ;               ( go back get another command line )
@@ -1762,10 +1768,10 @@ CREATE I/O  ' ?RX , ' TX! , ( Array to store default I/O vectors. )
 
 // === Interpreter and Compiler pg 88-90: [ ] ' ALLOT , [COMPILE] COMPILE LITERAL $," RECURSE
 interpret(`
-( "," COMPILE LITERAL $," are moved earlier, redefinition of ] is moved later as needs $COMPILE ) 
+( "," COMPILE LITERAL $," are moved earlier, redefinition of ] is moved later as needs $COMPILE )
 : ' ( -- ca ) TOKEN NAME? IF EXIT THEN THROW ;
 
-: ALLOT ( n -- ) CP +! ; ( ERRATA Zen has +1 instead of +! fixed in V5 and Staapl) 
+: ALLOT ( n -- ) CP +! ; ( ERRATA Zen has +1 instead of +! fixed in V5 and Staapl)
 
 : [COMPILE] ( -- ; <string> ) ' , ; IMMEDIATE ( Needs redefining to use new "'" )
 
@@ -1777,20 +1783,291 @@ test("HERE 2 ALLOT HERE SWAP -", [2]);
 test(': foo [COMPILE] ( ; foo 2 )', []);
 test(': foo ?DUP IF DUP 1 - RECURSE THEN ; 3 foo', [ 3, 2, 1]);
 
-// Control Structures pg91-92: FOR BEGIN NEXT UNTIL AGAIN IF AHEAD REPEAT THEN AFT ELSE WHILE
-// String Literals pg93: ABORT" $" ." ( ABORT" ." moved to pg84 where used )
-// Name Dictionary Compiler pg94-96: ?UNIQUE $,n $COMPILE OVERT ; ] call, : IMMEDIATE  (see dollarCommaN)
-// Defining Words pg97: USER CREATE VARIABLE
-// Utilities pg98
-// Memory Dump pg99 _TYPE do+ DUMP
-// Stack Dump pg100 .S
-// Stack Checking pg101 !CSP ?CSP
-// Dictionary Dump pg102 .ID WORDS
-// Search Token Name pg103 >NAME
-// The simplest Decompiler pg104 SEE
+// === Control Structures pg91-92: FOR BEGIN NEXT UNTIL AGAIN IF AHEAD REPEAT THEN AFT ELSE WHILE
+// All moved earlier
+
+// === String Literals pg93: ABORT" $" ." ( ABORT" ." moved to pg84 where used )
+interpret(`
+: $" ( -- ; <string> )
+  ( Compile an inline string literal.)
+  COMPILE $"|     ( compile string runtime code)
+  $," ; IMMEDIATE ( compile string itself )
+`);
+test(': foo $" hello" COUNT NIP ; foo', [ 5]);
+
+// === Name Dictionary Compiler pg94-96: ?UNIQUE $,n $COMPILE OVERT ; ] call, : IMMEDIATE  (see dollarCommaN)
+
+interpret(`
+: ?UNIQUE ( a -- a ) ( Redefining code word qUNIQUE in Forth)
+  ( Display a warning message if the word already exists.)
+  DUP NAME?       ( name exists already?)
+  IF ."  reDef "  ( if so, print warning )
+    OVER .$       ( with the offending name )
+  THEN DROP ;     ( discard token address )
+`);
+test('TOKEN foo DUP ?UNIQUE -', [0]);
+interpret(`
+: $,n ( na -- ) ( See also dollarCommaN above)
+  ( Build a new dictionary name using the string at na.)
+  DUP C@                      ( null input?)
+  IF ?UNIQUE                  ( duplicate name? )
+    ( na) DUP LAST !          ( save na for vocabulary link for OVERT)
+    ( na) HERE ALIGNED SWAP   ( align code address )
+    ( cp na) CELL-            ( link address )
+    ( cp la) CURRENT @ @      ( link to current vocab)
+    ( cp la na') OVER !
+    ( cp la) CELL- DUP NP !   ( adjust name pointer )
+    ( ptr) ! EXIT             ( save code pointer and exit )
+  THEN                        ( here if null input )
+  $" name" THROW ;            ( this is an error return )
+
+: $COMPILE ( a -- ) ( Redefining code word jsCOMPILE in Forth)
+  ( Compile next word to code dictionary as a token or literal.)
+  NAME?         ( parse the next word out )
+  ?DUP          ( successful? )
+  IF C@         ( yes, get the lexicon )
+    =IMED AND   ( is it an immediate word? ) ( ERRATA V5 has @ - Staapl,Zen correct)
+    IF EXECUTE  ( yes.  execute it )
+    ELSE ,      ( no.  compile it )
+    THEN
+    EXIT        ( done. exit )
+  THEN          ( not a valid word )
+  'NUMBER @EXECUTE ( convert it to a number )
+  IF [COMPILE] LITERAL ( successful. compile a literal number )
+    EXIT        ( done )
+  THEN          ( not a number either )
+  THROW ;       ( generate an error condition )
+
+: OVERT ( -- ) ( Redefining code word in Forth)
+  ( Link a successfully defined word into the current vocabulary. )
+  LAST @        ( name field address of last word )
+  CURRENT @  ! ; ( link it to current vocabulary )
+
+: ; ( -- ) ( redefining code word)
+  ( Terminate a colon definition. )
+  COMPILE EXIT  ( compile exit code )
+  [COMPILE] [   ( return to interpreter state )
+  OVERT ;       ( restore current vocabulary )
+  COMPILE-ONLY IMMEDIATE
+
+: ] ( -- ) ( redefining code word)
+  ( Start compiling the words in the input stream.)
+  [ ' $COMPILE ] LITERAL  ( get code address of compiler )
+  'EVAL ! ;               ( store it in 'EVAL )
+`);
+interpret(`
+: : ( -- ; <string> ) ( redefining code word)
+  ( Start a new colon definition using next word as its name.) 
+  TOKEN $,n   ( compile new word with next name )
+  tokenDoList ,
+  ] ;
+`);
+
+test(': foo 1 ; foo', [1]);
+interpret(`
+( ERRATA v5 has @ instead of C@ )
+: IMMEDIATE ( -- )  ( redefining code word)
+  ( Make the last compiled word an immediate word.)
+  =IMED         ( immediate bit in the name length)
+  LAST @ C@ OR  ( OR it into the length byte )
+  LAST @ C! ;   ( store back to name field )
+
+`);
+//TODO may need JS equivalent - see if used;  : CALL, ( ca -- ) ( DTC 8086 relative call ) [ =CALL ] LITERAL , HERE CELL+ - , ;
+
+// === Defining Words pg97: USER CREATE VARIABLE
+
+// EFORTH-DIFF each of V5, Zen and Staapl do this differently - this is different again because of token threaded architecture)
+interpret(`
+: USER ( u -- ; <string> ) TOKEN $,n OVERT tokenUser , ;
+
+: CREATE ( -- ; <string> ) TOKEN $,n OVERT tokenVar , ;
+
+: VARIABLE ( -- ; <string> ) CREATE 0 , ;
+
+: CONSTANT ( u -- ; <string> ) TOKEN $,n OVERT tokenNextVal , , ;
+`)
+test('VARIABLE foo', []);
+test('12 foo !',[]);
+test('foo @', [12]);
+
+// === Utilities pg98
+// === Memory Dump pg99 _TYPE do+ DUMP
+
+// ERRATA Staapl & Zen - uses -ROT which isnt defined (its ROT ROT)
+// ERRATA Staapl - uses COUNT which is technically correct but poor typing
+interpret(`
+: _TYPE ( b u -- ) 
+  ( Unsigned multiply. Return double product.)
+  FOR           ( repeat u+1 times )
+    AFT         (  skip to THEN the first time )
+    DUP C@      ( get one character from b )
+    >CHAR EMIT  ( display only printable char )
+    1 + 
+  THEN NEXT     ( repeat u times )
+  DROP ;        ( discard b address )
+
+: dm+ ( b u -- b )
+  ( Dump u bytes from , leaving a+u on the stack.)
+  OVER 4 U.R SPACE  ( print address first )
+  FOR AFT           ( repeat u times )
+  DUP C@ 3 U.R      ( display bytes in 3 columns )
+  1 + THEN NEXT ;   ( repeat u times )
+
+: DUMP ( b u -- )
+  ( Dump u bytes from a, in a formatted manner.)
+  BASE @ >R             ( save current radix )
+  HEX                   ( always dump in hex )
+  16 /                  ( dump 16 bytes at a time)
+  FOR CR                ( new line for each 16 bytes )
+    16 2DUP dm+         ( dump 16 bytes with address ) 
+    -ROT 2 SPACES _TYPE ( display the ASCII characters )
+    NUF? 0=             ( exit the loop if a key is hit )
+  WHILE                 
+  NEXT                  ( repeat until all bytes are dumped)
+  ELSE R> DROP          ( key hit.  Discard loop count )
+  THEN 
+  DROP R> BASE ! ;      ( restore radix )
+
+`);
+//TODO-TEST TODO-IO test DUMP
+
+
+// === Stack Dump pg100 .S
+interpret(`
+: .S ( -- )
+  ( Display the contents of the data stack.)
+  CR            ( start stack dump on a new line)
+  DEPTH         ( get stack depth )
+  FOR AFT       ( repeat that many times )
+      R@ PICK . ( print one item in stack )
+    THEN
+  NEXT          ( repeat until done )
+  ."  <sp" ;    ( print stack pointer )
+`);
+//TODO-TEST TODO-IO .S
+
+// === Stack Checking pg101 !CSP ?CSP
+
+interpret(`
+: .BASE ( -- ; report current base in Decimal)
+  BASE @ DECIMAL DUP . BASE  ! ;
+: .FREE ( -- ; report free memory) 
+  CP 2@ - U. ;
+: !CSP ( -- ; Save stack pointer for error checking )
+  SP@ CSP ! ;
+: ?CSP ( -- ; Check stack pointer matches saved stack pointer )
+  SP@ CSP @ XOR ABORT" stack depth" ;
+`);
+// TODO-TEST TODO-IO .BASE .FREE !CSP ?CSP
+
+// === Dictionary Dump pg102 .ID WORDS
+interpret(`
+: .ID ( na -- )
+  ( Display the name at address.)
+  ?DUP                ( not valid name if na=0 )
+  IF COUNT            ( get length by mask lexicon bits )
+    $001F AND         ( limit length to 31 characters ) 
+    _TYPE ( print the name string )
+    EXIT 
+  THEN ." {noName}" ; ( error if na is not valid)
+`);
+interpret(`
+: WORDS ( -- )
+  ( Display the names in the context vocabulary.)
+  CR  CONTEXT @   ( search only the context vocab )
+  BEGIN @ ?DUP    ( continue if not end of vocab )
+  WHILE DUP SPACE
+    .ID           ( print a name)
+    CELL-         ( get the link field )
+    NUF?          ( exit if a key is hit)
+  UNTIL           ( repeat next name )
+    DROP
+  THEN ;          ( end of vocab exit )
+`);
+//TODO-TEST TODO-IO test WORDS
+
+// === Search Token Name pg103 >NAME
+interpret(`
+: >NAME ( ca -- na, F )
+  ( Convert code address to a name address. )
+  CURRENT             ( search only the current vocab )
+  BEGIN CELL+ @ ?DUP  ( end of vocabulary? )
+  WHILE 2DUP
+    BEGIN @ DUP
+    WHILE 2DUP NAME> XOR ( code pointer=ca? )
+    WHILE CELL-
+    REPEAT            ( ca not found, repeat next word)
+    THEN NIP ?DUP
+  UNTIL NIP NIP EXIT  ( found.  return name address )
+  THEN DROP 0 ;       ( end of vocabulary, failure )
+`);
+//TODO-TEST TODO-IO test >NAME
+
+// === The simplest Decompiler pg104 SEE
+interpret(`
+: SEE ( -- ; <string> )
+  ( A simple decompiler. )
+  '               ( find the next word in context voc)
+  CR CELL+        ( skip the CALL instruction )
+  BEGIN CELL+     ( skip doLIST address offset )
+    DUP @ DUP     ( get the next token )
+    IF >NAME      ( find its name field address )
+    THEN
+    ?DUP          ( if name is valid )
+    IF SPACE .ID  ( print the name of token )
+    ELSE DUP @ U. ( else print the value as literal )
+    THEN
+    NUF?          ( exit if a key is hit )
+  UNTIL           ( continue to the next token )
+  DROP ;          ( discard the token address )
+`);
+//TODO-IO SEE is not going to be correct as is
+//TODO-TEST TODO-IO test SEE
+
+// ERRATA Zen uses CONSTANT but doesnt define it
 // Signon Message pg105 VER hi
+interpret(`
+$100 CONSTANT VER ( Return the version number of this implementation.)
+
+( ERRATA v5 'hi' doesnt restore BASE )
+: hi ( -- )
+  !IO           ( initialize terminal I/O )
+  BASE @ HEX    ( Save BASE and switch to HEX)
+  CR ." webFORTH V" VER <# # # 46 HOLD # #> TYPE ( display sign-on text and version )
+  BASE !        ( Restore BASE)
+  CR ; COMPILE-ONLY
+`);
+
 // Hardware Reset pg106 COLD
 
+code('userAreaInit', () => {
+  a = 0; userInit.forEach( v => Ustore(a++ * 2, v)); });
+
+interpret(`
+: EMPTY ( -- )
+( Empty out any definitions)
+  FORTH CONTEXT @ DUP CURRENT 2! ;
+`);
+interpret(`
+CREATE 'BOOT  ' hi , ( application vector )
+`);
+interpret(`
+( ERRATA ZEN uses but doesnt define U0 and assumes US=37 )
+: COLD ( -- )
+  BEGIN
+    userAreaInit  ( initialize user area, often U0 UP =US CMOVE )
+    ( initRegisters ; this is needed somewhere - to initialize RP, SP and IP, but clearly must be done by here )
+    PRESET        ( Initialize TIB and SP )
+    'BOOT @EXECUTE ( Vectored Boot routine, defaults to HI
+    FORTH          ( Make FORTH context vocabulary - searches)
+    CONTEXT @ DUP CURRENT 2! ( Definitions in FORTH as well )
+    ( OVERT         ( And link most recent definition into dictionary  - unclear why this is useful )
+    QUIT          ( Invoke Forth "operating system" )
+  AGAIN ;         ( Safeguard the Forth interpreter )
+`);
+// TODO-EVAL switch to using new EVAL for "interpret()  or maybe QUIT
+
 // TESTING ===
-run(name2xt('FORTH'));
+test('COLD',[]);
 console.log('Finished:');
