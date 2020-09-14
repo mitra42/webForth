@@ -15,7 +15,7 @@
  */
 
 let testing = 0x0; // 0x01 display words passed to interpreters; 0x02 each word in tokenthread
-let testingDepth = 6;
+let testingDepth = 3;
 let padTestLength = 0; // Display pad length
 // == Some debugging routines, can all be commented out (as long as their calls are)
 let debugName; // Set in run()
@@ -351,29 +351,15 @@ code('testing3', () => testing |= 3); // this word can be slotted in a definitio
 
 // Basic key I/O eForthAndZen pg 35
 code('BYE', 'TODO-bye');
-code('?RX', () => console.error('TODO ?RX not defined')); //TODO-IO
-code('TX!', () => console.error('TODO TX! not defined', SPpop())); //TODO-IO
-code('!IO', () => console.error('TODO !IO not defined')); //TODO-IO
-
-/* TODO-IO FAILED attempt to get stdin/stdout IO then code see issue #14
-var stream = require('stream');
-var s = stream.Duplex()
-function foo() {
-  chunk = null;
-  let i = 1000;
-  while(!chunk) {
-    //console.log('preread');
-    chunk = s.read(1)
-    if (chunk && chunk.length) { console.log('Saw chunk of len',chunk.length); }
-    //console.log('Looping');
+code('?RX', () => {SPpush(0);}); //TODO-IO
+code('TX!', () => process.stdout.write(Uint8Array.from([SPpop()])));
+code('!IO', () => {
+  if (process.stdin.isTTY) {
+    process.stdin.setRawMode();
   }
-  console.log('OutOLoop');
-};
-foo();
-process.stdin.setEncoding('ascii');
-process.stdin.pipe(s).pipe(process.stdout);
-console.log('exited');
-*/
+  process.stdin.setEncoding('utf8');
+  process.stdout.setEncoding('utf8');
+}); //TODO-IO
 
 /** ===================================================
  * INNER INTERPRET === YES THIS IS IT ! eForthAndZen#36
@@ -494,16 +480,16 @@ code('UM+', () => {
 function USER(name, init) {
   Mstore(UP + _USER, init);
   $USER(name); // Put into dictionary
-  userInit.push((typeof init === 'string') ?  name2xt(init) : init);
+  userInit.push(init);
 }
 
 USER('SP0', SPP); // (--a) Pointer to bottom of the data stack.
 USER('RP0', RPP); // (--a) Pointer to bottom of the return stack.
-USER("'?KEY", '?RX'); // Execution vector of ?KEY. Default to ?rx.
-USER("'EMIT", 'TX!');  // Execution vector of EMIT. Default to tx!
-USER("'EXPECT", 'accept'); // Execution vector of EXPECT. Default to 'accept'.
+USER("'?KEY", name2xt('?RX')); // Execution vector of ?KEY. Default to ?rx.
+USER("'EMIT", name2xt('TX!'));  // Execution vector of EMIT. Default to TX!
+USER("'EXPECT", name2xt('accept')); // Execution vector of EXPECT. Default to 'accept'.
 USER("'TAP", undefined); // TODO KTAP Execution vector of TAP. Default the kTAP.
-USER("'ECHO", 'TX!'); // Execution vector of ECHO. Default to tx!.
+USER("'ECHO", name2xt('TX!')); // Execution vector of ECHO. Default to tx!.
 USER("'PROMPT", undefined); // TODO DOTOK Execution vector of PROMPT.  Default to '.ok'.
 USER('BASE', 10);
 USER('temp', 0); // A temporary storage location used in parse and find. EFORTH-ZEN-ERRATA its uses as 'temp', listing says 'tmp'
@@ -529,6 +515,7 @@ console.assert(_USER === CURRENToffset, 'CURRENT mismatch offset should be ', _U
 USER('CURRENT', currentFetch()); // Point to the vocabulary to be extended. Default to FORTH.
 USER(undefined, currentFetch()); // Vocabulary link uses one cell after CURRENT (not clear how this is used)
 console.assert(_USER === CPoffset, 'CP mismatch offset should be ', _USER); // This is checked because need to know this earlier
+//TODO-VM Note there is a (hidden) assumption that CP and NP are consecutive - used to check free space
 USER('CP', cpFetch()); // eForth initializes to CTOP but we have to use this during compilation
 console.assert(_USER === NPoffset, 'NP mismatch offset should be ', _USER); // This is checked because need to know this earlier
 USER('NP', npFetch()); // normally set on pg106 but we are using it live. Its the bottom of what compiled in name space.
@@ -726,6 +713,7 @@ interpret('0A BASE !');
 test('12 34 UM+ 60000 60000 UM+', [46, 0, 60000 + 60000 - (2 ** 16), 1]);
 // IMMEDIATE implicitly tested
 test('32 PARSE ABC SWAP DROP', [3]);
+test('!IO 62 TX!', []);
 
 // === Vocabulary and Sort Order eForthAndZen pg47
 
@@ -1159,21 +1147,26 @@ interpret(`
 test('123 <# DUP SIGN #S #>', [padPtr() - 3, 3], { hold: '123' });
 test('-123 DUP ABS <# #S SWAP SIGN #>', [padPtr() - 4, 4], { hold: '-123'});
 
+// TODO-ZEN-V5-STAAPL - COMPARE ABOVE HERE
 // === More definitions moved up
 interpret(`
 : EMIT ( c--;  Send a character to the output device. pg69)
   'EMIT @EXECUTE ;
 : SPACE ( -- ; Send the blank character to the output device. pg70)
   BL EMIT ; ( send out blank character)
-: SPACES ( n -- ; Send n spaces to the output device. pg70)
-  SWAP 0 MAX FOR AFT SPACE THEN NEXT DROP ;
+: CHARS ( +n c -- ; Send n characters to output device)
+  SWAP 0 MAX FOR AFT DUP EMIT THEN NEXT DROP ; ( From Staapl and V5, not in Zen) ( TODO-ANS flagged as possible conflict)
+: SPACES ( n -- ; Send n spaces to the output device. pg70) ( ERRATA Zen has bad initial SWAP) 
+  BL CHARS ; 
 : TYPE ( b u -- ; Output u characters from b)
   FOR AFT DUP C@ EMIT 1 + THEN NEXT DROP ;
+: .$ ( a -- ) COUNT TYPE ; ( from Staapl, not in eForth)
 `);
-//TODO-IO : .$ ( a -- ) COUNT TYPE ; ( from Staapl, not in eForth)
-code('.$', () => console.log(countedToJS(SPpop())));
-// TODO-TEST TODO-OUTPUT EMIT, SPACE SPACES TYPE
+test('60 EMIT SPACE 2 SPACES 61 EMIT', []);
+// .$ is tested by ."| and others
+//code('.$', () => console.log(countedToJS(SPpop()))); // Can use this alternative till debug I/O
 
+// TODO-ZEN-V5-STAAPL - COMPARE BELOW HERE
 // === Number output pg66 str HEX DECIMAL .R U.R U. . ?
 interpret(`
 : str ( n -- b u ; Convert a signed integer to a numeric string)
@@ -1211,7 +1204,7 @@ interpret(`
 : ? ( a -- ; Display the contents in a memory cell.)
   @ . ; ( very simple but useful command)
 `);
-//TODO-TEST TODO-OUTPUT .R U.R U. . ?
+test('-123 5 .R 123 5 U.R 123 U. 123 . BASE ?', []);
 
 // === Numeric input pg67-68 DIGIT? NUMBER?
 // EFORTH-ZEN-ERRATA NIP is not designed
@@ -1297,10 +1290,10 @@ interpret(`
 interpret(`
 : PACE ( --) ( Send a pace character for the file downloading process.)
   11 EMIT ; ( 11 is the pace character)
-( SPACE and SPACES and TYPE moved earlier)
-: CHARS ( +n c -- ) SWAP 0 MAX FOR AFT DUP EMIT THEN NEXT DROP ; ( From Staapl, not in eForth)
+( SPACE and SPACES and TYPE and CHARS moved earlier)
+( ERRATA Zen has 15 instead of 13 )
 : CR ( --) ( Output carriage return line feed)
-  15 EMIT 11 EMIT ;
+  13 EMIT 11 EMIT ;
 `);
 //TODO-TEST TODO-INPUT then test PACE, CR
 
@@ -1322,8 +1315,7 @@ interpret(`
   do$        ( get string address)
   .$ ;       ( print the compiled string)
 `);
-//TODO-TEST check $"| tested by $" once that is defined
-//TODO-TEST TODO-OUTPUT then check ."| tested by ."
+//."| tested by ."; $"| tested by $"
 
 // === Word Parser pg72-73 PARSE parse
 /*
@@ -1411,14 +1403,14 @@ interpret(`
   NP @                ( word buffer below name dictionary )
   OVER - 2 - PACK$ ;  ( copy parsed string to word buffer )
 
-: WORD ( c -- a ; <string> ) ( Parse a word from input stream and copy it to code dictionary.)
+: WORD ( c -- a ; <string> ) ( Parse a word from input stream and copy it to code dictionary. Not if not in definition it will be overwritten by next)
   PARSE         ( parse out a string delimited by c )
   HERE PACK$ ;  ( copy the string into the word buffer )
 `);
-//TODO-TEST TODO-OUTPUT test .(
 test('1 2 ( 3 ) 4 \\ commenting', [1, 2, 4]);
 test('TOKEN xxx C@', [3]);
 test('BL WORD yyyy DUP C@ SWAP CP @ -', [4, 0]);
+test(': foo .( output at compile time) ;', []);
 
 // === Dictionary Search pg75-77 NAME> SAME? find NAME?
 
@@ -1567,7 +1559,7 @@ interpret(`
   DROP            ( discard buffer address )
   0 >IN ! ;       ( initialized parsing pointer )
 `);
-// TODO-TEST TODO-IO input handlign needs EXPECT etc
+// TODO-TEST TODO-IO input handling needs EXPECT etc
 
 // Error Handling pg80-82 CATCH THROW NULL$ ABORT abort" ?STACK
 interpret(`
@@ -1631,10 +1623,11 @@ CREATE NULL$ 0 , ( EFORTH-ZEN-ERRATA inserts a string "coyote" after this, no id
 // Test is tricky - the "3" in bar is thrown away during hte "THROW" while 5 is argument to THROW
 test(`: bar 3 5 THROW 4 ; : foo 1 [ ' bar ] LITERAL CATCH 2 ; foo`, [1, 5, 2]); debugStack=[];
 test(`: bar 3 ; : foo 1 [ ' bar ] LITERAL CATCH 2 ; foo`, [1, 3, 0, 2]);
+test(': foo ." hello" ; foo', []);
 // Note that abort restores the stack, so shouldn't have consumed something else will have random noise on stack
 test(`: bar ?DUP ABORT" test" 3 ; : foo [ ' bar ] LITERAL CATCH ; 1 foo C@ 0 foo`, [1, 4, 3, 0]); debugStack=[];
 //$," and abort" are implicitly tested by ABORT"
-//TODO-TEST TODO-IO test ."
+
 
 // === Text Interpreter loop pg83-84 $INTERPRET [ .OK ?STACK EVAL
 interpret(`
@@ -1675,7 +1668,7 @@ interpret(`
   DROP              ( discard the string address )
   'PROMPT @EXECUTE ;  ( display the proper prompt, if any )
 `);
-//TODO-TEST TODO-IO .OK EVAL
+//TODO-TEST TODO-IO test EVAL, not that .OK wont work here since not yet using $INTERPRET
 
 test('BL PARSE 123 PAD PACK$ $INTERPRET', [123]);
 test('123 BL PARSE DUP PAD PACK$ $INTERPRET', [123, 123]);
@@ -1836,6 +1829,7 @@ interpret(`
   IF [COMPILE] LITERAL ( successful. compile a literal number )
     EXIT        ( done )
   THEN          ( not a number either )
+  COUNT TYPE SPACE ." Not found" ( TODO remove line when have better handling of THROW)
   THROW ;       ( generate an error condition )
 
 : OVERT ( -- ) ( Redefining code word in Forth)
@@ -1930,8 +1924,8 @@ interpret(`
   DROP R> BASE ! ;      ( restore radix )
 
 `);
-//TODO-TEST TODO-IO test DUMP
-
+//TODO-TEST TODO-IO test DUMP (needs NUF? which needs ?RX
+// test('LAST @ 48 DUMP',[]);
 
 // === Stack Dump pg100 .S
 interpret(`
@@ -1945,7 +1939,7 @@ interpret(`
   NEXT          ( repeat until done )
   ."  <sp" ;    ( print stack pointer )
 `);
-//TODO-TEST TODO-IO .S
+test('1 2 .S', [1, 2]);
 
 // === Stack Checking pg101 !CSP ?CSP
 
@@ -1959,7 +1953,7 @@ interpret(`
 : ?CSP ( -- ; Check stack pointer matches saved stack pointer )
   SP@ CSP @ XOR ABORT" stack depth" ;
 `);
-// TODO-TEST TODO-IO .BASE .FREE !CSP ?CSP
+test('.BASE .FREE 1 !CSP ?CSP',[1]);
 
 // === Dictionary Dump pg102 .ID WORDS
 interpret(`
@@ -1985,7 +1979,7 @@ interpret(`
     DROP
   THEN ;          ( end of vocab exit )
 `);
-//TODO-TEST TODO-IO test WORDS
+test('WORDS', []);
 
 // === Search Token Name pg103 >NAME
 interpret(`
@@ -2002,28 +1996,34 @@ interpret(`
   UNTIL NIP NIP EXIT  ( found.  return name address )
   THEN DROP 0 ;       ( end of vocabulary, failure )
 `);
-//TODO-TEST TODO-IO test >NAME
+test("BL WORD DUP NAME? SWAP >NAME =", [forthTrue] );
 
 // === The simplest Decompiler pg104 SEE
 interpret(`
 : SEE ( -- ; <string> )
-  ( A simple decompiler. )
-  '               ( find the next word in context voc)
-  CR CELL+        ( skip the CALL instruction )
-  BEGIN CELL+     ( skip doLIST address offset )
-    DUP @ DUP     ( get the next token )
-    IF >NAME      ( find its name field address )
-    THEN
-    ?DUP          ( if name is valid )
-    IF SPACE .ID  ( print the name of token )
-    ELSE DUP @ U. ( else print the value as literal )
-    THEN
-    NUF?          ( exit if a key is hit )
-  UNTIL           ( continue to the next token )
-  DROP ;          ( discard the token address )
+  '                 ( ca)
+  CR
+  DUP @ tokenDoList = 
+  IF 
+    ." : " DUP >NAME .ID ( xt )
+    BEGIN CELL+        ( xt+2
+      DUP @ DUP         ( xt+2 xt' xt' )
+      IF >NAME          ( xt+2 na|F )
+      THEN
+      ?DUP IF           ( xt+2 na | xt+2)
+        SPACE .ID       ( xt+2)
+        DUP @ doLIT EXIT = OVER CELL+ @ 20 < AND IF DROP EXIT THEN ( Guess when have end )
+      ELSE DUP @ U.     ( xt+2)
+      THEN
+      NUF?
+    UNTIL
+  ELSE ." Not colon definition"
+  THEN
+  DROP ;
 `);
 //TODO-IO SEE is not going to be correct as is
 //TODO-TEST TODO-IO test SEE
+test('SEE >NAME',[]);
 
 // ERRATA Zen uses CONSTANT but doesnt define it
 // Signon Message pg105 VER hi
