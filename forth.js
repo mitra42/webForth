@@ -152,7 +152,12 @@ function xt2name(xt) {
   const na = xt2na(xt);
   return na ? countedToJS(na) : 'undefined';
 }
-function name2xt(name) { return na2xt(name2na(name)); }
+function name2xt(name) {
+  xt = na2xt(name2na(name));
+  if (!xt) {
+    console.log(`${name} is undefined`); }
+  return xt;
+}
 function UfetchName(name, offset = 0) { return Ufetch(Mfetch(name2xt(name) + 2), offset); } // e.g. UfetchName('CURRENT',2)
 function UstoreName(name, w, offset = 0) { return Ustore(Mfetch(name2xt(name) + 2), w, offset); } // e.g. UstoreName('BASE',10)
 
@@ -201,7 +206,7 @@ function qUnique() { // a -- a; Check if unique and display warning
 function dollarCommaN() { // na -- ; Same function as $,n on pg94 common between $CODE and ':'
   if (m[SPfetch()]) {                 // DUP C@ IF  ; test for no word
     qUnique();
-    a = SPpop();
+    let a = SPpop();
     lastStore(a);             // DUP LAST ! ; a=na  ; LAST=na
     a -= CELLL;               // CELL-      ; a=la
     // Link address points to previous NA (prev value of LAST)
@@ -347,7 +352,9 @@ code('find', find);
 // == Debugging code words
 code('debugNA', () => console.log('NAME=', countedToJS(SPfetch()))); // Print the NA on console
 code('testing3', () => testing |= 3); // this word can be slotted in a definition to turn on debugging
-
+code('break', () => {
+  console.log("Stick a breakpoint here");
+})
 
 // Basic key I/O eForthAndZen pg 35
 code('BYE', 'TODO-bye');
@@ -487,7 +494,7 @@ USER('SP0', SPP); // (--a) Pointer to bottom of the data stack.
 USER('RP0', RPP); // (--a) Pointer to bottom of the return stack.
 USER("'?KEY", name2xt('?RX')); // Execution vector of ?KEY. Default to ?rx.
 USER("'EMIT", name2xt('TX!'));  // Execution vector of EMIT. Default to TX!
-USER("'EXPECT", name2xt('accept')); // Execution vector of EXPECT. Default to 'accept'.
+USER("'EXPECT", 0); // Execution vector of EXPECT. Default to 'accept' - initialized when accept defined TODO needs to be in UserInit.
 USER("'TAP", undefined); // TODO KTAP Execution vector of TAP. Default the kTAP.
 USER("'ECHO", name2xt('TX!')); // Execution vector of ECHO. Default to tx!.
 USER("'PROMPT", undefined); // TODO DOTOK Execution vector of PROMPT.  Default to '.ok'.
@@ -1040,7 +1047,9 @@ interpret(`
 : TIB ( -- a; Return address of terminal input buffer)
   #TIB CELL+ @ ; ( 1 cell after #TIB)
 : @EXECUTE ( a -- ; execute vector -if any- stored in address a)
-  @ ?DUP IF EXECUTE THEN ;
+  @ ?DUP IF EXECUTE 
+  ELSE break
+  THEN ;
 `);
 test('HLD @ 2 HLD +! HLD @ SWAP -', [2]);
 test('1 2 3 SP@ 4 5 ROT 2!', [1, 4, 5]);
@@ -1545,6 +1554,8 @@ interpret(`
   DROP              ( b b+u ; drop current pointer
   OVER - ;          ( b u; leave actual count)
 
+' accept 'EXPECT ! ( TODO needs to be in userInit for COLD )
+
 : EXPECT ( b u -- )
   ( Accept input stream and store count in SPAN.)
   'EXPECT @EXECUTE  ( execute accept )
@@ -1979,7 +1990,7 @@ interpret(`
     DROP
   THEN ;          ( end of vocab exit )
 `);
-test('WORDS', []);
+//test('WORDS', []);
 
 // === Search Token Name pg103 >NAME
 interpret(`
@@ -2023,7 +2034,7 @@ interpret(`
 `);
 //TODO-IO SEE is not going to be correct as is
 //TODO-TEST TODO-IO test SEE
-test('SEE >NAME',[]);
+//test('SEE >NAME',[]);
 
 // ERRATA Zen uses CONSTANT but doesnt define it
 // Signon Message pg105 VER hi
@@ -2042,7 +2053,7 @@ $100 CONSTANT VER ( Return the version number of this implementation.)
 // Hardware Reset pg106 COLD
 
 code('userAreaInit', () => {
-  a = 0; userInit.forEach( v => Ustore(a++ * 2, v)); });
+  let a = 0; userInit.forEach( v => Ustore(a++ * 2, v)); });
 
 interpret(`
 : EMPTY ( -- )
