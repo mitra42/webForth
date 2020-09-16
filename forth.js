@@ -15,7 +15,7 @@
  */
 
 let testing = 0x0; // 0x01 display words passed to interpreters; 0x02 each word in tokenthread
-let testingDepth = 3;
+let testingDepth = 8;
 let padTestLength = 0; // Display pad length
 // == Some debugging routines, can all be commented out (as long as their calls are)
 let debugName; // Set in run()
@@ -358,14 +358,58 @@ code('break', () => {
 
 // Basic key I/O eForthAndZen pg 35
 code('BYE', 'TODO-bye');
-code('?RX', () => {SPpush(0);}); //TODO-IO
+
+/*
+ * Input call chain is
+ * ?RX  read one char if present
+ * ?KEY via '?KEY to ?RX
+ * KEY loop till ?KEY
+ * accept read a line via KEY, processing control chars via 'TAP  to kTAP
+ * QUERY read a line via 'EXPECT to accept into TIB and reset >IN
+ * que read an evaluate a line
+ * QUIT loop over que, handling errors
+ *
+ * TODO-INPUT strategy A:
+ *    ?RX does a stdin.read (sync) expecting null
+ *    !IO does raw
+ *    KEY has a yield << wont work - what is the callback
+ */
+// Call chain is ?RX < '?KEY  < ?KEY < KEY < accept < 'EXPECT < QUERY < que < QUIT
+
+const buff = "";
+code('?RX', () => {
+  if (!buff.length) {
+    let buff = process.stdin.read(); // Synchronous
+  }
+  if (buff && buff.length) {
+    SPpush(buff[0]);
+    buff = buff.slice(1);
+    SPpush(forthTrue);
+  } else {
+    SPpush(0);
+  }
+});
 code('TX!', () => process.stdout.write(Uint8Array.from([SPpop()])));
-code('!IO', () => {
+code('!IO', () => { //TODO-IO might be better with pause/resume
   if (process.stdin.isTTY) {
     process.stdin.setRawMode();
   }
   process.stdin.setEncoding('utf8');
   process.stdout.setEncoding('utf8');
+  /*
+  process.stdin.on('data', (s) => {
+    process.stdout.write(`data1: ${s}`); // TODO-IO comment out
+    stdinBuf += s; });
+   */
+  /*
+  process.stdin.on('readable', () => {
+      process.stdout.write(`readable`); // TODO-IO comment out
+      let chunk;
+      while ((chunk = process.stdin.read()) !== null) {
+        process.stdout.write(`data2: ${chunk}`); // TODO-IO comment out
+        stdinBuf += chunk;
+      }
+    }); */
 }); //TODO-IO
 
 /** ===================================================
@@ -2080,5 +2124,5 @@ interpret(`
 // TODO-EVAL switch to using new EVAL for "interpret()  or maybe QUIT
 
 // TESTING ===
-test('COLD',[]);
+//test('CONSOLE QUIT',[]);
 console.log('Finished:');
