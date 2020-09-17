@@ -1,4 +1,27 @@
 # Forth for Javascript - Design criteria
+Mitra Ardron <mitra@mitra.biz> 17 Sept 2020
+
+## Key Concepts
+
+* Based on eForth but not quite same
+* Javascript then Forth
+* Token threaded
+* Memory Handling
+* Colon, Code and other words
+* I/O
+* Async
+
+#### Orthogonality and likely changes
+
+* Sync/Async/Event Driven
+* Cell size
+* Memory handling
+
+
+
+
+
+## Earlier version - pretty much everything below here is changed
 Mitra Ardron <mitra@mitra.biz> 8 Aug 2020
 
 This doc may or may not match the code, 

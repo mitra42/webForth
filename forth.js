@@ -1,6 +1,6 @@
 /*
  * References see FORTH.md
-*/
+ */
 
 async function outer() {
 // TODO-ZEN-V5-STAAPL - COMPARE BELOW HERE
@@ -16,7 +16,7 @@ async function outer() {
    */
 
   let testing = 0x0; // 0x01 display words passed to interpreters; 0x02 each word in tokenthread
-  let testingDepth = 2;
+  let testingDepth = 2; 
   let padTestLength = 0; // Display pad length
 // == Some debugging routines, can all be commented out (as long as their calls are)
   let debugName; // Set in run()

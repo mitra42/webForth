@@ -1,3 +1,4 @@
+/* NOTE THIS FILE IS OBSOLETE - IT WILL BE RELEVANT FOR ISSUE #15 */
 /* These functions will get split into different files */
 
 const safe = true;

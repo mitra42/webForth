@@ -4,7 +4,7 @@
     "email": "mitra@mitra.biz",
     "url": "http://www.mitra.biz"
   },
-  "name": "forth_js",
+  "name": "webforth",
   "browserslist": "> 20%, not dead",
   "description": "Forth implemented in Javascript",
   "version": "0.0.1",
