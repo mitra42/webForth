@@ -2,7 +2,6 @@
  * References see FORTH.md
  */
 
-async function outer() {
 // TODO-ZEN-V5-STAAPL - COMPARE BELOW HERE
   /* Naming conventions and abbreviations
    * xt: execution token, points at the token field of a definition
@@ -16,7 +15,7 @@ async function outer() {
    */
 
   let testing = 0x0; // 0x01 display words passed to interpreters; 0x02 each word in tokenthread
-  let testingDepth = 2; 
+  let testingDepth = 2;
   let padTestLength = 0; // Display pad length
 // == Some debugging routines, can all be commented out (as long as their calls are)
   let debugName; // Set in run()
@@ -442,6 +441,21 @@ async function outer() {
   code('debugPrintTIB', () => { console.log("TIB: ",m.slice(UfetchName('#TIB', 2) + UfetchName('>IN'), UfetchName('#TIB', 2) + UfetchName('#TIB')).toString('utf8'))});
   code('debug1', () => {console.log("ACCEPT1");});
 
+  // Test routing - usage e.g. interpret(`1 DUP 1 1 2 TEST`);
+  code('TEST', () => { //  a1 a2 a3 b1 b2 b3 n -- ; Check n parameters on stack
+    let mm = m;
+    let n = SPpop();
+
+    let b = [];
+    for (let i=0; i < n; i++) {
+      b.unshift(SPpop());
+    }
+    console.assert((SPP - SP) / CELLL === n);
+    for (let i=0; i < n; i++) {
+      console.assert(SPpop() === b.pop());
+    }
+  });
+
 
   // Basic key I/O eForthAndZen pg 35
   code('BYE', 'TODO-bye');
@@ -843,6 +857,9 @@ async function outer() {
     UstoreName("'EVAL", xtINTERPRET);
   }
 
+// This is an outer wrapper, TODO pull whatever possible out of it.
+async function outer() {
+
   openBracket(); // Start off interpreting
   code('[', openBracket);
   await interpret('IMMEDIATE'); //pg84 and pg88
@@ -880,7 +897,10 @@ async function outer() {
 //EXIT & EXECUTE tested with '
 // doLIT implicitly tested by all literals
 // next, ?branch, branch implicitly tested by control structures
+
   await test('CELLL', [2]); // Assuming small cell, otherwise it should be 2
+  await interpret('CELLL 2 1 TEST');
+  await interpret('0 TEST');
   await test('123 HLD ! HLD @', [123]); // Also tests user variables
   await test('111 HLD ! 222 HLD C! HLD C@ 0 HLD C! HLD @', [222, 111]);
 // R> >R R@ SP@ SP! tested after arithmetic operators
