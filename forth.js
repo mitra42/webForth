@@ -490,7 +490,7 @@ async function outer() {
    */
 
 // == INNER INTERPRETER - loops through nesting
-  async function threadtoken(xt) {
+  function threadtoken(xt) {
     console.assert(xt >= CODEE && xt < NAMEE); // Catch bizarre xt values TODO-EFFICIENCY comment out
     if (testing & 0x02) {
       debugName = xt2name(xt); // Expensive so only done when testing
@@ -502,7 +502,7 @@ async function outer() {
     //console.assert(SPP >= SP && RPP >= RP);
     const tok = ((m[xt++] << 8) + m[xt++]);
     console.assert(tok < codeSpace.length);
-    await codeSpace[tok](xt); // Run the token function - like tokenDoList or tokenVar
+    return codeSpace[tok](xt); // Run the token function - like tokenDoList or tokenVar - will return null or a Promise
   }
 
 // This is not re-entrant, normally its threadtoken you want ....
@@ -518,8 +518,13 @@ async function outer() {
       xt = IPnext(); // SEE-OTHER-ENDIAN
       //TODO-EFFICIENCY comment this out except when needed for debugging, they are slow
       // debugTIB =  m.slice(UfetchName('#TIB', 2) + UfetchName('>IN'), UfetchName('#TIB', 2) + UfetchName('#TIB')).toString('utf8');
-      await threadtoken(xt);
-      await new Promise(resolve => setImmediate(resolve)); //TODO-IO to allow IO to run
+      let maybePromise = threadtoken(xt);
+      if (maybePromise) {
+        await maybePromise;
+      } else {
+        //TODO-ASYNC maybe only do this every n cycles
+        await new Promise(resolve => setImmediate(resolve)); //ASYNC: to allow IO to run
+      }
     }
   }
 
@@ -2114,7 +2119,7 @@ CREATE I/O  ' ?RX , ' TX! , ( Array to store default I/O vectors. )
 
 `);
 //TODO-TEST TODO-IO test DUMP (needs NUF? which needs ?RX
-// await test('LAST @ 48 DUMP',[]);
+//await test('LAST @ 48 DUMP',[]);
 
 // === Stack Dump pg100 .S
   await interpret(`
@@ -2210,8 +2215,6 @@ CREATE I/O  ' ?RX , ' TX! , ( Array to store default I/O vectors. )
   THEN
   DROP ;
 `);
-//TODO-IO SEE is not going to be correct as is
-//TODO-TEST TODO-IO test SEE
 //await test('SEE >NAME',[]);
 
 // ERRATA Zen uses CONSTANT but doesnt define it
@@ -2258,8 +2261,8 @@ CREATE 'BOOT  ' hi , ( application vector )
   AGAIN ;         ( Safeguard the Forth interpreter )
 `);
 // TODO-EVAL switch to using new EVAL for "interpret()  or maybe QUIT
-  console.log('starting CONSOLE QUIT');
-  await interpret('CONSOLE QUIT');
+  //console.log('starting CONSOLE QUIT');
+  //await interpret('CONSOLE QUIT');
   console.log('outer ending');
 }
 // TESTING ===
