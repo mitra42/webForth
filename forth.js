@@ -446,6 +446,7 @@ async function outer() {
   // Basic key I/O eForthAndZen pg 35
   code('BYE', 'TODO-bye');
 
+  code('MS', async function MS() { await new Promise(resolve => setTimeout(resolve, SPpop()));});
   /*
    * Input call chain is
    * ?RX  read one char if present
@@ -510,6 +511,7 @@ async function outer() {
 // TODO-THREADING If that becomes necessary, it MIGHT work to save IP (where?) and restore after while loop
 // Cant use R or S for it as words use that across calls to the 'EVAL
   async function run(xt) {
+    let waitFrequency = 0;
     console.assert(IP === 0); // Cant nest run()
     await threadtoken(xt);
     // If this returns without changing program Counter, it will exit
@@ -523,7 +525,10 @@ async function outer() {
         await maybePromise;
       } else {
         //TODO-ASYNC maybe only do this every n cycles
-        await new Promise(resolve => setImmediate(resolve)); //ASYNC: to allow IO to run
+        if (!waitFrequency--) {
+          await new Promise(resolve => setImmediate(resolve)); //ASYNC: to allow IO to run
+          waitFrequency = 100;
+        }
       }
     }
   }
@@ -537,7 +542,7 @@ async function outer() {
 // TODO-THREADING it works because it itself is a code word, incuded in colon words
 // and because there is nothing after the return from threadtoken which would get executed out of order
 // it may or may not work in other situations.
-  code('EXECUTE', async function EXECUTE() { await threadtoken(SPpop()); });
+  code('EXECUTE', function EXECUTE() { return threadtoken(SPpop()); });
 
 // === Literals eForthAndZen#37
 // push the value in the next code word
@@ -1460,7 +1465,13 @@ async function outer() {
 : ?KEY ( -- c T | F) ( Return input character and true, or a false if no input.)
   '?KEY @EXECUTE ;
 : KEY ( -- c ) ( Wait for and return an input character.)
-  BEGIN ?KEY UNTIL ;
+  0 ( Initial delay )
+  BEGIN 
+    DUP MS        ( Introduce a delay, drops CPU from 100% to insignificant)
+    1 + 1000 MAX  ( Ramp to a max delay of 1S ) 
+    ?KEY          ( delay c T | delay F; Check for key ) 
+  UNTIL
+  NIP ;           ( Drop delay )
 ( EMIT moved up )
 : NUF? ( -- t) ( Return false if no input, else pause and if CR return true)
   ?KEY DUP ( -- c T T | F F;  wait for a key-stroke)
@@ -2261,8 +2272,8 @@ CREATE 'BOOT  ' hi , ( application vector )
   AGAIN ;         ( Safeguard the Forth interpreter )
 `);
 // TODO-EVAL switch to using new EVAL for "interpret()  or maybe QUIT
-  //console.log('starting CONSOLE QUIT');
-  //await interpret('CONSOLE QUIT');
+  console.log('starting CONSOLE QUIT');
+  await interpret('CONSOLE QUIT');
   console.log('outer ending');
 }
 // TESTING ===
