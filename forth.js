@@ -21,6 +21,7 @@
  * Standard Pointers used - esp IP, SP, RP, UP
  * Functions to simplify storing and retrieving 16 bit values into 8 bit stacks etc.
  * Access to the USER variables before they are defined
+ * Utility functions - leading to the definition of "find"
 */
 
 
@@ -33,8 +34,6 @@ let debugStack = []; // Maintains a position, like a stack trace, don't manipula
 let debugName; // Set in threadtoken()
 function debugPush() { debugStack.push(debugName); } // in tokenDoList
 function debugPop() { debugStack.pop(); } // in EXIT
-
-// TODO-ZEN-V5-STAAPL - COMPARE BELOW HERE
 
 // === Memory Map - pg26
 // TODO-VM TODO-MEM rework this into separate slots and then check if really need ! and @ into some parts of mem
@@ -108,80 +107,89 @@ function cpFetch() { return Ufetch(CPoffset); }
 function npFetch() { return Ufetch(NPoffset); }
 function lastFetch() { return Ufetch(LASToffset); }
 
-// ============ TIDYING UP FROM HERE DOWN ================
+// === Utility functions ====
 
-  function countedToJS(a) {
-    const c = m[a] & bitsMASK;
-    return m.slice(a + 1, a + c + 1).toString('utf8');
-  }
+// Convert a string made up of a count and that many bytes to a Javascript string.
+// it assumes a maximum of nameMaxLength (31) characters.
+function countedToJS(a) {
+  return m.slice(a + 1, a + (m[a] & bitsMASK) + 1).toString('utf8');
+}
 
-  /* Not currently used
-  function SPpopWord() {  // b u -- ; return w the JS string
-    const u = SPpop(); const b = SPpop(); return m.slice(b, b + u).toString('utf8');
-  }
-  */
-  function na2xt(na) {
-    return Mfetch(na - 2 * CELLL);
-  }
+// Convert a name address to the code dictionary definition.
+function na2xt(na) {
+  return Mfetch(na - 2 * CELLL);
+}
 
-  function _find(va, name, cell1, xt) {
-    let p = va;
-    while (p = Mfetch(p)) {
-      //console.log('_find: comparing:', countedToJS(p)) // comment out except when debugging find
-      const c1 = Mfetch(p);
-      if (xt && (na2xt(p) === xt)) {
+// Inner function of find, traverses a linked list Name dictionary.
+// name   javascript string looking for
+// va     pointer holding address of first element in the list.
+// cell1  if present, gives it a quick first-cell test to apply.
+// xt     if present we are looking for name pointing at this executable (for decompiler)
+// returns 0 or na
+//TODO rework so dont have to create a JS string first, do the inner comparisom with a code version of SAME?
+function _sameq(na1, na2, chars) { // return f
+  // Note this is similar to SAME? but takes a count (not count of cells, and returns boolean
+  for (let i = 0; i < chars; i++) {
+    if (m[na1 + i] !== m[na2 + i]) {
+      return false;
+    }
+  }
+  return true;
+}
+
+function _find(va, na, byte1, xt) { // return na that matches or 0
+  let p = va;
+  while (p = Mfetch(p)) {
+    //console.log('_find: comparing:', countedToJS(p)) // comment out except when debugging find
+    if (xt) {
+      if (na2xt(p) === xt) {
         return p;
       }
-      if (!cell1 || (cell1 === (c1 & cellMASK))) { // first cell matches (if cell1 not passed then does slow compare
-        if (countedToJS(p) === name) { // This is what SAME? does
+    } else { // Searching on na
+      const b1 = m[p] & bitsMASK;
+      const c = m[p] & bitsMASK; // count
+      if (!byte1 || (byte1 === c)) { // first cell matches (if cell1 not passed then does slow compare
+        if (_sameq(p+1, na+1, c)) {
           return p;
         }
       }
-      p -= CELLL; // point at link address and loop for next word
     }
-    // Drop through not found
-    return 0;
+    p -= CELLL; // point at link address and loop for next word
   }
+  // Drop through not found
+  return 0;
+}
 
-  function name2na(name) {
-    return _find(currentFetch(), name);
+// Search a single vocabulary for a string
+// This has same footprint as eForth's "find" but is approx 8x faster.
+function find() { // a va -- ca na | a 0
+  const va = SPpop();
+  const a = SPpop();
+  const byte1 = m[a];
+  //console.log('find: Looking for', name) // comment out except when debugging find
+  const na = _find(va, a, byte1);
+  if (na) {
+    SPpush(na2xt(na));
+    SPpush(na);
+  } else {
+    SPpush(a);
+    SPpush(0);
   }
+}
 
-  function find() { // a va -- ca na | a 0
-    const va = SPpop();
-    const a = SPpop();
-    const cell1 = Mfetch(a);
-    const name = countedToJS(a);
-    //console.log('find: Looking for', name) // comment out except when debugging find
-    const na = _find(va, name, cell1);
-    if (na) {
-      SPpush(na2xt(na));
-      SPpush(na);
-    } else {
-      SPpush(a);
-      SPpush(0);
-    }
-  }
+// Traverse dictionary to convert xt back to a na (for decompiler or debugging)
+function xt2na(xt) {
+  return _find(currentFetch(), undefined, undefined, xt);
+}
 
-  function xt2na(xt) {
-    return _find(currentFetch(), undefined, undefined, xt);
-  }
+// Convert xt to a Javascript string of its name or 'undefined' (only used for debugging).
+function xt2name(xt) {
+  const na = xt2na(xt);
+  return na ? countedToJS(na) : 'undefined';
+}
 
-  function xt2name(xt) {
-    const na = xt2na(xt);
-    return na ? countedToJS(na) : 'undefined';
-  }
-
-  function name2xt(name) {
-    xt = na2xt(name2na(name));
-    if (!xt) {
-      console.log(`${name} is undefined`);
-    }
-    return xt;
-  }
-
-Ustore(CPoffset, CODEE); // Pointer to where compiling into dic TODO-MEM will be code.length
-Ustore(NPoffset, NAMEE); // Pointer to where writing name stack TODO-MEM will move
+// ============ TIDYING UP FROM HERE DOWN ================
+// TODO-ZEN-V5-STAAPL - COMPARE BELOW HERE
 
 // === ASSEMBLY MACROS (or JS equivalent) pg 30
 // TODO_VM will prob need to be inside 'vm'
@@ -192,23 +200,23 @@ Ustore(NPoffset, NAMEE); // Pointer to where writing name stack TODO-MEM will mo
   function $ALIGN() {
   } // Not applicable since using a byte Buffer
 
-  function $DW(...words) { // Forth presumes big-endian, high word stored at low memory address (which is above on stacks)
-    words.forEach((word) => {
-      let w;
-      if (typeof word === 'string') {
-        w = name2xt(word);
-        if (!w) {
-          console.error('Cant find', word);
-        }
-      } else {
-        w = word;
-      }
-      let cp = cpFetch();
-      m[cp++] = w >> 8;
-      m[cp++] = w & 0xFF;
-      Ustore(CPoffset, cp);
-    });
-  }
+function $DW(...words) { // Forth presumes big-endian, high word stored at low memory address (which is above on stacks)
+  words.forEach((word) => {
+    let w;
+    //if (typeof word === 'string') {
+    //  w = name2xt(word);
+    //  if (!w) {
+    //    console.error('Cant find', word);
+    //  }
+    //} else {
+    w = word;
+    //}
+    let cp = cpFetch();
+    m[cp++] = w >> 8;
+    m[cp++] = w & 0xFF;
+    Ustore(CPoffset, cp);
+  });
+}
 
   console.assert(CELLL === 2); // Presuming its 2
 
@@ -327,8 +335,11 @@ Ustore(NPoffset, NAMEE); // Pointer to where writing name stack TODO-MEM will mo
     //return xt;
   }
 
-//User variables initialization eForthAndZen pg33 see pg46
+//For User variables initialization Zen pg33 see pg46
 
+// Setup pointers for first dictionary entries.
+Ustore(CPoffset, CODEE); // Pointer to where compiling into dic TODO-MEM will be code.length
+Ustore(NPoffset, NAMEE); // Pointer to where writing name stack TODO-MEM will move
 
 //TODO define VOCABULARY as CREATE DOES> word
 
@@ -361,16 +372,18 @@ code('userAreaInit', () => {
   let a = 0;
   userInit.forEach(v => Ustore(a++ * 2, v));
 });
-code('find', find);
+code('find', find); // Fast version of find - see Forth definition below
 // code('OVERT', OVERT);  // Note redefined below in FORTH but not used prior to that
 // code('?UNIQUE', qUnique); // Note redefined below in FORTH but not used prior to that
 // code('$,n', dollarCommaN); // Note redefined below in FORTH but not used prior to that
 // code('$COMPILE', jsCOMPILE); // Note redefined below in FORTH but not used prior to that
+code('>NAME', () => SPpush(xt2na(SPpop()))); // Fast version of >NAME see Forth definition below
 
 // == Debugging code words
   code('debugNA', () => console.log('NAME=', countedToJS(SPfetch()))); // Print the NA on console
   code('testing3', () => testing |= 3); // this word can be slotted in a definition to turn on debugging
-  code('break', () => { console.log("Stick a breakpoint here"); })
+  code('break', () => {
+    console.log("Stick a breakpoint here"); })
   code('debugPrintTIB', () => { console.log("TIB: ",m.slice(Ufetch(TIBoffset) + Ufetch(INoffset), Ufetch(TIBoffset) + Ufetch(nTIBoffset)).toString('utf8'))});
   code('debug1', () => {console.log("ACCEPT1");});
 
@@ -410,7 +423,7 @@ code('find', find);
 // Call chain is ?RX < '?KEY  < ?KEY < KEY < accept < 'EXPECT < QUERY < que < QUIT
 
   let buff = null;
-  code('?RX', () => {
+  const qRX = code('?RX', () => {
     if (!(buff && buff.length)) {
       let s = process.stdin.read(); // Synchronous
       if (s) buff = Buffer.from(s,'utf8');
@@ -423,7 +436,7 @@ code('find', find);
       SPpush(0);
     }
   });
-  code('TX!', () => process.stdout.write(Uint8Array.from([SPpop()])));
+  const TXbang = code('TX!', () => process.stdout.write(Uint8Array.from([SPpop()])));
   code('!IO', () => {
     if (process.stdin.isTTY) {
       //process.stdout.write('RAW'); //TODO-IO comment out
@@ -494,7 +507,7 @@ code('find', find);
 
 // === Literals eForthAndZen#37
 // push the value in the next code word
-  code('doLIT', () => SPpush(IPnext()));
+const doLIT = code('doLIT', () => SPpush(IPnext()));
 
 // Address Literals (aka branches and jumps) eForthAndZen#38
 
@@ -579,11 +592,11 @@ code('find', find);
 
   USER('SP0', SPP); // (--a) Pointer to bottom of the data stack.
   USER('RP0', RPP); // (--a) Pointer to bottom of the return stack.
-  USER("'?KEY", name2xt('?RX')); // Execution vector of ?KEY. Default to ?rx.
-  USER("'EMIT", name2xt('TX!'));  // Execution vector of EMIT. Default to TX!
+  USER("'?KEY", qRX); // Execution vector of ?KEY. Default to ?rx.
+  USER("'EMIT", TXbang);  // Execution vector of EMIT. Default to TX!
   USER("'EXPECT", 0); // Execution vector of EXPECT. Default to 'accept' - initialized when accept defined TODO needs to be in UserInit.
   USER("'TAP", undefined); // TODO KTAP Execution vector of TAP. Default the kTAP.
-  USER("'ECHO", name2xt('TX!')); // Execution vector of ECHO. Default to tx!.
+  USER("'ECHO", TXbang); // Execution vector of ECHO. Default to tx!.
   USER("'PROMPT", undefined); // TODO DOTOK Execution vector of PROMPT.  Default to '.ok'.
   const BASEoffset = _USER;
   USER('BASE', 10);
@@ -722,7 +735,7 @@ code('COMPILE-ONLY', compileOnly);
     } else { // a
       await run(Ufetch(NUMBERoffset)); // n T | a F //TODO-THREADING this might not work, if NUMBER is colon word
       if (SPpop()) {
-        $DW('doLIT', SPpop());
+        $DW(doLIT, SPpop());
       } else {
         console.log("Number conversion of", countedToJS(SPpop()), "failed"); // TODO handle error in Forth-ish way (via Throw)
       }
@@ -1480,12 +1493,13 @@ BL WORD yyyy DUP C@ SWAP CP @ - 4 0 2 TEST
   2 CELLS - ( move to code pointer field )
   @ ; ( get code field address )
 
-: SAME? ( a1 a2 u -- a1 a2 f \\ -0+ )
+
+: SAME? ( a1 a2 u -- a1 a2 f \\ -0+ ) ( See JS sameq )
   ( Compare u cells in two strings. Return 0 if identical.)
   ( NOTICE THIS IS CELLS NOT BYTES )
   FOR               ( scan u+1 cells ) ( a1 a2 ; R: u)
     AFT             ( skip the loop the first time ) ( a1 a2; R: u-n)
-      OVER          ( copy a1 ) ( a1 a2 a1; u-n  R: u-n)
+      OVER          ( copy a1 ) ( a1 a2 a1; R: u-n)
       R@ CELLS + @  ( fetch one cell from a1) ( a1 a2 a1[u-n]  R: u-n)
       OVER          ( copy a2 ) ( a1 a2 a1[u-n] a2  R: u-n)
       R@ CELLS + @  ( fetch one cell from a2) ( a1 a2 a1[u-n] a2[u-n]  R: u-n)
@@ -1499,7 +1513,8 @@ BL WORD yyyy DUP C@ SWAP CP @ - 4 0 2 TEST
   NEXT              ( loop u times if strings are the same ) ( a1 a2;  R: u-n-1)
   0 ;               ( then push the 0 flag on the stack ) ( a1 a2 0)
 
-: find ( a va -- ca na, a F )
+( This can replace the code definition of find, however it is approx 8x slower )
+: FORTHfind ( a va -- ca na, a F )
   ( Search a vocabulary for a string. Return ca and na if succeeded.)
   SWAP                ( va a )
   DUP C@ CELLL / temp !   ( va a -- , get cell count ) ( EFORTH-ZEN-ERRATA was '2 /'
@@ -1556,7 +1571,7 @@ BL WORD yyyy DUP C@ SWAP CP @ - 4 0 2 TEST
 BL WORD xxx DUP C@ 1 + PAD SWAP CMOVE PAD BL WORD xxx 4 SAME? >R 2DROP R> 0 1 TEST
 BL WORD xxx DUP C@ 1 + PAD SWAP CMOVE PAD BL WORD xzx 4 SAME? >R 2DROP R> 0= 0 1 TEST
 FORTH 0 TEST
-( TODO convert test now dont have testFind ; BL WORD TOKEN CONTEXT @ find', testFind.map(k => k ; (Compare with results from old version of find )
+( TODO convert test now dont have testFind ; BL WORD TOKEN CONTEXT @ FORTHfind', testFind.map(k => k ; (Compare with results from old version of find )
 ( TODO convert this test - now dont have testFind - BL WORD TOKEN NAME?', testFind ; // Name searches all vocabs )
 ( === Text input from terminal pg 78: ^H TAP kTAP accept EXPECT QUERY )
 ( EFORTH-ZEN-ERRATA CTRL used here but not defined. )
@@ -2036,7 +2051,7 @@ foo @ 12 1 TEST
 ( WORDS 0 TEST ; Commented out as expensive )
 
 ( === Search Token Name pg103 >NAME )
-: >NAME ( ca -- na, F )
+: FORTH>NAME ( ca -- na, F ) ( 
   ( Convert code address to a name address. )
   CURRENT             ( search only the current vocab )
   BEGIN CELL+ @ ?DUP  ( end of vocabulary? )
@@ -2048,8 +2063,9 @@ foo @ 12 1 TEST
     THEN NIP ?DUP
   UNTIL NIP NIP EXIT  ( found.  return name address )
   THEN DROP 0 ;       ( end of vocabulary, failure )
-
-BL WORD DUP NAME? SWAP >NAME = -1 1 TEST
+BL WORD DUP NAME? SWAP >NAME = -1 1 TEST ( Test FAST JS version )
+( : >NAME FORTH>NAME ; ) ( Uncomment to use FORTH version of >NAME )
+BL WORD DUP NAME? SWAP FORTH>NAME = -1 1 TEST
 
 ( === The simplest Decompiler pg104 SEE )
 : SEE ( -- ; <string> )
@@ -2073,7 +2089,7 @@ BL WORD DUP NAME? SWAP >NAME = -1 1 TEST
   THEN
   DROP ;
 
-( SEE >NAME 0 TEST ; Commented out as expensive )
+SEE FORTH>NAME 0 TEST ( Commented out as expensive TODO seems to crash out)
 
 ( ERRATA Zen uses CONSTANT but doesnt define it )
 ( === Signon Message pg105 VER hi )
