@@ -2,170 +2,116 @@
  * References see FORTH.md
  */
 
+/* Naming conventions and abbreviations
+ * xt: execution token, points at the token field of a definition
+ * na: Name Address, points to the name, (first byte count+flags, then that number of characters, max 31)
+ * ca: Codefield Address, field that holds the xt
+ * la: Linkfield Address, field holding the na of the previously defined word in this vocabulary
+ * u: unsigned 16 bit
+ * c: character
+ * w: word - 16 bit signed
+ * n: word - 16 bit signed
+ */
+
+/* Sections below in order
+ * Support for Debugging - constants, variables, arrays, functions used by tools
+ * Memory Map - constants that lay out the memory array
+ * Javascript structures - implement the memory map and record the full state.
+ * Other key constants - especially bitmasks
+ * Standard Pointers used - esp IP, SP, RP, UP
+ * Functions to simplify storing and retrieving 16 bit values into 8 bit stacks etc.
+ * Access to the USER variables before they are defined
+*/
+
+
+// === Support for Debugging ============
+let testing = 0x0; // 0x01 display words passed to interpreters; 0x02 each word in tokenthread - typically set by 'testing3'
+const testingDepth = 2;
+const padTestLength = 0; // Display pad length TODO-TESTING-20 this is not currently used
+// function forthNum(n) { return (n < 0) ? 0x10000 + n : n; } // to allow negative numbers in testing etc - but unused
+let debugStack = []; // Maintains a position, like a stack trace, don't manipulate directly use functions below
+let debugName; // Set in threadtoken()
+function debugPush() { debugStack.push(debugName); } // in tokenDoList
+function debugPop() { debugStack.pop(); } // in EXIT
+
 // TODO-ZEN-V5-STAAPL - COMPARE BELOW HERE
-  /* Naming conventions and abbreviations
-   * xt: execution token, points at the token field of a definition
-   * na: Name Address, points to the name, (first byte count+flags, then that number of characters, max 31)
-   * ca: Codefield Address, field that holds the xt
-   * la: Linkfield Address, field holding the na of the previously defined word in this vocabulary
-   * u: unsigned 16 bit
-   * c: character
-   * w: word - 16 bit signed
-   * n: word - 16 bit signed
-   */
-
-  let testing = 0x0; // 0x01 display words passed to interpreters; 0x02 each word in tokenthread
-  let testingDepth = 2;
-  let padTestLength = 0; // Display pad length
-// == Some debugging routines, can all be commented out (as long as their calls are)
-  let debugName; // Set in run()
-  let debugTIB;
-  let debugStack = [];
-
-  function debugPush() {
-    debugStack.push(debugName);
-  } // in tokenDoList
-  function debugPop() {
-    debugStack.pop();
-  } // in EXIT
-
-// EFORTH-DIFF difference to eForth in using indirect threaded code as makes more sense in JS
-
-// TODO review eForth Word Set at eForthAndZen pg 25 and check all implemented
-
-// eForthAndZen pg 26
 
 // === Memory Map - pg26
 // TODO-VM TODO-MEM rework this into separate slots and then check if really need ! and @ into some parts of mem
-// EFORTH-ZEN-ERRATA doesnt define CELLL (and presumes is 2 in multiple places)
-// EFORTH-ZEN-ERRATA the definitions on pg 26 dont come close to matching the addresses given as the example below. In particular UPP and RPP overlap !
-  const CELLL = 2;  // Using Buffers, but needs to be 2 as needs to be big enough for an address (offset into buffer) if change see CELL+ CELL- CELLS ALIGNED $USER
-  const US = 64 * CELLL;  // user area size in cells i.e. 64 variables - standard beow is using about 37
-  const RTS = 0x80 * CELLL; // return stack/TIB size // eFORTH-DIFF was 64 which is tiny for any kind of string handling TODO review this
-  const SPS = 0x80 * CELLL; // Size of data stack 256 bytes for now
-// From top down
-  const EM = 0x4000; // top of memory
-  const UPP = EM - US; // start of user area // TODO-MULTI UP should be a variable, and used in most places UPP is
-  const RPP = UPP - (8 * CELLL); // top of return stack RP0 TODO figure out if this 8 celll buffer is used - something about a word buffer
-  const TIBB = RPP - RTS; // Terminal input buffer
-  const SPP = TIBB - (8 * CELLL); // start of data stack - bottom down, points at top of stack TODO figure out if this 8 celll buffer is used - something about a word buffer
-  const NAMEE = SPP - SPS; // name dictionary
-// And bottom up - gap in middle is code directory
-  const COLDD = 0x100; // cold start vector
-  const CODEE = COLDD + US; // code dictionary
-  const bitsCOMP = 0x40; // bit in first char of name field to indicate 'compile-only'
-  const bitsIMED = 0x80; // bit in first char of name field to indicate 'immediate'
-  const bitsMASK = 0x1FFF; // bits to mask out of a call with count and first char
+// ERRATA Zen doesnt define CELLL (and presumes is 2 in multiple places)
+// ERRATA In Zen the definitions on pg 26 dont come close to matching the addresses given as the example below. In particular UPP and RPP overlap !
+const CELLL = 2;  // Using Buffers, but needs to be 2 as needs to be big enough for an address (offset into buffer) if change see CELL+ CELL- CELLS ALIGNED $USER
+const US = 64 * CELLL;  // user area size in cells i.e. 64 variables - standard usage below is using about 37
+const RTS = 0x80 * CELLL; // return stack/TIB size // eFORTH-DIFF was 64 which is tiny for any kind of string handling TODO review this
+const SPS = 0x80 * CELLL; // Size of data stack 256 bytes for now
+// Now the memory map itself, starting at the top of memory.
+const EM = 0x4000; // top of memory
+const UPP = EM - US; // start of user area // TODO-MULTI UP should be a variable, and used in most places UPP is
+const RPP = UPP - (8 * CELLL); // top of return stack RP0 - there is an 8 cell buffer which is probably just for safety.
+const TIBB = RPP - RTS; // Terminal input buffer - shares space with Return stack
+const SPP = TIBB - (8 * CELLL); // start of data stack - grows down, points at top of stack - 8 word buffer for safety
+const NAMEE = SPP - SPS; // name dictionary
+// And then building from the bottom up. The gap in middle is code directory
+const COLDD = 0x100; // cold start vector - its unclear if these bottom 0x100 are useful outside of the DOS context.
+// Above COLDD is a store of initial values for User variables
+const CODEE = COLDD + US; // code dictionary grows up from here towards NAME dictionary.
+// PAD is 80 bytes above the current top of the Code directory, and HLD (where numbers are build for output) is a few bytes growing down from PAD.
 
-// TODO-VM make this something passed to each function.
-// Standard pointers used (ref eForthAndZen pg22
-  let IP = 0;  // Interpreter Pointer
-  let SP = SPP;  // Data Stack Pointer
-  let RP = RPP;  // Return Stack Pointer (aka BP in 8086)
-//let WP = 0;  // Word or Work Pointer
-  let UP = UPP;  // User Area Pointer // TODO-MULTI will move this around
+// === Javascript structures - implement the memory map and record the full state.
+const m = Buffer.alloc(EM); // Allocate as one big buffer for now. TODO-MEM try alternatives including Uint8Array Uint16Array
+const codeSpace = []; // Maps tokens to executable functions
+const userInit = [0, 0, 0, 0]; // Used for initialization of user variables - for now not in m as would be in ROM normally TODO-MEM move to COLDD
 
+// === Other key constants.
+const bitsCOMP = 0x40; // bit in first char of name field to indicate 'compile-only'
+const bitsIMED = 0x80; // bit in first char of name field to indicate 'immediate'
+const bitsSPARE = 0x20; // Unused spare bit in names
+const bitsMASK = 0xFF - bitsCOMP - bitsIMED - bitsSPARE; // bits to mask out of a call with count and first char (
+const cellMASK = (bitsMASK << 8) + 0xFF // mask used when masking cells in fast search for name //TODO-CELLL will change if CELLL > 2
+const nameMaxLength = 31; // Max number of characters in a name, length needs to be representable after BitMask (we have one spare bit here)
+console.assert(nameMaxLength === bitsMASK); // If this isn't true then check each of the usages below
 
-  const m = Buffer.alloc(EM); // Allocate as one big buffer for now. TODO-MEM redo as a struct of some sort or poss u16 array
+// === Standard pointers used (ref eForthAndZen pg22
+// TODO-VM TODO-MULTI think about how these may need to be Task specific
+let IP = 0;  // Interpreter Pointer
+let SP = SPP;  // Data Stack Pointer
+let RP = RPP;  // Return Stack Pointer (aka BP in 8086)
+const UP = UPP;  // User Area Pointer // TODO-MULTI will move this around
 
-// Javascript structures
-  const codeSpace = []; // Maps tokens to executable functions
-  const userInit = [0, 0, 0, 0]; // Used for initialization of user variables - for now not in m as would be in ROM normally
-
+// === Functions to simplify storing and retrieving 16 bit values into 8 bit stacks etc.
 // These aren't part of eForth, but are here to simplify storing 16 bit words into 8 bit bytes in the Buffer.
-  function SPfetch() {
-    return (m[SP] << 8) | m[SP + 1];
-  }
+//TODO-CELLL if change CELLL these will need changing
+function SPfetch() { return (m[SP] << 8) | m[SP + 1]; }
+function SPpop() { return (m[SP++] << 8) | m[SP++]; }
+function SPpush(u16) { m[--SP] = u16 & 0xFF; m[--SP] = (u16 >> 8); }
+function RPfetch() { return (m[RP] << 8) | m[RP + 1]; }
+function RPpop() { return (m[RP++] << 8) | m[RP++]; }
+function RPpush(u16) { m[--RP] = u16 & 0xFF; m[--RP] = (u16 >> 8); }
+function IPnext() { return (m[IP++] << 8) | m[IP++]; }
+function Mstore(a, v) { m[a++] = v >> 8; m[a] = v & 0xFF; }
+function Mfetch(a) { return (m[a++] << 8) | m[a]; }
+function Ufetch(userindex, offset = 0) { return Mfetch(UP + userindex + offset); }
+function Ustore(userindex, w, offset = 0) { return Mstore(UP + userindex + offset, w); }
 
-  function SPpop() {
-    return (m[SP++] << 8) | m[SP++];
-  }
-
-  function SPpush(u16) {
-    m[--SP] = u16 & 0xFF;
-    m[--SP] = (u16 >> 8);
-  }
-
-  function RPfetch() {
-    return (m[RP] << 8) | m[RP + 1];
-  }
-
-  function RPpop() {
-    return (m[RP++] << 8) | m[RP++];
-  }
-
-  function RPpush(u16) {
-    m[--RP] = u16 & 0xFF;
-    m[--RP] = (u16 >> 8);
-  }
-
-  function IPnext() {
-    return (m[IP++] << 8) | m[IP++];
-  }
-
-  function Mstore(a, v) {
-    m[a++] = v >> 8;
-    m[a] = v & 0xFF;
-  }
-
-  function Mfetch(a) {
-    return (m[a++] << 8) | m[a];
-  }
-
-  function Ufetch(userindex, offset = 0) {
-    return Mfetch(UP + userindex + offset);
-  }
-
-  function Ustore(userindex, w, offset = 0) {
-    return Mstore(UP + userindex + offset, w);
-  }
-
-function forthNum(n) {
-  return (n < 0) ? 0x10000 + n : n;
-} // to allow negative numbers in testing etc
-
+// === Access to the USER variables before they are defined
+// Not more const offsets are defined along with the USER definitions.
 // Handle the Code and Namespace \pointer, which always points after last thing compiled into dictionary - in eForthAndZen this is '$'
-  const CURRENToffset = 64;
-  const CPoffset = 68; // This value is checked during the sequence of USER below
-  const NPoffset = 70;
-  const LASToffset = 72;
+//TODO-CELLL these are at CELLL increments
+const CONTEXToffset = 46;
+const CURRENToffset = 64;
+const CPoffset = 68; // This value is checked during the sequence of USER below
+const NPoffset = 70;
+const LASToffset = 72;
 
-  function currentFetch() {
-    return Ufetch(CURRENToffset);
-  }
+function currentFetch() { return Ufetch(CURRENToffset); }
+function cpFetch() { return Ufetch(CPoffset); }
+function npFetch() { return Ufetch(NPoffset); }
+function lastFetch() { return Ufetch(LASToffset); }
 
-  function currentStore(w) {
-    return Ustore(CURRENToffset, w);
-  }
-
-  function cpFetch() {
-    return Ufetch(CPoffset);
-  }
-
-  function cpStore(w) {
-    Ustore(CPoffset, w);
-  }
-
-  function npFetch() {
-    return Ufetch(NPoffset);
-  }
-
-  function npStore(w) {
-    Ustore(NPoffset, w);
-  }
-
-  function lastStore(w) {
-    Ustore(LASToffset, w);
-  }
-
-  function lastFetch() {
-    return Ufetch(LASToffset);
-  }
-
-  const nameMaxLength = 31;
+// ============ TIDYING UP FROM HERE DOWN ================
 
   function countedToJS(a) {
-    const c = m[a] & 0x1f;
+    const c = m[a] & bitsMASK;
     return m.slice(a + 1, a + c + 1).toString('utf8');
   }
 
@@ -186,7 +132,7 @@ function forthNum(n) {
       if (xt && (na2xt(p) === xt)) {
         return p;
       }
-      if (!cell1 || (cell1 === (c1 & bitsMASK))) { // first cell matches (if cell1 not passed then does slow compare
+      if (!cell1 || (cell1 === (c1 & cellMASK))) { // first cell matches (if cell1 not passed then does slow compare
         if (countedToJS(p) === name) { // This is what SAME? does
           return p;
         }
@@ -234,15 +180,8 @@ function forthNum(n) {
     return xt;
   }
 
-  function UfetchName(name, offset = 0) {
-    return Ufetch(Mfetch(name2xt(name) + 2), offset);
-  } // e.g. UfetchName('CURRENT',2)
-  function UstoreName(name, w, offset = 0) {
-    return Ustore(Mfetch(name2xt(name) + 2), w, offset);
-  } // e.g. UstoreName('BASE',10)
-
-  cpStore(CODEE); // Pointer to where compiling into dic TODO-MEM will be code.length
-  npStore(NAMEE); // Pointer to where writing name stack TODO-MEM will move
+Ustore(CPoffset, CODEE); // Pointer to where compiling into dic TODO-MEM will be code.length
+Ustore(NPoffset, NAMEE); // Pointer to where writing name stack TODO-MEM will move
 
 // === ASSEMBLY MACROS (or JS equivalent) pg 30
 // TODO_VM will prob need to be inside 'vm'
@@ -267,7 +206,7 @@ function forthNum(n) {
       let cp = cpFetch();
       m[cp++] = w >> 8;
       m[cp++] = w & 0xFF;
-      cpStore(cp);
+      Ustore(CPoffset, cp);
     });
   }
 
@@ -289,13 +228,13 @@ function forthNum(n) {
     if (m[SPfetch()]) {                 // DUP C@ IF  ; test for no word
       qUnique();
       let a = SPpop();
-      lastStore(a);             // DUP LAST ! ; a=na  ; LAST=na
+      Ustore(LASToffset, a);    // DUP LAST ! ; a=na  ; LAST=na
       a -= CELLL;               // CELL-      ; a=la
       // Link address points to previous NA (prev value of LAST)
       // Note that first time this is run, it gets a 0 (CURRENT is 0, @0 is 0) if that changes will need to test Current here.
       Mstore(a, Mfetch(currentFetch())); // CURRENT @ @ OVER ! ; la = top of current dic
       a -= CELLL;               // CELL-      ; a=ca
-      npStore(a);               // DUP NP !   ; NP=ca // adjust name pointer
+      Ustore(NPoffset, a);      // DUP NP !   ; NP=ca // adjust name pointer
       Mstore(a, cpFetch());     // ! EXIT     ; ca=CP ; code field to where will build in dictionary
     } else {                    // THEN $" name" THROW ;
       console.log('name error'); // This is an error - is a THROW when in FORTH
@@ -307,14 +246,14 @@ function forthNum(n) {
   }
 
   function $CODE(lex, name) { //TODO-CELLL check this carefully
-    console.assert(name.length <= 31);
+    console.assert(name.length <= nameMaxLength);
     // <NP-after>CPh CPl <_LINK> LINKh LINKl count name... <NP-BEFORE>
     $ALIGN();
     const np = npFetch();
     // Note this is going to give the name string an integral number of cells.
-    const len = (((lex & 0x01F) / CELLL) + 1) * CELLL;
+    const len = (((lex & bitsMASK) / CELLL) + 1) * CELLL;
     let a = np - len;
-    npStore(a);
+    Ustore(NPoffset, a);
     SPpush(a); // so dollarCommaN can find it
     m[a++] = lex;
     m.write(name, a, 'utf8');
@@ -361,21 +300,6 @@ function forthNum(n) {
   const tokenNextVal = tokenFunction(payload => SPpush(Mfetch(payload)));
   const tokenVar = tokenFunction(payload => SPpush(payload));
 
-  /* No longer used - not sure if it was ever used in eForth
-  function D$(funct, string) {
-    $DW(funct, string.length);
-    let cp = cpFetch();
-    cp +=  m.write(string, cp, 'utf8');
-    cpStore(cp);
-    $ALIGN();
-  }
-  */
-
-  /* No longer used - it was the end of $COLON in a direct threaded eForth
-  function $NEXT() {
-    $DW(EXIT);
-  }
-  */
   function initRegisters() {
     SP = SPP;
     RP = RPP;
@@ -396,11 +320,11 @@ function forthNum(n) {
   }
 
   function constant(name, val) {  // TODO merge this with CONSTANT once defined
-    const xt = cpFetch();
+    //const xt = cpFetch();
     $CODE(name.length, name);
     $DW(tokenNextVal, val);
     OVERT();
-    return xt;
+    //return xt;
   }
 
 //User variables initialization eForthAndZen pg33 see pg46
@@ -410,20 +334,21 @@ function forthNum(n) {
 
   const tokenVocabulary = tokenFunction((payload) => {
     // : doVOC R> CONTEXT ! ;
-    UstoreName('CONTEXT', payload);
+    Ustore(CONTEXToffset, payload);
   });
   $CODE(5, 'FORTH');
   $DW(tokenVocabulary);
-  currentStore(cpFetch()); // Initialize Current. Context & Current+2 initialized in USER process pg46
+  Ustore(CURRENToffset, cpFetch()); // Initialize Current. Context & Current+2 initialized in USER process pg46
   $DW(0, 0);
-  OVERT(); // Uses the initialization done by currentStore above.
+  OVERT(); // Uses the initialization done by Ustore(CURRENToffset) above.
 
 // === Add some constants defined earlier prior to dictionary being available
   constant('CELLL', CELLL); // effectively '2 CONSTANT CELLL' but dont have CONSTANT at this point
   constant('=TIB', TIBB);
   constant('=COMP', bitsCOMP); // Compile only word - TODO figure out how used EFORTH-ZEN-ERRATA used but not defined
   constant('=IMED', bitsIMED); // Immediate word - interpreted during compilation EFORTH-ZEN-ERRATA used but not defined
-  constant('=MASK', bitsMASK); // EFORTH-ZEN-ERRATA used but not defined
+  constant('=BYTEMASK', bitsMASK); // EFORTH-ZEN-ERRATA used but not defined
+  constant('=CELLMASK', cellMASK); // EFORTH-ZEN-ERRATA used but not defined
   constant('tokenDoList', tokenDoList);
   constant('tokenUser', tokenUser);
   constant('tokenVar', tokenVar);
@@ -446,7 +371,7 @@ code('find', find);
   code('debugNA', () => console.log('NAME=', countedToJS(SPfetch()))); // Print the NA on console
   code('testing3', () => testing |= 3); // this word can be slotted in a definition to turn on debugging
   code('break', () => { console.log("Stick a breakpoint here"); })
-  code('debugPrintTIB', () => { console.log("TIB: ",m.slice(UfetchName('#TIB', 2) + UfetchName('>IN'), UfetchName('#TIB', 2) + UfetchName('#TIB')).toString('utf8'))});
+  code('debugPrintTIB', () => { console.log("TIB: ",m.slice(Ufetch(TIBoffset) + Ufetch(INoffset), Ufetch(TIBoffset) + Ufetch(nTIBoffset)).toString('utf8'))});
   code('debug1', () => {console.log("ACCEPT1");});
 
   // Test routing - usage e.g. interpret(`1 DUP 1 1 2 TEST`);
@@ -542,7 +467,7 @@ code('find', find);
       console.assert(IP >= CODEE && IP <= NAMEE); // TODO-EFFICIENCY comment out
       xt = IPnext(); // SEE-OTHER-ENDIAN
       //TODO-EFFICIENCY comment this out except when needed for debugging, they are slow
-      // debugTIB =  m.slice(UfetchName('#TIB', 2) + UfetchName('>IN'), UfetchName('#TIB', 2) + UfetchName('#TIB')).toString('utf8');
+      // debugTIB =  m.slice(Ufetch(TIBoffset) + Ufetch(INoffset), Ufetch(TIBoffset) + Ufetch(nTIBoffset)).toString('utf8');
       let maybePromise = threadtoken(xt);
       if (maybePromise) {
         await maybePromise;
@@ -660,17 +585,24 @@ code('find', find);
   USER("'TAP", undefined); // TODO KTAP Execution vector of TAP. Default the kTAP.
   USER("'ECHO", name2xt('TX!')); // Execution vector of ECHO. Default to tx!.
   USER("'PROMPT", undefined); // TODO DOTOK Execution vector of PROMPT.  Default to '.ok'.
+  const BASEoffset = _USER;
   USER('BASE', 10);
   USER('temp', 0); // A temporary storage location used in parse and find. EFORTH-ZEN-ERRATA its uses as 'temp', listing says 'tmp'
   USER('SPAN', 0); // Hold character count received by EXPECT.
+const INoffset = _USER;
   USER('>IN', 0); // Hold the character pointer while parsing input stream.
+const nTIBoffset = _USER;
   USER('#TIB', 0); // Hold the current count and address of the terminal input buffer.
+const TIBoffset = _USER;
   USER(undefined, TIBB); // Terminal Input Buffer used one cell after #TIB.
   USER('CSP', 0); // Hold the stack pointer for error checking.
+const EVALoffset = _USER;
   USER("'EVAL", undefined); // Initialized when have jsINTERPRET
+const NUMBERoffset = _USER;
   USER("'NUMBER", undefined); // TODO NUMBQ Execution vector of number conversion. Default to NUMBER?.
   USER('HLD', 0); // Hold a pointer in building a numeric output string.
   USER('HANDLER', 0); // Hold the return stack pointer for error handling.
+console.assert(CONTEXToffset === _USER);
   USER('CONTEXT', currentFetch()); // A area to specify vocabulary search order. Default to FORTH. Vocabulary stack, 8 cells following CONTEXT.
   USER(undefined, 0);
   USER(undefined, 0);
@@ -705,7 +637,7 @@ function compileOnly() { setHeaderBits(bitsCOMP); }
 code('COMPILE-ONLY', compileOnly);
 
   function tibIn() {
-    return UfetchName('#TIB', CELLL) + UfetchName('>IN');
+    return Ufetch(TIBoffset) + Ufetch(INoffset);
   }  // TIB >IN @ +
   const BL = 32;
   constant('BL', BL);
@@ -713,22 +645,22 @@ code('COMPILE-ONLY', compileOnly);
 
   function fPARSE() { // returns b (address) and u (length)
     const c = SPpop();
-    const tib = UfetchName('#TIB', CELLL);
-    const ntib = UfetchName('#TIB');
-    let inoffset = UfetchName('>IN');
+    const tib = Ufetch(TIBoffset);
+    const ntib = Ufetch(nTIBoffset);
+    let inoffset = Ufetch(INoffset);
     if (c === BL) {
       while ((inoffset < ntib) && (m[tib + inoffset] <= BL)) {
         inoffset++;
       }  // If blank then skip over leading BL /control chars
     }
-    // inoffset now points at first non-delimiter or #tib
+    // inoffset now points at first non-delimiter or #TIB
     const b = tib + inoffset;
     while ((inoffset < ntib) && ((c === BL) ? (c < m[tib + inoffset]) : (c !== m[tib + inoffset]))) {
       inoffset++;
-    } // Exit with inoffset at #tib or after delimiter
+    } // Exit with inoffset at #TIB or after delimiter
     SPpush(b);
     SPpush(tib + inoffset - b); // Store length not including trailing delimiter
-    UstoreName('>IN', inoffset < ntib ? ++inoffset : inoffset); // Skip over delimiter - TODO its not clear this is what FORTH wants. eForth doc is almost certainly wrong
+    Ustore(INoffset, inoffset < ntib ? ++inoffset : inoffset); // Skip over delimiter - TODO its not clear this is what FORTH wants. eForth doc is almost certainly wrong
   }
 
   code('PARSE', fPARSE);
@@ -738,7 +670,7 @@ code('COMPILE-ONLY', compileOnly);
     fPARSE();   // b u (counted string, adjusts >IN)
     const u = Math.min(SPpop(), nameMaxLength);
     const b = SPpop();
-    const np = UfetchName('NP') - u - 2;
+    const np = npFetch() - u - 2;
     m.copy(m, np + 1, b, b + u);
     m[np] = u;  // 1 byte count
     m[np + u + 1] = 0;  // EFORTH-ZEN-ERRATA  pg62 - PACK$ does `0 !` which I think will overwrite bottom value of name dict as NP is last byte used
@@ -748,14 +680,14 @@ code('COMPILE-ONLY', compileOnly);
   code('TOKEN', jsTOKEN);
 
   function findName() { // a -- xt na | a F
-    SPpush(UfetchName('CONTEXT'));  // a va
+    SPpush(Ufetch(CONTEXToffset));  // a va
     find();                           // xt na | a F
   }
 
   function NUMBER() { //TODO-INTERPRETER-5 make this work like things stored in 'NUMBER
     const a = SPpop();
     const w = countedToJS(a);
-    const base = UfetchName('BASE');
+    const base = Ufetch(BASEoffset);
     const n = parseInt(w, base); // TODO-NUM handle parsing errors // Needs forth to convert word
     if (isNaN(n)) {
       SPpush(a);
@@ -767,7 +699,7 @@ code('COMPILE-ONLY', compileOnly);
   }
 
 // Define NUMBER and store its xt in 'NUMBER
-  UstoreName("'NUMBER", code('NUMBER', NUMBER));
+  Ustore(NUMBERoffset, code('NUMBER', NUMBER));
   const redefined = ['TOKEN', 'find', "'", '$,', '$,n', ']', ':', 'IMMEDIATE']; // Have to be careful about use of these as will use old version
   const redefinedImmediate = ['[', ';']; // Don't care about these as being immediate they are not left around
 
@@ -788,7 +720,7 @@ code('COMPILE-ONLY', compileOnly);
         $DW(xt);
       }
     } else { // a
-      await run(UfetchName("'NUMBER")); // n T | a F //TODO-THREADING this might not work, if NUMBER is colon word
+      await run(Ufetch(NUMBERoffset)); // n T | a F //TODO-THREADING this might not work, if NUMBER is colon word
       if (SPpop()) {
         $DW('doLIT', SPpop());
       } else {
@@ -804,7 +736,7 @@ code('COMPILE-ONLY', compileOnly);
       const xt = SPpop();
       await run(xt); //TODO-THREADING maybe should be threadToken - but that won't work if this isn't running inside run already
     } else {
-      await run(UfetchName("'NUMBER")); // n T | a F //TODO-THREADING this might not work, if NUMBER is colon word
+      await run(Ufetch(NUMBERoffset)); // n T | a F //TODO-THREADING this might not work, if NUMBER is colon word
       if (!SPpop()) {
         console.log("Number conversion of", countedToJS(SPfetch()), "failed"); // TODO handle error in Forth-ish way (via Throw)
       }
@@ -817,16 +749,16 @@ code('COMPILE-ONLY', compileOnly);
       console.log(m.slice(SP, SPP), ' >>', inp);
     }
     console.assert(inp.length < (RTS - 10));
-    UstoreName('>IN', 0); // Start at beginning of TIB
-    UstoreName('#TIB', m.write(inp, tibIn(), 'utf8')); // copy string to TIB, and store length in #TIB
+    Ustore(INoffset, 0); // Start at beginning of TIB
+    Ustore(nTIBoffset, m.write(inp, tibIn(), 'utf8')); // copy string to TIB, and store length in #TIB
     //OBS: while (input && input.length) {
-    while (UfetchName('>IN') < UfetchName('#TIB')) {
+    while (Ufetch(INoffset) < Ufetch(nTIBoffset)) {
       jsTOKEN(); // a ; pointing to word in Name Buffer (NB)
       // There may be case where jsTOKEN returns empty string at end of line or similar.
       if (m[SPfetch()] === 0) { // Skip zero length string
         SPpop();
       } else {
-        await run(UfetchName("'EVAL"));  //TODO-THREADING this is probably problematic as will nest "run"
+        await run(Ufetch(EVALoffset));  //TODO-THREADING this is probably problematic as will nest "run"
       }
       console.assert(SP <= SPP && RP <= RPP); // Side effect of making SP and SPP available to debugger.
     }
@@ -841,7 +773,7 @@ code('COMPILE-ONLY', compileOnly);
   }
 
   function padPtr() {
-    return UfetchName('CP') + 80;
+    return cpFetch() + 80;
   } // Sometimes JS needs the pad pointer
   async function test(inp, arr, {pad = undefined, hold = undefined} = {}) {
     console.assert((SPP === SP) && (RPP === RP) && (debugStack.length === 0));
@@ -865,13 +797,13 @@ code('COMPILE-ONLY', compileOnly);
 
 // TODO could replace with : ':' TOKEN $,n [ ' doLIST ] LITERAL CALL, ] ; see pg96
   function openBracket() {
-    UstoreName("'EVAL", xtINTERPRET);
+    Ustore(EVALoffset, xtINTERPRET);
   }
 
 code('[', openBracket); immediate(); //pg84 and pg88
 
 function closeBracket() {
-  UstoreName("'EVAL", xtCOMPILE);
+  Ustore(EVALoffset, xtCOMPILE);
 }
 
 code(']', closeBracket); // pg88 and pg95
@@ -932,13 +864,13 @@ const forthInForth = `
   1 2 ( 3 ) 1 2 2 TEST
 ( Now that ( is defined we can use comments below here )
 
-( === Test as many of the words defined in code as possbile) 
+( === Test as many of the words defined in code as possbile)
 ( EXIT & EXECUTE tested with ' )
 ( doLIT implicitly tested by all literals )
 ( next, ?branch, branch implicitly tested by control structures )
 CELLL 2 1 TEST ( Assuming small cell, otherwise it should be 2 )
 123 HLD ! HLD @ 123 1 TEST ( Also tests user variables )
-111 HLD ! 222 HLD C! HLD C@ 0 HLD C! HLD @ 222, 111 2 TEST 
+111 HLD ! 222 HLD C! HLD C@ 0 HLD C! HLD @ 222, 111 2 TEST
 ( R> >R R@ SP@ SP! tested after arithmetic operators )
 30 20 DROP 30 1 TEST
 30 20 DUP 30 20 20 3 TEST
@@ -977,7 +909,7 @@ CTRL H 8 1 TEST
 ( test is non-obvious )
 
 ( Note eForth has +, but that isn't defined till pg50 )
-: CELL+ CELLL UM+ DROP ; 
+: CELL+ CELLL UM+ DROP ;
 1 CELL+ 3 1 TEST
 
 ( EFORTH-ZEN-ERRATA - pg57 presumes CELLL==2 and need to align, not case with JS and byte Buffer )
@@ -985,7 +917,7 @@ CTRL H 8 1 TEST
 : ALIGNED ;
 ( 101 ALIGNED 101 1 TEST
 
-( ERRATA v5 does not have ALIGNED ) 
+( ERRATA v5 does not have ALIGNED )
 : , HERE ( w --; Compile an integer into the code dictionary. pg 90)
   ALIGNED DUP CELL+ CP ! ! ;
 
@@ -1147,7 +1079,7 @@ CTRL H 8 1 TEST
   ABS SWAP ABS UM*  ( multiply absolutes)
   R> IF DNEGATE THEN ;  ( negate if signs are different)
 
-1 2 4 UM/MOD 1 32768 2 TEST 
+1 2 4 UM/MOD 1 32768 2 TEST
 1 2 4 M/MOD 1 32768 2 TEST
 9 4 /MOD 1 2 2 TEST
 9 4 MOD 1 1 TEST
@@ -1226,7 +1158,7 @@ CTRL H 8 1 TEST
 : TIB ( -- a; Return address of terminal input buffer)
   #TIB CELL+ @ ; ( 1 cell after #TIB)
 : @EXECUTE ( a -- ; execute vector -if any- stored in address a)
-  @ ?DUP IF EXECUTE 
+  @ ?DUP IF EXECUTE
   ELSE break
   THEN ;
 
@@ -1343,8 +1275,8 @@ TIB >R BL PARSE XXX SWAP R> - 3 16 2 TEST
   BL EMIT ; ( send out blank character)
 : CHARS ( +n c -- ; Send n characters to output device)
   SWAP 0 MAX FOR AFT DUP EMIT THEN NEXT DROP ; ( From Staapl and V5, not in Zen) ( TODO-ANS flagged as possible conflict)
-: SPACES ( n -- ; Send n spaces to the output device. pg70) ( ERRATA Zen has bad initial SWAP) 
-  BL CHARS ; 
+: SPACES ( n -- ; Send n spaces to the output device. pg70) ( ERRATA Zen has bad initial SWAP)
+  BL CHARS ;
 : TYPE ( b u -- ; Output u characters from b)
   FOR AFT DUP C@ EMIT 1 + THEN NEXT DROP ;
 : .$ ( a -- ) COUNT TYPE ; ( from Staapl, not in eForth)
@@ -1523,7 +1455,7 @@ BL PARSE 1234 PAD PACK$ NUMBER? DROP 1234 1 TEST
 ( Note there is jsTOKEN which does same thing )
 : TOKEN ( -- a ; <string> ; Parse a word from input stream and copy it to name dictionary.)
   BL PARSE            ( parse out next space delimited string )
-  31 MIN              ( truncate it to 31 characters = nameMaxLength )
+  =BYTEMASK MIN              ( truncate it to 31 characters = nameMaxLength )
   NP @                ( word buffer below name dictionary )
   OVER - 2 - PACK$ ;  ( copy parsed string to word buffer )
 
@@ -1578,7 +1510,7 @@ BL WORD yyyy DUP C@ SWAP CP @ - 4 0 2 TEST
     ( debugNA )       ( uncomment for debugging find - will report each name as checked)
     IF                ( na=0 at the end of a vocabulary )
       DUP @           ( not end of vocabulary, test 1st cell )
-      [ =MASK ] LITERAL AND ( mask off lexicon bits )
+      [ =CELLMASK ] LITERAL AND ( mask off lexicon bits )
       R@ XOR          ( compare with 1st cell in string )
       IF              ( 1st cells do not match )
         CELL+ -1      ( try the next name in the vocabulary )
@@ -2084,7 +2016,7 @@ foo @ 12 1 TEST
   ( Display the name at address.)
   ?DUP                ( not valid name if na=0 )
   IF COUNT            ( get length by mask lexicon bits )
-    $001F AND         ( limit length to 31 characters )
+    =BYTEMASK AND         ( limit length to 31 characters )
     _TYPE ( print the name string )
     EXIT
   THEN ." {noName}" ; ( error if na is not valid)

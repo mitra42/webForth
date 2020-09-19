@@ -5,13 +5,71 @@ Mitra Ardron <mitra@mitra.biz> 17 Sept 2020
 
 * Based on eForth but not quite same
 * Javascript then Forth
-* Token threaded
 * Memory Handling
 * Colon, Code and other words
 * I/O
 * Async
+* Token threaded
+* Orthogonality and likely changes
 
-#### Orthogonality and likely changes
+#### Based on eForth but not quite same
+This system is based on eForth, 
+I primarily used the version of eForth in "Zen and Forth", but this has a lot of bugs,
+some of the bugs are fixed in the `v5` version, 
+and others in the version ported to `staapl`, 
+so I've picked and chosen and flagged the errors with "ERRATA" in the code. 
+
+#### Javascript then Forth
+There are several ways to bootstrap Forth. 
+A common way on bigger systems is Forth written in Forth and cross-compiled to an image.
+However this requires a Forth system to build it on. 
+eForth relies on a Macro-Assembler, but the code is only available in text form, 
+which you have to assemble by hand - and then figure out the numerous bugs.
+
+As an alternative this system bootstraps in Javascript, 
+first some javascript functions are written, all the way up to a simpler interpreter,
+that interpreter can compile a FORTH dictionary to bring up the rest of the language, 
+and at some point in the compilation process the interpreter switches so it is itself
+running in FORTH.  
+
+### Memory Handling
+The memory map follows the eForth model as defined on page 27 of eForth,
+Note this doesn't quite match the supplied code on page 26! 
+The code that defines these is well commented
+
+#### Memory map to Javascript
+The primary memory, is a large byte buffer. 
+This may change and alternatives get tried such as Uint8Array or Uint16Array. 
+In future different parts of memory could be split, especially for multi-tasking, 
+but eForth doesn't lend itself easily to that. 
+See issue-15 and issue-11.
+
+### Colon, Code and other words
+### I/O
+### Async
+
+### Token Threaded
+The key to Forth is a threaded interpreter. 
+Each word consists of a list of pointers to other words.
+The inner interpreter iterates over those lists. 
+
+There are three common ways to implement the interpreters. 
+
+1. Direct threaded, where you call the word directly - eForth does this. 
+2. Indirect threaded, the first word of the definition has a pointer to code. 
+3. Token threaded, the first word contains a token. 
+
+We are using Token threading 
+because we can't easily mix javascript code into the byte-array of Forth.
+The first word contains an index into a table of code. 
+This code table is used for both defining words (colon, constant etc) 
+and for any word implemented in pure javacript. 
+
+Code words are defined in javascript with `code(<name>, () => {javascript});`
+
+
+Which iterates through lists of pointers to other wo
+### Orthogonality and likely changes
 
 * Sync/Async/Event Driven
 * Cell size
