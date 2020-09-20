@@ -66,7 +66,8 @@ const bitsCOMP = 0x40; // bit in first char of name field to indicate 'compile-o
 const bitsIMED = 0x80; // bit in first char of name field to indicate 'immediate'
 const bitsSPARE = 0x20; // Unused spare bit in names
 const bitsMASK = 0xFF - bitsCOMP - bitsIMED - bitsSPARE; // bits to mask out of a call with count and first char (
-const cellMASK = (bitsMASK << 8) + 0xFF // mask used when masking cells in fast search for name //TODO-CELLL will change if CELLL > 2
+console.assert(CELLL === 2); // Presuming its 2 TODO-CELLL
+const cellMASK = (bitsMASK << 8) + 0xFF // mask used when masking cells in fast search for name
 const nameMaxLength = 31; // Max number of characters in a name, length needs to be representable after BitMask (we have one spare bit here)
 console.assert(nameMaxLength === bitsMASK); // If this isn't true then check each of the usages below
 
@@ -79,7 +80,7 @@ const UP = UPP;  // User Area Pointer // TODO-MULTI will move this around
 
 // === Functions to simplify storing and retrieving 16 bit values into 8 bit stacks etc.
 // These aren't part of eForth, but are here to simplify storing 16 bit words into 8 bit bytes in the Buffer.
-//TODO-CELLL if change CELLL these will need changing
+console.assert(CELLL === 2); // Presuming its 2 TODO-CELLL
 function SPfetch() { return (m[SP] << 8) | m[SP + 1]; }
 function SPpop() { return (m[SP++] << 8) | m[SP++]; }
 function SPpush(u16) { m[--SP] = u16 & 0xFF; m[--SP] = (u16 >> 8); }
@@ -95,12 +96,11 @@ function Ustore(userindex, w, offset = 0) { return Mstore(UP + userindex + offse
 // === Access to the USER variables before they are defined
 // Not more const offsets are defined along with the USER definitions.
 // Handle the Code and Namespace \pointer, which always points after last thing compiled into dictionary - in eForthAndZen this is '$'
-//TODO-CELLL these are at CELLL increments
-const CONTEXToffset = 46;
-const CURRENToffset = 64;
-const CPoffset = 68; // This value is checked during the sequence of USER below
-const NPoffset = 70;
-const LASToffset = 72;
+const CONTEXToffset = 23 * CELLL;
+const CURRENToffset = 32 * CELLL;
+const CPoffset = 34 * CELLL; // This value is checked during the sequence of USER below
+const NPoffset = 35 * CELLL;
+const LASToffset = 36 * CELLL;
 
 function currentFetch() { return Ufetch(CURRENToffset); }
 function cpFetch() { return Ufetch(CPoffset); }
@@ -195,25 +195,15 @@ function xt2name(xt) {
 // TODO_VM will prob need to be inside 'vm'
 //OBS uses NB user variable: let _NAME = NAMEE; // initialize name pointer
 //OBS uses CP user variable let _CODE = CODEE; // initialize code pointer - points at start of last word defined (CP points to top of dict)
-  let _USER = 4 * CELLL; // first user variable offset, skips 4 variables used by multitasking
+// === ASSEMBLY MACROS (or JS equivalent) Zen pg30
+function $ALIGN() { } // Not applicable since using a byte Buffer TODO-CELLL
 
-  function $ALIGN() {
-  } // Not applicable since using a byte Buffer
-
+console.assert(CELLL === 2); // Presuming its 2 TODO-CELLL
 function $DW(...words) { // Forth presumes big-endian, high word stored at low memory address (which is above on stacks)
   words.forEach((word) => {
-    let w;
-    //if (typeof word === 'string') {
-    //  w = name2xt(word);
-    //  if (!w) {
-    //    console.error('Cant find', word);
-    //  }
-    //} else {
-    w = word;
-    //}
     let cp = cpFetch();
-    m[cp++] = w >> 8;
-    m[cp++] = w & 0xFF;
+    m[cp++] = word >> 8;
+    m[cp++] = word & 0xFF;
     Ustore(CPoffset, cp);
   });
 }
@@ -253,7 +243,8 @@ function $DW(...words) { // Forth presumes big-endian, high word stored at low m
     Mstore(currentFetch(), lastFetch()); // LAST @ CURRENT @ !
   }
 
-  function $CODE(lex, name) { //TODO-CELLL check this carefully
+console.assert(CELLL === 2); // Presuming its 2 TODO-CELLL  check this carefully
+  function $CODE(lex, name) {
     console.assert(name.length <= nameMaxLength);
     // <NP-after>CPh CPl <_LINK> LINKh LINKl count name... <NP-BEFORE>
     $ALIGN();
@@ -295,14 +286,6 @@ function $DW(...words) { // Forth presumes big-endian, high word stored at low m
 
   const tokenUser = tokenFunction(payload => SPpush(Mfetch(payload) + UP));
 
-  function $USER(name) { // Note unlike eForth we use Token threading see USER() which also initialized
-    if (name) {
-      $CODE(name.length, name);
-      $DW(tokenUser, _USER);
-      OVERT();
-    }
-    _USER += CELLL; // Need to skip to next _USER in either case
-  }
 
 // tokenNextVal TODO define VARIABLE and CONSTANT to use this
   const tokenNextVal = tokenFunction(payload => SPpush(Mfetch(payload)));
@@ -349,7 +332,7 @@ Ustore(NPoffset, NAMEE); // Pointer to where writing name stack TODO-MEM will mo
   });
   $CODE(5, 'FORTH');
   $DW(tokenVocabulary);
-  Ustore(CURRENToffset, cpFetch()); // Initialize Current. Context & Current+2 initialized in USER process pg46
+  Ustore(CURRENToffset, cpFetch()); // Initialize Current. Context & Current+CELLL initialized in USER process Zen pg46
   $DW(0, 0);
   OVERT(); // Uses the initialization done by Ustore(CURRENToffset) above.
 
@@ -370,7 +353,7 @@ Ustore(NPoffset, NAMEE); // Pointer to where writing name stack TODO-MEM will mo
   code('initRegisters', initRegisters);
 code('userAreaInit', () => {
   let a = 0;
-  userInit.forEach(v => Ustore(a++ * 2, v));
+  userInit.forEach(v => Ustore(a++ * CELLL, v));
 });
 code('find', find); // Fast version of find - see Forth definition below
 // code('OVERT', OVERT);  // Note redefined below in FORTH but not used prior to that
@@ -548,7 +531,7 @@ const doLIT = code('doLIT', () => SPpush(IPnext()));
   code('SP!', () => SP = SPpop());
 
 // Classic Data stack words eForthAndZen#42
-  code('DROP', () => SP += 2);
+  code('DROP', () => SP += CELLL);
   code('DUP', () => SPpush(SPfetch()));
   code('SWAP', () => {
     const x = SPpop();
@@ -683,7 +666,7 @@ code('COMPILE-ONLY', compileOnly);
     fPARSE();   // b u (counted string, adjusts >IN)
     const u = Math.min(SPpop(), nameMaxLength);
     const b = SPpop();
-    const np = npFetch() - u - 2;
+    const np = npFetch() - u - CELLL;
     m.copy(m, np + 1, b, b + u);
     m[np] = u;  // 1 byte count
     m[np + u + 1] = 0;  // EFORTH-ZEN-ERRATA  pg62 - PACK$ does `0 !` which I think will overwrite bottom value of name dict as NP is last byte used
@@ -1470,7 +1453,7 @@ BL PARSE 1234 PAD PACK$ NUMBER? DROP 1234 1 TEST
   BL PARSE            ( parse out next space delimited string )
   =BYTEMASK MIN              ( truncate it to 31 characters = nameMaxLength )
   NP @                ( word buffer below name dictionary )
-  OVER - 2 - PACK$ ;  ( copy parsed string to word buffer )
+  OVER - CELLL - PACK$ ;  ( copy parsed string to word buffer )
 
 : WORD ( c -- a ; <string> ) ( Parse a word from input stream and copy it to code dictionary. Not if not in definition it will be overwritten by next)
   PARSE         ( parse out a string delimited by c )
