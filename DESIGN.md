@@ -27,10 +27,10 @@ eForth relies on a Macro-Assembler, but the code is only available in text form,
 which you have to assemble by hand - and then figure out the numerous bugs.
 
 As an alternative this system bootstraps in Javascript, 
-first some javascript functions are written, all the way up to a simpler interpreter,
-that interpreter can compile a FORTH dictionary to bring up the rest of the language, 
-and at some point in the compilation process the interpreter switches so it is itself
-running in FORTH.  
+* first some javascript functions are written - equivalent of the core code functions in eForth
+* then some JS functions that enable a simple interpreter, especially `find` which is a key efficiency enabler anyway.
+* that interpreter can compile a FORTH dictionary to bring up the rest of the language, 
+* at some point in the compilation process the interpreter switches so it is itself running in FORTH.  
 
 ### Memory Handling
 The memory map follows the eForth model as defined on page 27 of eForth,
@@ -65,7 +65,7 @@ The first word contains an index into a table of code.
 This code table is used for both defining words (colon, constant etc) 
 and for any word implemented in pure javacript. 
 
-Code words are defined in javascript with `code(<name>, () => {javascript});`
+Code words are defined in javascript with `c.code(<name>, () => {javascript});`
 
 
 Which iterates through lists of pointers to other wo
