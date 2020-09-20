@@ -22,6 +22,7 @@
  * Functions to simplify storing and retrieving 16 bit values into 8 bit stacks etc.
  * Access to the USER variables before they are defined
  * Functions related to building "find" and its wrappers
+ * JS Functions to be able to define words
  *
 */
 
@@ -94,6 +95,12 @@ let SP = SPP;  // Data Stack Pointer
 let RP = RPP;  // Return Stack Pointer (aka BP in 8086)
 const UP = UPP;  // User Area Pointer // TODO-MULTI will move this around
 
+// Currently unused register initialization.
+function initRegisters() {
+  SP = SPP;
+  RP = RPP;
+  IP = 0;
+}
 // === Functions to simplify storing and retrieving 16 bit values into 8 bit stacks etc.
 // These aren't part of eForth, but are here to simplify storing 16 bit words into 8 bit bytes in the Buffer.
 console.assert(CELLL === 2); // Presuming its 2 TODO-CELLL
@@ -205,10 +212,8 @@ function xt2name(xt) {
   return na ? countedToJS(na) : 'undefined';
 }
 
-// ============ TIDYING UP FROM HERE DOWN ================
-// TODO-ZEN-V5-STAAPL - COMPARE BELOW HERE
+// === JS Functions to be able to define words ==== in Zen pg30 these are Macros.
 
-// === ASSEMBLY MACROS (or JS equivalent) Zen pg30
 c.$ALIGN = () => { } // Not applicable since using a byte Buffer TODO-CELLL
 
 // Compile one or more words into the next consecutive code cells.
@@ -258,7 +263,7 @@ c.dollarCommaN = function dollarCommaN() {
 }
 
 // Make the most recent definition available in the directory. This is part of closing every "defining word"
-function OVERT() {
+c.OVERT = () => {
   Mstore(currentFetch(), lastFetch()); // LAST @ CURRENT @ !
 }
 
@@ -279,7 +284,6 @@ c.CODE = (name) => {
 
 // Zen pg31
 // tokenFunction defines a function, puts a pointer to it in jsFunctions and returns the token that should be in the dict
-// TODO-CLEANUP add some kind of hints for code that a: critical; b: discard after fist parse c: discard after redefined (but check not used)
 function tokenFunction(func, attribs = {}) {
   const x = jsFunctions.length;
   jsFunctions.push(func);
@@ -287,63 +291,45 @@ function tokenFunction(func, attribs = {}) {
   return x;
 }
 
+// This is the most important token function - used for a Colon word to iterate over the list.
 const tokenDoList = tokenFunction((payload) => {
-  debugPush(); // Pop is in EXIT
+  debugPush(); // Pop is in EXIT. this will be undefined if not "testing"
   RPpush(IP);
-  IP = payload;
-}); // Note same code on tokenDoes
+  IP = payload; // Point at first word in the definition
+});
 
-/* no longer used, as define ':' before need this.
-function $COLON(name) {
-  const xt = cpFetch();
-  c.CODE(name);
-  // Now writing in code dictionary
-  $DW(tokenDoList);
-  OVERT();
-  return xt;
-}
-*/
-
+// Leaves an address in the user area, note it doesnt compile the actual address since UP will change when multi-tasking
 const tokenUser = tokenFunction(payload => SPpush(Mfetch(payload) + UP));
 
-
-// tokenNextVal TODO define VARIABLE and CONSTANT to use this
+// Put the contents of the payload (1 word) onto Stack, used for CONSTANT
 const tokenNextVal = tokenFunction(payload => SPpush(Mfetch(payload)));
+
+// Put the address of the payload onto Stack - used for CREATE which is used by VARIABLE
 const tokenVar = tokenFunction(payload => SPpush(payload));
 
-function initRegisters() {
-  SP = SPP;
-  RP = RPP;
-  IP = 0;
-}
-
-function doCOLDD() {
-  initRegisters();
-  COLD(); // TODO-EPRECORE should run the inner interpreter on COLD
-}
-
-c.code = (name, func) => {
+// Define a word that will use a Javascript function for its action.
+c.code = (name, func, attribs = {}) => {
   const xt = cpFetch();
-  c.CODE(name);
-  $DW(tokenFunction(func));
-  OVERT();
-  return xt;
-}
-c.replacedCode = (name, func) => {
-  const xt = cpFetch();
-  c.CODE(name);
-  $DW(tokenFunction(func, { replaced: true, name: name }));
-  OVERT();
-  return xt;
-}
+  c.CODE(name);                       // Build the name
+  $DW(tokenFunction(func), attribs);  // The entire definition is the token for the JS function
+  c.OVERT();                          // Make the name usable
+  return xt;                          // Return the XT
+};
 
-c.constant = (name, val) => {  // TODO merge this with CONSTANT once defined
-  //const xt = cpFetch();
+// Like code, but for code that will be replaced by a FORTH definition,
+// so need to check its not used in any definition.
+c.replacedCode = (name, func) => c.code(name, func, { replaced: true, name: name });
+
+// Defining function for constants, Replaced by CONSTANT in FORTH
+c.constant = (name, val) => {
   c.CODE(name);
   $DW(tokenNextVal, val);
-  OVERT();
-  //return xt;
+  c.OVERT();
 }
+
+// ============ TIDYING UP FROM HERE DOWN ================
+// TODO-ZEN-V5-STAAPL - COMPARE BELOW HERE
+
 
 //For User variables initialization Zen pg33 see Zen pg46
 
@@ -361,7 +347,7 @@ Ustore(NPoffset, NAMEE); // Pointer to where writing name stack TODO-MEM will mo
   $DW(tokenVocabulary);
   Ustore(CURRENToffset, cpFetch()); // Initialize Current. Context & Current+CELLL initialized in USER process Zen pg46
   $DW(0, 0);
-  OVERT(); // Uses the initialization done by Ustore(CURRENToffset) above.
+  c.OVERT(); // Uses the initialization done by Ustore(CURRENToffset) above.
 
 // === Add some constants defined earlier prior to dictionary being available
   c.constant('CELLL', CELLL); // effectively '2 CONSTANT CELLL' but dont have CONSTANT at this point
@@ -590,7 +576,6 @@ const doLIT = c.code('doLIT', () => SPpush(IPnext()));
 // See Zen pg31 for tokenUser etc and $USER nd Zen pg33 for USER initialization values
 
 //TODO-VAR put definition of tokenVariable or how to do it here ... (probably)
-//TODO-EFORTH-5 define variable creation process use tokenNextVal
 //TODO-VM Variables should not be in code space
 //VARIABLE UP; //TODO-VAR figure out how to point VARIABLE UP at UP for high level forth (maybe not reqd) //TODO-MULTITASK think
 
@@ -601,7 +586,7 @@ c.USER = (name, init) => {
   if (name) { // Put into dictionary
     c.CODE(name);
     $DW(tokenUser, _USER);
-    OVERT();
+    c.OVERT();
   }
   _USER += CELLL; // Need to skip to next _USER in either case
   userInit.push(init); //TODO put in user init area in m[]
@@ -849,7 +834,7 @@ c.replacedCode(':', () => {
 
 c.replacedCode(';', () => { // Zen pg95
   $DW(EXIT);
-  OVERT();
+  c.OVERT();
   openBracket();
 });
 c.immediate();
@@ -882,7 +867,7 @@ c.immediate();
 c.replacedCode('CREATE', () => {
   c.TOKEN();
   c.dollarCommaN();
-  OVERT();
+  c.OVERT();
   $DW(tokenVar);
 });
 
