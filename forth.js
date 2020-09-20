@@ -223,7 +223,7 @@ function qUnique() {
 
 // na -- ; Builds bytes around a newly entered name. Same function as $,n on Zen pg94 used by all defining words ($CODE ':')
 function dollarCommaN() {
-  if (m[SPfetch()]) {                 // DUP C@ IF  ; test for no word
+  if (m[SPfetch()]) {         // DUP C@ IF  ; test for no word
     qUnique();
     let a = SPpop();
     Ustore(LASToffset, a);    // DUP LAST ! ; a=na  ; LAST=na
@@ -235,88 +235,89 @@ function dollarCommaN() {
     Ustore(NPoffset, a);      // DUP NP !   ; NP=ca // adjust name pointer
     Mstore(a, cpFetch());     // ! EXIT     ; ca=CP ; code field to where will build in dictionary
   } else {                    // THEN $" name" THROW ;
-    console.log('name error'); // This is an error - is a THROW when in FORTH
+    console.log('name error'); // This is an error - in FORTH equivalent its a THROW
   }
 }
 
-  function OVERT() {
-    Mstore(currentFetch(), lastFetch()); // LAST @ CURRENT @ !
-  }
+// Make the most recent definition available in the directory. This is part of closing every "defining word"
+function OVERT() {
+  Mstore(currentFetch(), lastFetch()); // LAST @ CURRENT @ !
+}
 
-console.assert(CELLL === 2); // Presuming its 2 TODO-CELLL  check this carefully
-  function $CODE(lex, name) {
-    console.assert(name.length <= nameMaxLength);
-    // <NP-after>CPh CPl <_LINK> LINKh LINKl count name... <NP-BEFORE>
-    $ALIGN();
-    const np = npFetch();
-    // Note this is going to give the name string an integral number of cells.
-    const len = (((lex & bitsMASK) / CELLL) + 1) * CELLL;
-    let a = np - len;
-    Ustore(NPoffset, a);
-    SPpush(a); // so dollarCommaN can find it
-    m[a++] = lex;
-    m.write(name, a, 'utf8');
-    dollarCommaN(); // Build the headers that precede the name
-  }
+//  Build a new definition - part of all defining words.
+function $CODE(name) {
+  console.assert(name.length <= nameMaxLength);
+  // <NP-after>CPh CPl <_LINK> LINKh LINKl count name... <NP-BEFORE>
+  $ALIGN();
+  // Note this is going to give the name string an integral number of cells.
+  const len = ((name.length / CELLL) + 1) * CELLL;
+  let a = npFetch() - len;
+  Ustore(NPoffset, a);
+  SPpush(a); // so dollarCommaN can find it
+  m[a++] = name.length; // This byte will be updated by immediate() or compileOnly()
+  m.write(name, a, 'utf8');
+  dollarCommaN(); // Build the headers that precede the name
+}
 
 // Zen pg31
 // tokenFunction defines a function, puts a pointer to it in codeSpace and returns the token that should be in the dict
-  function tokenFunction(func) {
-    const x = codeSpace.length;
-    codeSpace.push(func);
-    return x;
-  }
+// TODO-CLEANUP add some kind of hints for code that a: critical; b: discard after fist parse c: discard after redefined (but check not used)
+function tokenFunction(func) {
+  const x = codeSpace.length;
+  codeSpace.push(func);
+  return x;
+}
 
-  const tokenDoList = tokenFunction((payload) => {
-    debugPush(); // Pop is in EXIT
-    RPpush(IP);
-    IP = payload;
-  }); // Note same code on tokenDoes
+const tokenDoList = tokenFunction((payload) => {
+  debugPush(); // Pop is in EXIT
+  RPpush(IP);
+  IP = payload;
+}); // Note same code on tokenDoes
 
-  /* no longer used, as define ':' before need this.
-  function $COLON(name) {
-    const xt = cpFetch();
-    $CODE(name.length, name);
-    // Now writing in code dictionary
-    $DW(tokenDoList);
-    OVERT();
-    return xt;
-  }
-  */
+/* no longer used, as define ':' before need this.
+function $COLON(name) {
+  const xt = cpFetch();
+  $CODE(name);
+  // Now writing in code dictionary
+  $DW(tokenDoList);
+  OVERT();
+  return xt;
+}
+*/
 
-  const tokenUser = tokenFunction(payload => SPpush(Mfetch(payload) + UP));
+const tokenUser = tokenFunction(payload => SPpush(Mfetch(payload) + UP));
 
 
 // tokenNextVal TODO define VARIABLE and CONSTANT to use this
-  const tokenNextVal = tokenFunction(payload => SPpush(Mfetch(payload)));
-  const tokenVar = tokenFunction(payload => SPpush(payload));
+const tokenNextVal = tokenFunction(payload => SPpush(Mfetch(payload)));
+const tokenVar = tokenFunction(payload => SPpush(payload));
 
-  function initRegisters() {
-    SP = SPP;
-    RP = RPP;
-    IP = 0;
-  }
+function initRegisters() {
+  SP = SPP;
+  RP = RPP;
+  IP = 0;
+}
 
-  function doCOLDD() {
-    initRegisters();
-    COLD(); // TODO-EPRECORE should run the inner interpreter on COLD
-  }
+function doCOLDD() {
+  initRegisters();
+  COLD(); // TODO-EPRECORE should run the inner interpreter on COLD
+}
 
-  function code(name, func) {
-    const xt = cpFetch();
-    $CODE(name.length, name);
-    $DW(tokenFunction(func));
-    OVERT();
-    return xt;
-  }
+function code(name, func) {
+  const xt = cpFetch();
+  $CODE(name);
+  $DW(tokenFunction(func));
+  OVERT();
+  return xt;
+}
 
-  function constant(name, val) {  // TODO merge this with CONSTANT once defined
-    //const xt = cpFetch();
-    $CODE(name.length, name);
-    $DW(tokenNextVal, val);
-    OVERT();
-    //return xt;
-  }
+function constant(name, val) {  // TODO merge this with CONSTANT once defined
+  //const xt = cpFetch();
+  $CODE(name);
+  $DW(tokenNextVal, val);
+  OVERT();
+  //return xt;
+}
 
 //For User variables initialization Zen pg33 see Zen pg46
 
@@ -330,7 +331,7 @@ Ustore(NPoffset, NAMEE); // Pointer to where writing name stack TODO-MEM will mo
     // : doVOC R> CONTEXT ! ;
     Ustore(CONTEXToffset, payload);
   });
-  $CODE(5, 'FORTH');
+  $CODE( 'FORTH');
   $DW(tokenVocabulary);
   Ustore(CURRENToffset, cpFetch()); // Initialize Current. Context & Current+CELLL initialized in USER process Zen pg46
   $DW(0, 0);
@@ -572,7 +573,7 @@ let _USER = 4 * CELLL; // first user variable offset, skips 4 variables used by 
 function USER(name, init) {
   Mstore(UP + _USER, init);
   if (name) { // Put into dictionary
-    $CODE(name.length, name);
+    $CODE(name);
     $DW(tokenUser, _USER);
     OVERT();
   }
