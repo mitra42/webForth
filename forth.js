@@ -23,9 +23,14 @@
  * Access to the USER variables before they are defined
  * Functions related to building "find" and its wrappers
  * JS Functions to be able to define words
- *
+ * Start the dictionary - includes defining Vocabulary token and "FORTH"
+ * Make some Javascript constants available in FORTH (these look like those defined with CONSTANT later)
+ * Add functions defined earlier, now the dictionary is available
+ * Code words to support debugging on the console
+ * Basic low level key I/O and links to OS
+ * INNER INTERPRETER YES THIS IS IT !
 */
-
+//eslint-env node
 
 // === Support for Debugging ============
 let testing = 0x0; // 0x01 display words passed to interpreters; 0x02 each word in tokenthread - typically set by 'testing3'
@@ -43,7 +48,7 @@ function debugPop() { debugStack.pop(); } // in EXIT
 // ERRATA In Zen the definitions on Zen pg26 dont come close to matching the addresses given as the example below. In particular UPP and RPP overlap !
 const CELLL = 2;  // Using Buffers, but needs to be 2 as needs to be big enough for an address (offset into buffer) if change see CELL+ CELL- CELLS ALIGNED $USER
 // There is an assumption that memory is Big-Endian (higher byte in lower memory location)
-// Memory is assumed not to be aligned to a CELLL boundary, but this assumption should be confied to $ALIGN()
+// Memory is assumed not to be aligned to a CELLL boundary, but this assumption should be confined to $ALIGN()
 const US = 64 * CELLL;  // user area size in cells i.e. 64 variables - standard usage below is using about 37
 const RTS = 0x80 * CELLL; // return stack/TIB size // eFORTH-DIFF was 64 which is tiny for any kind of string handling TODO review this
 const SPS = 0x80 * CELLL; // Size of data stack 256 bytes for now
@@ -63,28 +68,29 @@ const CODEE = COLDD + US; // code dictionary grows up from here towards NAME dic
 // === Javascript structures - implement the memory map and record the full state.
 const m = Buffer.alloc(EM); // Allocate as one big buffer for now. TODO-MEM try alternatives including Uint8Array Uint16Array
 const jsFunctions = []; // Maps tokens to executable functions - only accessed through tokenFunction or threadToken
-const jsFunctionAttributes = [] // Attributes of the functions, used by the compiler
+const jsFunctionAttributes = []; // Attributes of the functions, used by the compiler
 const userInit = [0, 0, 0, 0]; // Used for initialization of user variables - for now not in m as would be in ROM normally TODO-MEM move to COLDD
 let c = {}; // These are functions ONLY used during the compilation process here, and deleted at the end.
 
 // Delete or dereference unused code (including itself)
 c.postBootstrapCleanup = () => {
-  for (let prop in c) { delete c[prop]}
+  Object.keys(c).forEach(prop => delete c[prop]);
   c = null; // Remove bootstrap compiler and any attached functions
-  for (let i in jsFunctions) {
+  for (const i in jsFunctions) {
     if (jsFunctionAttributes[i].replaced) {
       jsFunctionAttributes[i] = null;
       jsFunctions[i] = null;
     }
   }
-}
+};
 // === Other key constants.
 const bitsCOMP = 0x40; // bit in first char of name field to indicate 'compile-only'
 const bitsIMED = 0x80; // bit in first char of name field to indicate 'immediate'
 const bitsSPARE = 0x20; // Unused spare bit in names
 const bitsMASK = 0xFF - bitsCOMP - bitsIMED - bitsSPARE; // bits to mask out of a call with count and first char (
 console.assert(CELLL === 2); // Presuming its 2 TODO-CELLL
-const cellMASK = (bitsMASK << 8) + 0xFF // mask used when masking cells in fast search for name
+const cellMASK = (bitsMASK << 8) + 0xFF; // mask used when masking cells in fast search for name
+const forthTrue = 0xFFFF; // Forth True is -1, but only 16 bits of it
 const nameMaxLength = 31; // Max number of characters in a name, length needs to be representable after BitMask (we have one spare bit here)
 console.assert(nameMaxLength === bitsMASK); // If this isn't true then check each of the usages below
 
@@ -129,6 +135,7 @@ function currentFetch() { return Ufetch(CURRENToffset); }
 function cpFetch() { return Ufetch(CPoffset); }
 function npFetch() { return Ufetch(NPoffset); }
 function lastFetch() { return Ufetch(LASToffset); }
+c.padPtr = () => cpFetch() + 80; // Sometimes JS needs the pad pointer
 
 // === Functions related to building "find"  and its wrappers ====
 
@@ -150,7 +157,7 @@ function na2xt(na) {
 // cell1  if present, gives it a quick first-cell test to apply.
 // xt     if present we are looking for name pointing at this executable (for decompiler)
 // returns 0 or na
-//TODO rework so dont have to create a JS string first, do the inner comparisom with a code version of SAME?
+//TODO rework so dont have to create a JS string first, do the inner comparison with a code version of SAME?
 function _sameq(na1, na2, chars) { // return f
   // Note this is similar to SAME? but takes a count (not count of cells, and returns boolean
   for (let i = 0; i < chars; i++) {
@@ -170,10 +177,9 @@ function _find(va, na, byte1, xt) { // return na that matches or 0
         return p;
       }
     } else { // Searching on na
-      const b1 = m[p] & bitsMASK;
-      const c = m[p] & bitsMASK; // count
-      if (!byte1 || (byte1 === c)) { // first cell matches (if cell1 not passed then does slow compare
-        if (_sameq(p+1, na+1, c)) {
+      const b1 = m[p] & bitsMASK; // count
+      if (!byte1 || (byte1 === b1)) { // first cell matches (if cell1 not passed then does slow compare
+        if (_sameq(p + 1, na + 1, b1)) {
           return p;
         }
       }
@@ -214,7 +220,7 @@ function xt2name(xt) {
 
 // === JS Functions to be able to define words ==== in Zen pg30 these are Macros.
 
-c.$ALIGN = () => { } // Not applicable since using a byte Buffer TODO-CELLL
+c.$ALIGN = () => { }; // Not applicable since using a byte Buffer TODO-CELLL
 
 // Compile one or more words into the next consecutive code cells.
 console.assert(CELLL === 2); // Presuming its 2 TODO-CELLL
@@ -242,7 +248,7 @@ c.qUnique = () => {
   } else {
     SPpop();              // DROP a
   }
-}
+};
 
 // na -- ; Builds bytes around a newly entered name. Same function as $,n on Zen pg94 used by all defining words (c.CODE ':')
 c.dollarCommaN = function dollarCommaN() {
@@ -260,12 +266,12 @@ c.dollarCommaN = function dollarCommaN() {
   } else {                    // THEN $" name" THROW ;
     console.log('name error'); // This is an error - in FORTH equivalent its a THROW
   }
-}
+};
 
 // Make the most recent definition available in the directory. This is part of closing every "defining word"
 c.OVERT = () => {
   Mstore(currentFetch(), lastFetch()); // LAST @ CURRENT @ !
-}
+};
 
 //  Build a new definition - part of all defining words.
 c.CODE = (name) => {
@@ -280,7 +286,7 @@ c.CODE = (name) => {
   m[a++] = name.length; // This byte will be updated by c.immediate() IMMEDIATE or COMPILE-ONLY
   m.write(name, a, 'utf8');
   c.dollarCommaN(); // Build the headers that precede the name
-}
+};
 
 // Zen pg31
 // tokenFunction defines a function, puts a pointer to it in jsFunctions and returns the token that should be in the dict
@@ -318,56 +324,50 @@ c.code = (name, func, attribs = {}) => {
 
 // Like code, but for code that will be replaced by a FORTH definition,
 // so need to check its not used in any definition.
-c.replacedCode = (name, func) => c.code(name, func, { replaced: true, name: name });
+c.replacedCode = (name, func) => c.code(name, func, { name, replaced: true });
 
 // Defining function for constants, Replaced by CONSTANT in FORTH
 c.constant = (name, val) => {
   c.CODE(name);
   $DW(tokenNextVal, val);
   c.OVERT();
-}
+};
 
-// ============ TIDYING UP FROM HERE DOWN ================
-// TODO-ZEN-V5-STAAPL - COMPARE BELOW HERE
-
-
-//For User variables initialization Zen pg33 see Zen pg46
+// === Start the dictionary - includes defining Vocabulary token and "FORTH"
 
 // Setup pointers for first dictionary entries.
-Ustore(CPoffset, CODEE); // Pointer to where compiling into dic TODO-MEM will be code.length
-Ustore(NPoffset, NAMEE); // Pointer to where writing name stack TODO-MEM will move
+Ustore(CPoffset, CODEE); // Pointer to where compiling into dic
+Ustore(NPoffset, NAMEE); // Pointer to where writing name stack
 
-//TODO define VOCABULARY as CREATE DOES> word
+//TODO define VOCABULARY as CREATE DOES> word then come back and replace this
 
-  const tokenVocabulary = tokenFunction((payload) => {
-    // : doVOC R> CONTEXT ! ;
-    Ustore(CONTEXToffset, payload);
-  });
-  c.CODE( 'FORTH');
-  $DW(tokenVocabulary);
-  Ustore(CURRENToffset, cpFetch()); // Initialize Current. Context & Current+CELLL initialized in USER process Zen pg46
-  $DW(0, 0);
-  c.OVERT(); // Uses the initialization done by Ustore(CURRENToffset) above.
-
-// === Add some constants defined earlier prior to dictionary being available
-  c.constant('CELLL', CELLL); // effectively '2 CONSTANT CELLL' but dont have CONSTANT at this point
-  c.constant('=TIB', TIBB);
-  c.constant('=COMP', bitsCOMP); // Compile only word - TODO figure out how used EFORTH-ZEN-ERRATA used but not defined
-  c.constant('=IMED', bitsIMED); // Immediate word - interpreted during compilation EFORTH-ZEN-ERRATA used but not defined
-  c.constant('=BYTEMASK', bitsMASK); // EFORTH-ZEN-ERRATA used but not defined
-  c.constant('=CELLMASK', cellMASK); // EFORTH-ZEN-ERRATA used but not defined
-  c.constant('tokenDoList', tokenDoList);
-  c.constant('tokenUser', tokenUser);
-  c.constant('tokenVar', tokenVar);
-  c.constant('tokenNextVal', tokenNextVal);
-  c.constant('=US', US); // Size of user area
-
-// === Add some functions defined earlier prior to dictionary being available
-  c.code('initRegisters', initRegisters);
-c.code('userAreaInit', () => {
-  let a = 0;
-  userInit.forEach(v => Ustore(a++ * CELLL, v));
+const tokenVocabulary = tokenFunction((payload) => {
+  // : doVOC R> CONTEXT ! ;
+  Ustore(CONTEXToffset, payload);
 });
+
+// Define the first word in the dictionary, I'm using "FORTH" for this because we need this variable to define everything else.
+c.CODE('FORTH');
+$DW(tokenVocabulary);
+Ustore(CURRENToffset, cpFetch()); // Initialize Current. Context & Current+CELLL initialized in USER process Zen pg46
+$DW(0, 0);
+c.OVERT(); // Uses the initialization done by Ustore(CURRENToffset) above.
+
+// === Make some Javascript constants available in FORTH (these look like those defined with CONSTANT later)
+c.constant('CELLL', CELLL);     // The length of a memory CELLL, use this instead of assuming its 2 bytes
+c.constant('=TIB', TIBB);       // Initial value for TIB buffer
+c.constant('=COMP', bitsCOMP);  // Compile only word ERRATA Zen uses this but its not defined
+c.constant('=IMED', bitsIMED);  // Immediate word - interpreted during compilation ERRATA Zen uses this but its not defined
+c.constant('=BYTEMASK', bitsMASK); // ERRATA Zen uses this but its not defined
+c.constant('=CELLMASK', cellMASK); // ERRATA Zen uses this but its not defined
+c.constant('tokenDoList', tokenDoList); // The first cell in ':' definitions
+c.constant('tokenUser', tokenUser);     // First cell in USER variables
+c.constant('tokenVar', tokenVar);       // First cell in VARIABLE or CREATE definitions
+c.constant('tokenNextVal', tokenNextVal); // First cell in CONSTANT
+c.constant('=US', US); // Size of user area
+
+// === Add functions defined earlier, now the dictionary is available
+c.code('initRegisters', initRegisters);
 c.code('find', find); // Fast version of find - see Forth definition below
 // c.code('OVERT', OVERT);  // Note redefined below in FORTH but not used prior to that
 // c.code('?UNIQUE', c.qUnique); // Note redefined below in FORTH but not used prior to that
@@ -375,131 +375,148 @@ c.code('find', find); // Fast version of find - see Forth definition below
 // c.code('$COMPILE', jsCOMPILE); // Note redefined below in FORTH but not used prior to that
 c.code('>NAME', () => SPpush(xt2na(SPpop()))); // Fast version of >NAME see Forth definition below
 
-// == Debugging code words
-  c.code('debugNA', () => console.log('NAME=', countedToJS(SPfetch()))); // Print the NA on console
-  c.code('testing3', () => testing |= 3); // this word can be slotted in a definition to turn on debugging
-  c.code('break', () => {
-    console.log("Stick a breakpoint here"); })
-  c.code('debugPrintTIB', () => { console.log("TIB: ",m.slice(Ufetch(TIBoffset) + Ufetch(INoffset), Ufetch(TIBoffset) + Ufetch(nTIBoffset)).toString('utf8'))});
-  c.code('debug1', () => {console.log("ACCEPT1");});
+// === Code words to support debugging on the console
+// Put debugNA in a definition to print a counted string on the console
+c.code('debugNA', () => console.log('NAME=', countedToJS(SPfetch()))); // Print the NA on console
+// Put testing3 in a definition to start outputing stack trace on console.
+c.code('testing3', () => testing |= 3);
+// Put break in a definition.
+c.code('break', () => {
+  console.log('break in a FORTH word'); }); // Put a breakpoint in your IDE at this line
+// debugPrintTIB will print the current TIB.
+c.code('debugPrintTIB', () => console.log('TIB: ', m.slice(Ufetch(TIBoffset) + Ufetch(INoffset), Ufetch(TIBoffset) + Ufetch(nTIBoffset)).toString('utf8')));
 
-  // Test routing - usage e.g. c.interpret(`1 DUP 1 1 2 TEST`);
-  c.code('TEST', () => { //  a1 a2 a3 b1 b2 b3 n -- ; Check n parameters on stack
-    let mm = m;
-    let n = SPpop();
-
-    let b = [];
-    for (let i=0; i < n; i++) {
-      b.unshift(SPpop());
-    }
-    console.assert((SPP - SP) / CELLL === n);
-    for (let i=0; i < n; i++) {
-      console.assert(SPpop() === b.pop());
-    }
-    debugStack = [];
-  });
-
-
-  // Basic key I/O Zen pg 35
-  c.code('BYE', 'TODO-bye');
-
-  c.code('MS', async function MS() { await new Promise(resolve => setTimeout(resolve, SPpop()));});
-  /*
-   * Input call chain is
-   * ?RX  read one char if present
-   * ?KEY via '?KEY to ?RX
-   * KEY loop till ?KEY
-   * accept read a line via KEY, processing control chars via 'TAP  to kTAP
-   * QUERY read a line via 'EXPECT to accept into TIB and reset >IN
-   * que read an evaluate a line
-   * QUIT loop over que, handling errors
-   *
-   * See https://github.com/mitra42/webForth/issues/17 for strategy for async version
-   */
-// Call chain is ?RX < '?KEY  < ?KEY < KEY < accept < 'EXPECT < QUERY < que < QUIT
-
-  let buff = null;
-  const qRX = c.code('?RX', () => {
-    if (!(buff && buff.length)) {
-      let s = process.stdin.read(); // Synchronous
-      if (s) buff = Buffer.from(s,'utf8');
-    }
-    if (buff && buff.length) {
-      SPpush(buff[0]);
-      buff = buff.slice(1);
-      SPpush(forthTrue);
-    } else {
-      SPpush(0);
-    }
-  });
-  const TXbang = c.code('TX!', () => process.stdout.write(Uint8Array.from([SPpop()])));
-  c.code('!IO', () => {
-    if (process.stdin.isTTY) {
-      //process.stdout.write('RAW'); //TODO-IO comment out
-      //process.stdin.setRawMode();
-    }
-    process.stdin.setEncoding('utf8');
-    process.stdout.setEncoding('utf8');
-  });
-
-  /** ===================================================
-   * INNER INTERPRET === YES THIS IS IT ! eForthAndZen#36
-   * This is quite different from eForth as its threaded token
-   */
-
-// == INNER INTERPRETER - loops through nesting
-  function threadtoken(xt) {
-    console.assert(xt >= CODEE && xt < NAMEE); // Catch bizarre xt values TODO-EFFICIENCY comment out
-    if (testing & 0x02) {
-      debugName = xt2name(xt); // Expensive so only done when testing
-      if (testingDepth > debugStack.length) {
-        console.log('R:', RPP === RP ? '' : m.slice(RP, RPP), debugStack, xt2name(xt), 'S:', SPP === SP ? '' : m.slice(SP, SPP),
-          padTestLength ? ('pad: ' + (padTestLength > 0 ? m.slice(padPtr(), padPtr() + padTestLength) : m.slice(padPtr() + padTestLength, padPtr())).toString()) : '');
-      }
-    }
-    //console.assert(SPP >= SP && RPP >= RP);
-    const tok = ((m[xt++] << 8) + m[xt++]);
-    console.assert(tok < jsFunctions.length);
-    return jsFunctions[tok](xt); // Run the token function - like tokenDoList or tokenVar - will return null or a Promise
+// TEST will (destructively) check the stack matches expected result, used for testing the compiler.
+// e.g. c.interpret(`10 DUP 10 10 2 TEST`); // Confirm stack finishes with 2 items (10 10)
+c.replacedCode('TEST', () => { //  a1 a2 a3 b1 b2 b3 n -- ; Check n parameters on stack
+  const mm = m; // Just a trick to bring m into scope in case this fails
+  const stackDepth = SPpop();
+  // Copy stack matching against
+  const b = []; // Store matching stack here
+  for (let i = 0; i < stackDepth; i++) {
+    b.unshift(SPpop());
   }
+  // Check stack depth matches
+  console.assert((SPP - SP) / CELLL === stackDepth);
+  // Compare stacks
+  for (let i = 0; i < stackDepth; i++) {
+    console.assert(SPpop() === b.pop());
+  }
+  debugStack = []; // Reset Debug Stack as can be mucked up by THROW and CATCH
+});
+
+// === Basic low level key I/O and links to OS - Zen pg 35
+// This section will need editing for other systems.
+/*
+ * Input call chain is
+ * ?RX  read one char if present
+ * ?KEY via '?KEY to ?RX
+ * KEY loop till ?KEY
+ * accept read a line via KEY, processing control chars via 'TAP  to kTAP
+ * QUERY read a line via 'EXPECT to accept into TIB and reset >IN
+ * que read an evaluate a line
+ * QUIT loop over que, handling errors
+ *
+ * See https://github.com/mitra42/webForth/issues/17 for strategy for async version
+ */
+
+c.code('BYE', 'TODO-bye'); // TODO think thru how to exit
+
+c.code('MS', async () => { // ms --; delay for a period of time.
+  await new Promise(resolve => setTimeout(resolve, SPpop())); });
+
+let inputBuffer = null; // Local to ?RX do not access directly
+// Call chain is ?RX < '?KEY  < ?KEY < KEY < accept < 'EXPECT < QUERY < que < QUIT
+const qRX = c.code('?RX', () => {
+  // If there is no data in the buffer, check the stdin and reload the buffer.
+  if (!(inputBuffer && inputBuffer.length)) {
+    const s = process.stdin.read(); // Synchronous
+    if (s) inputBuffer = Buffer.from(s, 'utf8');
+  }
+  // If there is any data (old or new) in the buffer, return the first character and True
+  if (inputBuffer && inputBuffer.length) {
+    SPpush(inputBuffer[0]);
+    inputBuffer = inputBuffer.slice(1);
+    SPpush(forthTrue);
+  } else {
+    // If there is nothing (old or new) return False
+    SPpush(0);
+  }
+});
+
+// Low level TX!, output one character to stdout, inefficient, but not likely to be bottleneck.
+const TXbang = c.code('TX!',
+  () => process.stdout.write(Uint8Array.from([SPpop()])));
+
+// Setup I/O to the terminal
+c.code('!IO', () => {
+  if (process.stdin.isTTY) {
+    //process.stdout.write('RAW'); //TODO-IO comment out
+    //process.stdin.setRawMode();
+  }
+  process.stdin.setEncoding('utf8');
+  process.stdout.setEncoding('utf8');
+});
+
+// === INNER INTERPRETER YES THIS IS IT ! ==================== eForthAndZen#36
+// This is quite different from eForth as its token-threaded rather than direct threaded
+
+function threadtoken(xt) {
+  // console.assert(xt >= CODEE && xt < NAMEE); // Catch bizarre xt values TODO-EFFICIENCY comment out
+  // This next section is only done while testing, and outputs a trace, so set it on (with testing3) immediately before a likely error.
+  if (testing & 0x02) {
+    debugName = xt2name(xt); // Expensive so only done when testing
+    if (testingDepth > debugStack.length) {
+      console.log('R:', RPP === RP ? '' : m.slice(RP, RPP), debugStack, xt2name(xt), 'S:', SPP === SP ? '' : m.slice(SP, SPP),
+        padTestLength ? ('pad: ' + (padTestLength > 0 ? m.slice(c.padPtr(), c.padPtr() + padTestLength) : m.slice(c.padPtr() + padTestLength, c.padPtr())).toString()) : '');
+    }
+  }
+  const tok = ((m[xt++] << 8) + m[xt++]); // TODO-CELLL assumes CELLL == 2
+  // console.assert(tok < jsFunctions.length); // commented out for efficiency, a fail will just break in the next line anyway.
+  return jsFunctions[tok](xt); // Run the token function - like tokenDoList or tokenVar - will return null or a Promise
+}
 
 // This is not re-entrant, normally its threadtoken you want ....
 // In particular you cannot use this to nest forth in code in forth
 // TODO-THREADING If that becomes necessary, it MIGHT work to save IP (where?) and restore after while loop
 // Cant use R or S for it as words use that across calls to the 'EVAL
-  async function run(xt) {
-    let waitFrequency = 0;
-    console.assert(IP === 0); // Cant nest run()
-    await threadtoken(xt);
-    // If this returns without changing program Counter, it will exit
-    while (IP) {
-      console.assert(IP >= CODEE && IP <= NAMEE); // TODO-EFFICIENCY comment out
-      xt = IPnext(); // SEE-OTHER-ENDIAN
-      //TODO-EFFICIENCY comment this out except when needed for debugging, they are slow
-      // debugTIB =  m.slice(Ufetch(TIBoffset) + Ufetch(INoffset), Ufetch(TIBoffset) + Ufetch(nTIBoffset)).toString('utf8');
-      let maybePromise = threadtoken(xt);
-      if (maybePromise) {
-        await maybePromise;
-      } else {
-        //TODO-ASYNC maybe only do this every n cycles
-        if (!waitFrequency--) {
-          await new Promise(resolve => setImmediate(resolve)); //ASYNC: to allow IO to run
-          waitFrequency = 100;
-        }
-      }
+async function run(xt) {
+  let waitFrequency = 0;
+  console.assert(IP === 0); // Cant nest run()
+  await threadtoken(xt);
+  // If this returns without changing program Counter, it will exit
+  while (IP) {
+    // console.assert(IP >= CODEE && IP <= NAMEE); // uncomment if tracking down jumping into odd places
+    xt = IPnext();
+    //TODO-EFFICIENCY comment this out except when needed for debugging, they are slow
+    // debugTIB =  m.slice(Ufetch(TIBoffset) + Ufetch(INoffset), Ufetch(TIBoffset) + Ufetch(nTIBoffset)).toString('utf8');
+    // 'await threadtoken(xt)' would be legit, but creates a stack frame in critical inner loop, when usually not reqd.
+    const maybePromise = threadtoken(xt);
+    if (maybePromise) {
+      await maybePromise;
+    } else if (!waitFrequency--) {
+      await new Promise(resolve => setImmediate(resolve)); //ASYNC: to allow IO to run
+      waitFrequency = 100; // How many cycles to allow a thread swap
     }
   }
+}
 
-  const EXIT = c.code('EXIT', () => {
-    debugPop(); // Pushed in tokenDoList
-    IP = RPpop();
-  });
+// Unwind the effect of tokenDoList restoring IP to the next definition out.
+const EXIT = c.code('EXIT', () => {
+  debugPop(); // Pushed in tokenDoList
+  IP = RPpop();
+});
 
 // EXECUTE runs the word on the stack,
-// TODO-THREADING it works because it itself is a code word, incuded in colon words
+// TODO-THREADING it works because it itself is a code word, included in colon words
 // and because there is nothing after the return from threadtoken which would get executed out of order
-// it may or may not work in other situations.
-  c.code('EXECUTE', function EXECUTE() { return threadtoken(SPpop()); });
+// Note that it has a return which could be a promise, which the "run" will await on.
+// This pattern may or may not work in other situations.
+c.code('EXECUTE', () => threadtoken(SPpop()));
+
+// ============ TIDYING UP FROM HERE DOWN ================
+// TODO-ZEN-V5-STAAPL - COMPARE BELOW HERE
+
 
 // === Literals eForthAndZen#37
 // push the value in the next code word
@@ -575,6 +592,8 @@ const doLIT = c.code('doLIT', () => SPpush(IPnext()));
 // === High Level Forth Words Zen pg46
 // See Zen pg31 for tokenUser etc and $USER nd Zen pg33 for USER initialization values
 
+// === Define and initialize User variables Zen pg33 see Zen pg46
+
 //TODO-VAR put definition of tokenVariable or how to do it here ... (probably)
 //TODO-VM Variables should not be in code space
 //VARIABLE UP; //TODO-VAR figure out how to point VARIABLE UP at UP for high level forth (maybe not reqd) //TODO-MULTITASK think
@@ -591,6 +610,11 @@ c.USER = (name, init) => {
   _USER += CELLL; // Need to skip to next _USER in either case
   userInit.push(init); //TODO put in user init area in m[]
 }
+//TODO-USER change this to initialize from the cold boot area.
+c.code('userAreaInit', () => {
+  let a = 0;
+  userInit.forEach(v => Ustore(a++ * CELLL, v));
+});
 
   c.USER('SP0', SPP); // (--a) Pointer to bottom of the data stack.
   c.USER('RP0', RPP); // (--a) Pointer to bottom of the return stack.
@@ -646,7 +670,7 @@ console.assert(CONTEXToffset === _USER);
     const lastNA = lastFetch(); // LAST points at the name field of the last defined word
     m[lastNA] |= b;
   }
-c.immediate = () => { setHeaderBits(bitsIMED); } //TODO-C probably c.immediate and see where called
+c.immediate = () => { setHeaderBits(bitsIMED); }
 c.replacedCode('IMMEDIATE', c.immediate); // Zen pg96
 c.code('COMPILE-ONLY', () => setHeaderBits(bitsCOMP));
 
@@ -655,7 +679,6 @@ c.code('COMPILE-ONLY', () => setHeaderBits(bitsCOMP));
   }  // TIB >IN @ +
   const BL = 32;
   c.constant('BL', BL);
-  const forthTrue = 0xFFFF;
 
   function fPARSE() { // returns b (address) and u (length)
     const c = SPpop();
@@ -788,9 +811,6 @@ c.interpret = async (inp) => {
     }
   }
 
-  function padPtr() {
-    return cpFetch() + 80;
-  } // Sometimes JS needs the pad pointer
   async function test(inp, arr, {pad = undefined, hold = undefined} = {}) {
     console.assert((SPP === SP) && (RPP === RP) && (debugStack.length === 0));
     await c.interpret(inp);
@@ -801,10 +821,10 @@ c.interpret = async (inp) => {
       }
     }
     if (pad) {
-      console.assert(m.slice(padPtr(), padPtr() + pad.length).toString() === pad);
+      console.assert(m.slice(c.padPtr(), c.padPtr() + pad.length).toString() === pad);
     }
     if (hold) {
-      console.assert(m.slice(padPtr() - hold.length, padPtr()).toString() === hold);
+      console.assert(m.slice(c.padPtr() - hold.length, c.padPtr()).toString() === hold);
     }
     console.assert((SPP === SP) && (RPP === RP));
   }
@@ -1237,7 +1257,7 @@ TIB >R BL PARSE XXX SWAP R> - 3 16 2 TEST
   ( TODO rework this  test('NP @ 4 + COUNT PAD SWAP CMOVE', [], {pad: 'PACK$'});
   ( TODO rework this  test('PAD 3 + 5 BL FILL', [], {pad: 'PAC     '});
   ( TODO rework this test('PAD 8 -TRAILING >R PAD - R>', [0, 3], {pad: 'PAC'})
-  ( TODO rework this test NP @ 4 + COUNT PAD 1 - PACK$', [padPtr(] - 1], {pad: 'PACK$'})
+  ( TODO rework this test NP @ 4 + COUNT PAD 1 - PACK$', [c.padPtr(] - 1], {pad: 'PACK$'})
 
 ( === TEXT INTERPRETER ===  Zen pg63 )
 
@@ -1282,8 +1302,8 @@ TIB >R BL PARSE XXX SWAP R> - 3 16 2 TEST
   HLD @         ( address of last digit)
   PAD OVER - ;  ( return address of 1st digit and length)
 
-( TODO rework this test('123 <# DUP SIGN #S #>', [padPtr(] - 3, 3], {hold: '123'} )
-( TODO rework this  test('-123 DUP ABS <# #S SWAP SIGN #>', [padPtr(] - 4, 4], {hold: '-123'})
+( TODO rework this test('123 <# DUP SIGN #S #>', [c.padPtr(] - 3, 3], {hold: '123'} )
+( TODO rework this  test('-123 DUP ABS <# #S SWAP SIGN #>', [c.padPtr(] - 4, 4], {hold: '-123'})
 
 ( TODO-ZEN-V5-STAAPL - COMPARE ABOVE HERE )
 ( === More definitions moved up )
@@ -2198,7 +2218,7 @@ c.interpret(forthInForth)
 .then((result) => c.interpret("' WARM"))
 // Cleanup unneeded JS - this has to happen AFTER the ' WARM above
 .then((res) => c.postBootstrapCleanup())
-.then(() => run(SPpop()))
+//.then(() => run(SPpop()))
 .then(() => console.log("consoleInForth exited"))
 .catch(err => console.error(err));
 console.log('Main Finished but running promises:');

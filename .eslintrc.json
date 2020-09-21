@@ -12,9 +12,11 @@
         "jsx-a11y"
     ],
     "rules": {
+        "brace-style": 0,
         "guard-for-in": 1,
         "lines-between-class-members": 0,
         "max-len": 0,
+        "no-await-in-loop": 0,
         "no-bitwise": 0,
         "no-cond-assign": 0,
         "no-confusing-arrow": 0,
@@ -29,6 +31,7 @@
         "no-unused-vars": 1,
         "no-restricted-syntax": 1,
         "prefer-destructuring": 0,
+        "prefer-template": 0,
         "spaced-comment": 0
     }
 }
