@@ -40,6 +40,7 @@
  * Primitive words for memory, stack and return access, arithmetic and logic
  * Define and initialize User variable
  * Outer Interpreter: JS versions of NUMBER? $COMPILE $INTERPRET EVAL
+ * A group of words required for the JS interpreter redefined later
 */
 //eslint-env node
 
@@ -236,14 +237,14 @@ c.$ALIGN = () => { }; // Not applicable since using a byte Buffer TODO-CELLL
 
 // Compile one or more words into the next consecutive code cells.
 console.assert(CELLL === 2); // Presuming its 2 TODO-CELLL
-function $DW(...words) { // TODO-TIDYUP check if this is used in any permanent functions or only c. or c.replacedCode if not then make it c.
+c.DW = (...words) => {
   words.forEach((word) => {
     let cp = cpFetch();
     m[cp++] = word >> 8;
     m[cp++] = word & 0xFF;
     Ustore(CPoffset, cp);
   });
-}
+};
 
 // a -- a; Check if a definition of the word at 'a' would be unique and display warning (but continue) if it would not be.
 // Same profile as ?UNIQUE but not turned into a code word as not used prior to
@@ -295,7 +296,7 @@ c.CODE = (name) => {
   let a = npFetch() - len;
   Ustore(NPoffset, a);
   SPpush(a); // so c.dollarCommaN can find it
-  m[a++] = name.length; // This byte will be updated by c.immediate() IMMEDIATE or COMPILE-ONLY
+  m[a++] = name.length; // This byte will be updated by c.IMMEDIATE() IMMEDIATE or COMPILE-ONLY
   m.write(name, a, 'utf8');
   c.dollarCommaN(); // Build the headers that precede the name
 };
@@ -329,7 +330,7 @@ const tokenVar = tokenFunction(payload => SPpush(payload));
 c.code = (name, func, attribs = {}) => {
   const xt = cpFetch();
   c.CODE(name);                       // Build the name
-  $DW(tokenFunction(func, attribs));  // The entire definition is the token for the JS function
+  c.DW(tokenFunction(func, attribs));  // The entire definition is the token for the JS function
   c.OVERT();                          // Make the name usable
   return xt;                          // Return the XT
 };
@@ -341,7 +342,7 @@ c.replacedCode = (name, func) => c.code(name, func, { name, replaced: true });
 // Defining function for constants, Replaced by CONSTANT in FORTH
 c.constant = (name, val) => {
   c.CODE(name);
-  $DW(tokenNextVal, val);
+  c.DW(tokenNextVal, val);
   c.OVERT();
 };
 
@@ -360,9 +361,9 @@ const tokenVocabulary = tokenFunction((payload) => {
 
 // Define the first word in the dictionary, I'm using 'FORTH' for this because we need this variable to define everything else.
 c.CODE('FORTH');
-$DW(tokenVocabulary);
+c.DW(tokenVocabulary);
 Ustore(CURRENToffset, cpFetch()); // Initialize Current. Context & Current+CELLL initialized in USER process Zen pg46
-$DW(0, 0);
+c.DW(0, 0);
 c.OVERT(); // Uses the initialization done by Ustore(CURRENToffset) above.
 
 // === Make some Javascript constants available in FORTH (these look like those defined with CONSTANT later)
@@ -620,7 +621,7 @@ c.USER = (name, init) => {
   Mstore(COLDD + _USER, init); // Store in initialization area for COLD reboot
   if (name) {                     // Put into dictionary
     c.CODE(name);
-    $DW(tokenUser, _USER);
+    c.DW(tokenUser, _USER);
     c.OVERT();
   }
   _USER += CELLL; // Need to skip to next _USER
@@ -677,10 +678,6 @@ c.USER('NP', npFetch());  // normally set on Zen pg106 but we are using it live.
 console.assert(_USER === LASToffset);
 c.USER('LAST', lastFetch()); // normally set on Zen pg106 but using live
 
-// ============ TIDYING UP FROM HERE DOWN ================
-// TODO-ZEN-V5-STAAPL - COMPARE BELOW HERE
-
-
 // === JS interpreter - will be discarded when done or built out
 // ERRATA ZEN IMMEDIATE COMPILE-ONLY =COMP =IMED is not defined, in EFORTHv5 its defined as 0x80
 c.setHeaderBits = (b) => {
@@ -688,8 +685,8 @@ c.setHeaderBits = (b) => {
   m[lastNA] |= b;
 };
 // Moved early from Zen pg96: : IMMEDIATE =IMED LITERAL LAST @ C@ OR LAST @ C! ;
-c.immediate = () => { c.setHeaderBits(bitsIMED); };
-c.replacedCode('IMMEDIATE', c.immediate); // Zen pg96
+c.IMMEDIATE = () => { c.setHeaderBits(bitsIMED); };
+c.replacedCode('IMMEDIATE', c.IMMEDIATE); // Zen pg96
 c.replacedCode('COMPILE-ONLY', () => c.setHeaderBits(bitsCOMP));
 
 const BL = 32;
@@ -723,7 +720,7 @@ c.TOKEN = () => { // -- a; <string>; copy blank delimited string to name buffer,
   c.PARSE();   // b u (counted string, adjusts >IN)
   const u = Math.min(SPpop(), nameMaxLength); // length of string
   const b = SPpop(); // start of string
-  const np = npFetch() - u - CELLL; // Enough space in Name Directory to coyp string
+  const np = npFetch() - u - CELLL; // Enough space in Name Directory to copy string
   m.copy(m, np + 1, b, b + u);
   m[np] = u;  // 1 byte count
   m[np + u + 1] = 0;  // ERRATA  Zen pg62 - PACK$ does `0 !` which I think will overwrite bottom value of name dict as NP is last byte used
@@ -731,7 +728,7 @@ c.TOKEN = () => { // -- a; <string>; copy blank delimited string to name buffer,
 };
 c.replacedCode('TOKEN', c.TOKEN);
 
-// TODO-VOCABULARIES This just looks up a in the Context vocabulary, it makes no attempt to use multiplle vocabularies
+// TODO-VOCABULARIES This just looks up a in the Context vocabulary, it makes no attempt to use multiple vocabularies
 // If required then fixing this to iterate over the context array should not break anything (this is what NAME? does)
 c.findName = () => { // a -- xt na | a F
   SPpush(Ufetch(CONTEXToffset));  // a va
@@ -755,10 +752,10 @@ c.NUMBERQ = () => { // Same footprint as NUMBER?
 Ustore(NUMBERoffset, c.code('NUMBER?', c.NUMBERQ));
 
 // If we are going to compile it, then check its not compiling into the dict, code we plan on replacing. (See same code on "'")
-c.checkNotCompilingReplaceable = (xt) => {
+c.checkNotCompilingReplaceable = (xt, na) => {
   if (jsFunctionAttributes[Mfetch(xt)].replaced) {
     const inDefOf = countedToJS(lastFetch());
-    if (inDefOf !== '(') { // We redefine ( so ok with redef
+    if (inDefOf !== '(') { // We redefine ( so ok with redefinition
       console.log('Compiling', countedToJS(na), 'in', inDefOf, 'when code will be deleted');
       console.assert(false); // Break here, shouldn't be happening.
     }
@@ -775,14 +772,14 @@ c.$COMPILE = async () => { // a -- ...; same signature as to $COMPILE at Zen pg9
     if (ch & bitsIMED) {
       await run(xt); // This will work as long as this $INTERPRET never called from Forth as cant nest 'run' even indirectly
     } else {
-      c.checkNotCompilingReplaceable(xt);
+      c.checkNotCompilingReplaceable(xt, na);
       if (testing & 0x02) console.log('COMPILING:', countedToJS(na));
-      $DW(xt);
+      c.DW(xt);
     }
   } else { // a
     await run(Ufetch(NUMBERoffset)); // n T | a F // Works as long as NUMBER is code, OR this is called from code.
     if (SPpop()) {
-      $DW(doLIT, SPpop());
+      c.DW(doLIT, SPpop());
     } else {
       // TODO handle error in Forth-ish way (via Throw) - this is harder than it looks !
       console.log('Number conversion of', countedToJS(SPpop()), 'failed');
@@ -830,62 +827,66 @@ c.EVAL = async (inp) => {
 
 // Take a multiline string, and pass line by line to EVAL
 c.interpret = async (inp) => {
-  let inputs = inp.split('\n');
-  for (let i in inputs) {
+  const inputs = inp.split('\n');
+  // eslint-disable-next-line no-restricted-syntax,guard-for-in
+  for (const i in inputs) {
     await c.EVAL(inputs[i]);
   }
 };
 
-// === A group of words defined relative to the JS interpreter but will be redefined to the Forth interpreter at Zen pg TODO
+// === A group of words required for the JS interpreter redefined later
 
-// TODO could replace with : ':' TOKEN $,n [ ' doLIST ] LITERAL CALL, ] ; see Zen pg96
-  function openBracket() {
-    Ustore(EVALoffset, $INTERPRET); // uses JS $INTERPRET
-  }
+// : [  doLIT $INTERPRET 'EVAL ! ; IMMEDIATE
+c.openBracket = () => {
+  Ustore(EVALoffset, $INTERPRET); // uses JS $INTERPRET
+};
+//Zen pg84 and Zen pg88  redefined below to use FORTH $INTERPRET
+c.replacedCode('[', c.openBracket); c.IMMEDIATE();
 
-c.replacedCode('[', openBracket); c.immediate(); //Zen pg84 and Zen pg88  redefined below to use FORTH $INTERPRET
-
-function closeBracket() { //TODO check should be c.closeBracket
+// : ] doLIT $COMPILE 'EVAL ! ;
+c.closeBracket = () => {
   Ustore(EVALoffset, $COMPILE);
-}
+};
+//Zen pg84 and Zen pg95  redefined below to use FORTH $COMPILE
+c.replacedCode(']', c.closeBracket);
 
-c.replacedCode(']', closeBracket); // Zen pg88 and Zen pg95
-
+// : : TOKEN $,n [ ' doLIST ] LITERAL ] ; see Zen pg96
 c.replacedCode(':', () => {
   c.TOKEN();  // a; (counted string in named space)
   c.dollarCommaN();
-  $DW(tokenDoList); // Must be after creating the name and links etc
-  closeBracket();
+  c.DW(tokenDoList); // Must be after creating the name and links etc
+  c.closeBracket();
 });
 
-
+//TODO-TIDYUP - could be colon(';', doLIT, EXIT, COMMA, OVERT, [, EXIT
 c.replacedCode(';', () => { // Zen pg95
-  $DW(EXIT);
+  c.DW(EXIT);
   c.OVERT();
-  openBracket();
+  c.openBracket();
 });
-c.immediate();
+c.IMMEDIATE();
 
 // : ' ( -- xt ) TOKEN NAME? IF EXIT THEN THROW ; // Zen pg89 needs TOKEN NAME? THROW all of which are advanced
 c.tick = () => { // -- xt; Search for next word in input stream
   c.TOKEN(); // -- a; String with count in first byte
-  const a = SPfetch(); // used for debugging
+  //const a = SPfetch(); // used for debugging
   c.findName(); // xt na | a 0
   const na = SPpop();
   if (!na) {
     console.error(countedToJS(SPpop()), "not found during '");
   } else {
     // For debugging need to make sure we are not including code that will replaced by Forth versions.
-    c.checkNotCompilingReplaceable(SPfetch());
+    c.checkNotCompilingReplaceable(SPfetch(), na);
   }
 };
-c.replacedCode("'",c.tick);
+c.replacedCode("'", c.tick);
+
 // : [COMPILE] ' , ; IMMEDIATE   - its redefined in FORTH which is important as redefinition uses replaced '
 c.replacedCode('[COMPILE]', () => {
   c.tick(); // xt
-  $DW(SPpop());
+  c.DW(SPpop());
 });
-c.immediate();
+c.IMMEDIATE();
 
 // Create a new word that doesnt allocate any space, but will push address of that space. )
 // : CREATE TOKEN $,n OVERT COMPILE tokenVar ; // except tokenVar isn't an accessible value
@@ -893,7 +894,7 @@ c.replacedCode('CREATE', () => {
   c.TOKEN();
   c.dollarCommaN();
   c.OVERT();
-  $DW(tokenVar);
+  c.DW(tokenVar);
 });
 
 //TODO-TIDYUP - go back and check TODO-TIDYUP
@@ -904,6 +905,7 @@ c.replacedCode('CREATE', () => {
 // === Vocabulary and Sort Order Zen pg47
 // doVOC is not used; and 'FORTH' is moved earlier to be the first word defined
 
+// TODO-ZEN-V5-STAAPL - COMPARE BELOW HERE
 
 const forthInForth = `
 : 2DROP DROP DROP ;
@@ -913,7 +915,7 @@ const forthInForth = `
   1 2 ( 3 ) 1 2 2 TEST
 ( Now that ( is defined we can use comments below here )
 
-( === Test as many of the words defined in code as possbile)
+( === Test as many of the words defined in code as possible)
 ( EXIT & EXECUTE tested with ' )
 ( doLIT implicitly tested by all literals )
 ( next, ?branch, branch implicitly tested by control structures )
@@ -1670,7 +1672,7 @@ FORTH 0 TEST
   THEN        ( bot eot cur 0|-1 -- )
   R> + ;      ( decrement cur, but not passing bot )
 
-: TAP ( bottom eot currrent key -- bottom eot current )
+: TAP ( bottom eot current key -- bottom eot current )
   ( Accept and echo the key stroke and bump the cursor.)
   DUP         ( duplicate character )
   'ECHO @EXECUTE ( echo it to display )
@@ -1815,7 +1817,7 @@ CREATE NULL$ 0 , ( EFORTH-ZEN-ERRATA inserts a string "coyote" after this, no id
 
 : ?STACK ( -- )
   ( Abort if the data stack underflows.)
-  DEPTH 0< ABORT" underflow" ; ( Note staapl uses $" THROW, v5 uses ABORT)
+  DEPTH 0< ABORT" underflow" ; ( Note Staapl uses $" THROW, v5 uses ABORT)
 
 : EVAL ( -- )
   ( Interpret the input stream.)
@@ -1874,7 +1876,7 @@ BL PARSE 123 PAD PACK$ $INTERPRET 123 1 TEST
 : HAND ( -- )
   ( Select I/O vectors for terminal interface.)
   [ ' .OK  ] LITERAL  ( say 'ok' if all is well)
-  [ ' EMIT ] LITERAL  ( echo characters ) ( EFORTH-ZEN-ERRATA EFORTH-STAPPL-ERRATTA uses EMIT which is 'EMIT @', V5's use of EMIT is better because respects changes to 'EMIT
+  [ ' EMIT ] LITERAL  ( echo characters ) ( ERRATA zen, Staapl uses EMIT which is 'EMIT @', V5's use of EMIT is better because respects changes to 'EMIT
   [ ' kTAP ] LITERAL  ( ignore control characters )
   XIO ;
 
@@ -2048,7 +2050,7 @@ foo @ 12 1 TEST
 ( === Utilities Zen pg98 )
 ( === Memory Dump Zen pg99 _TYPE do+ DUMP )
 
-( ERRATA Staapl & Zen - uses -ROT which isnt defined (its ROT ROT)
+( ERRATA Staapl & Zen - uses -ROT which is not defined (its ROT ROT)
 ( ERRATA Staapl - uses COUNT which is technically correct but poor typing )
 
 : _TYPE ( b u -- )
@@ -2217,14 +2219,14 @@ CREATE 'BOOT  ' hi , ( application vector )
 
 // TESTING ===
 console.log('Javascript loaded:');
-openBracket(); // Start off interpreting
+c.openBracket(); // Start off interpreting
 c.interpret(forthInForth)
-.then((res) => console.log('=====forthInForth compiled'))
-.then((res) => console.log('=====debuggingForth compiled'))
-.then((result) => c.interpret("' WARM"))
-// Cleanup unneeded JS - this has to happen AFTER the ' WARM above
-.then((res) => c.postBootstrapCleanup())
-.then(() => run(SPpop()))
-.then(() => console.log('consoleInForth exited'))
-.catch(err => console.error(err));
+  .then(() => console.log('=====forthInForth compiled'))
+  .then(() => console.log('=====debuggingForth compiled'))
+  .then(() => c.interpret("' WARM"))
+  // Cleanup unneeded JS - this has to happen AFTER the ' WARM above
+  .then(() => c.postBootstrapCleanup())
+  .then(() => run(SPpop()))
+  .then(() => console.log('consoleInForth exited'))
+  .catch(err => console.error(err));
 console.log('Main Finished but running promises:');
