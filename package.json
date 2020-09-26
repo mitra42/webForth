@@ -4,10 +4,12 @@
     "email": "mitra@mitra.biz",
     "url": "http://www.mitra.biz"
   },
+  "bugs": {
+    "url": "https://github.com/mitra42/webforth/issues"
+  },
   "name": "webforth",
   "browserslist": "> 20%, not dead",
   "description": "Forth implemented in Javascript",
-  "version": "0.0.1",
   "dependencies": {},
   "devDependencies": {
     "eslint": "^5.12.0",
@@ -18,5 +20,12 @@
     "eslint-plugin-jsx-a11y": "^6.1.2",
     "eslint-plugin-react": "^7.12.3"
   },
-  "license": "AGPL-3.0"
+  "homepage": "https://github.com/mitra42/webforth#readme",
+  "keywords": ["forth"],
+  "license": "AGPL-3.0",
+  "repository": {
+    "type": "git",
+    "url": "git://github.com/mitra42/webforth.git"
+  },
+  "version": "0.0.2"
 }

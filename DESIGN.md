@@ -75,11 +75,19 @@ Which iterates through lists of pointers to other wo
 * Cell size
 * Memory handling
 
+#### Compatibility
+This version is based on eForth which itself is based on bForth.
+There are a bunch of bugs (including documentation bugs) in eForth but it should be the same API.
+
+There will definitely be divergences from ANS Forth, 
+but while that is the only "standard" it doesnt seem to be in wide use. 
+See [issue#12](https://github.com/mitra42/webForth/issues/12)
+
+I envision compatability vocabularies, so at the top of a file or extension one could 
+put e.g. `ANS : foo xxx ; FORTH` and know that foo used the ANS dialect.
 
 
-
-
-## Earlier version - pretty much everything below here is changed
+## Earlier version - pretty much everything below here was for a version now deleted
 Mitra Ardron <mitra@mitra.biz> 8 Aug 2020
 
 This doc may or may not match the code, 
