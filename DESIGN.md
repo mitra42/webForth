@@ -71,9 +71,14 @@ Code words are defined in javascript with `c.code(<name>, () => {javascript});`
 Which iterates through lists of pointers to other wo
 ### Orthogonality and likely changes
 
-* Sync/Async/Event Driven
-* Cell size
-* Memory handling
+#### Sync/Async/Event Driven
+TODO write up Async
+
+#### Cell size
+TODO write up Cell Size 
+
+#### Memory handling
+TODO write up memory handling
 
 #### Compatibility
 This version is based on eForth which itself is based on bForth.
@@ -86,6 +91,14 @@ See [issue#12](https://github.com/mitra42/webForth/issues/12)
 I envision compatability vocabularies, so at the top of a file or extension one could 
 put e.g. `ANS : foo xxx ; FORTH` and know that foo used the ANS dialect.
 
+#### Module wish list
+* Multi-task - like I did for Forth in 80s
+* IO from URLs
+* IO from disk
+* Web server
+* Interaction with DOM
+* Event handling interaction with Forth
+
 
 ## Earlier version - pretty much everything below here was for a version now deleted
 Mitra Ardron <mitra@mitra.biz> 8 Aug 2020
@@ -96,39 +109,11 @@ and is being randomly written as I come up with ideas,
 
 ### Random ideas to incorporate
 
-#### Imagine a set of modules
-* Kernel - written in JS, includes:
-  * Stack management
-  * Threaded interpreter
-  * Program space management - primitives the interpreter uses
-  * Primitives - bridge between Forth and Javascript, kept simple
-  * What else
-* Interpreter - parses text and passes to Kernel:programmer
-* Core Functions - written in Forth but with knowledge of some primitives
-* Forth language - written in Forth 
-
 #### Portability
 * Avoid JS specific stuff where possible 
 * This probably means avoiding classes, but maybe not
 * Try to avoid expensive constructs (even possibly dict)
 
-#### Compatibility
-Seriously.... I haven't gone back and looked at Forth, and last time was 35 years ago, 
-so a lot of this may change once I review it, but I wanted a fresh unbiased look first.
-
-Known Divergences (currently) include:
-* Stacks store Javascript variables - not bytes
-
-Forth has two kinds of strings c-addr & len, and counted strings, where the pointer is to the length. 
-The latter are deprecated, but WORD and FIND still use them.  
-Since neither make much sense in Javascript I defined a third kind which uses Javascript strings
-and is the equivalent. So this includes `s"`, `word` and `find`, instead of `S"`, `WORD` and `FIND`
-
-#### Module wish list
-* Multi-task - like I did for Forth in 80s
-* IO from URLs
-* IO from disk
-* Web server
 
 ### Threaded Interpreter - v1
 
