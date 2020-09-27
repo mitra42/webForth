@@ -2232,11 +2232,20 @@ CREATE 'BOOT  ' hi , ( application vector )
 class Forth {
   // Build and return an initialized Forth memory obj
   static m = m; // Expose standard memory space for export
+  static loaded = false;
 
   constructor(parms = {}) {
     // Support TODO-11-CELLL TODO-27-MEMORY TODO-28-MULTI
     this.m = m.copy(); // Wont be able to copy if CELLL varies
     //TODO-23 need separate IP etc
+  }
+  static async waitLoaded() {
+    let i = 0;
+    const delay=100;
+    while(!Forth.loaded) {
+      await new Promise(resolve => setTimeout(resolve, delay));
+      i++;
+    }
   }
   static new(parms = {}) {
     const f = new Forth(parms);
@@ -2276,13 +2285,12 @@ function startUp()  {
     .then(() => c.postBootstrapCleanup())
     //.then(() => run(SPpop()))
     //.then(() => console.log('consoleInForth exited'))
-    .then(() => Forth)
+    .then(() => Forth.loaded=true)
+    .then(() => console.log('Forth loaded=true'))
     .catch(err => console.error(err));
   return p;
   console.log('Main Finished but running promises:');
 }
-module.exports = exports = startUp().then((res) => {
-  console.log("Exporting", res);
-  return Forth; }
-)
+startUp(); // Async - this module will return before it completes
+module.exports = exports = Forth;
 //  .then(() => console.log("startUp done"));
