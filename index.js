@@ -1,4 +1,18 @@
 /*
+ * WIP to build a Node API along the lines in https://github.com/mitra42/webForth/issues/23
+ * See TODO-23-NODEAPI
+ *
+ * const Forth = require('webforth'); // The class or obj with functions
+ * Forth.load('foo.f'); // Load it into the class
+ * const forth = new Forth({ CELLL: 3, xxxMemSize: 1000000}) // Parameterized instance
+ * forth.load('https://....'); // Load it into the instance
+ * forth.interpret("1 2 DUP .S");
+ * boo = forth.rot([1,2,3]);  // Returns [2,3,1] - will depend what can do with JS API
+ * forth.console(); // Go interactive
+ */
+
+
+/*
  * References see FORTH.md
  */
 
@@ -2214,16 +2228,61 @@ CREATE 'BOOT  ' hi , ( application vector )
 : WARM CONSOLE 'BOOT @EXECUTE QUIT ;
 `;
 
+
+class Forth {
+  // Build and return an initialized Forth memory obj
+  static m = m; // Expose standard memory space for export
+
+  constructor(parms = {}) {
+    // Support TODO-11-CELLL TODO-27-MEMORY TODO-28-MULTI
+    this.m = m.copy(); // Wont be able to copy if CELLL varies
+    //TODO-23 need separate IP etc
+  }
+  static new(parms = {}) {
+    const f = new Forth(parms);
+    console.log("Forth copied");
+    c.openBracket();
+
+  }
+  load() {
+    console.error('Forth.prototype.load not defined')
+  }
+
+  static load() {
+    console.error('Forth.load not defined')
+  }
+
+  interpret() {
+    console.error('Forth.prototype.interpret not defined')
+  }
+  // This needs to access the Javascript API so .rot works
+  rot() {
+    console.error('Forth.prototype.rot not defined')
+  }
+  console() {
+    console.error('Forth.prototype.console not defined')
+  }
+}
+
 // TESTING ===
-console.log('Javascript loaded:');
-c.openBracket(); // Start off interpreting
-c.interpret(forthInForth)
-  .then(() => console.log('=====forthInForth compiled'))
-  .then(() => console.log('=====debuggingForth compiled'))
-  .then(() => c.interpret("' WARM"))
-  // Cleanup unneeded JS - this has to happen AFTER the ' WARM above
-  .then(() => c.postBootstrapCleanup())
-  .then(() => run(SPpop()))
-  .then(() => console.log('consoleInForth exited'))
-  .catch(err => console.error(err));
-console.log('Main Finished but running promises:');
+function startUp()  {
+  console.log('Javascript loaded:');
+  c.openBracket(); // Start off interpreting
+  const p = c.interpret(forthInForth)
+    .then(() => console.log('=====forthInForth compiled'))
+    .then(() => console.log('=====debuggingForth compiled'))
+    .then(() => c.interpret("' WARM"))
+    // Cleanup unneeded JS - this has to happen AFTER the ' WARM above
+    .then(() => c.postBootstrapCleanup())
+    //.then(() => run(SPpop()))
+    //.then(() => console.log('consoleInForth exited'))
+    .then(() => Forth)
+    .catch(err => console.error(err));
+  return p;
+  console.log('Main Finished but running promises:');
+}
+module.exports = exports = startUp().then((res) => {
+  console.log("Exporting", res);
+  return Forth; }
+)
+//  .then(() => console.log("startUp done"));

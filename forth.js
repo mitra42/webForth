@@ -2223,6 +2223,7 @@ c.interpret(forthInForth)
   .then(() => c.interpret("' WARM"))
   // Cleanup unneeded JS - this has to happen AFTER the ' WARM above
   .then(() => c.postBootstrapCleanup())
+  // .then(() => { console.log('Code size = ', cpFetch() - CODEE, "; Name size = ", NAMEE - npFetch(), "space = ", npFetch()-cpFetch()  );})
   .then(() => run(SPpop()))
   .then(() => console.log('consoleInForth exited'))
   .catch(err => console.error(err));
