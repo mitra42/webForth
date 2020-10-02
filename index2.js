@@ -1,910 +1,127 @@
-/*
- * References see FORTH.md
- */
+// This is a key table mapping the functions that go in the dictionary to the function names in the instance.
+const jsFunctionAttributes = [
+  { n: 'tokenVocabulary', token: true }, // Token used for Vocabularies must be first 0
+  { n: 'tokenNextVal', token: true }, // Token used for Constants must be next (1)
+  { n: 'tokenDoList', token: true },
+  { n: 'tokenUser', token: true },
+  { n: 'tokenVar', token: true },
+  { n: 'find' }, // Fast version of find - see Forth definition later
+  // { n: 'OVERT'}, // Not used yet
+  // { n: '?UNIQUE', f: 'qUnique' }, // Not used yet
+  // { n: '$,n', f: 'dollarCommaN' }, // Not used yet
+  { n: '>NAME', f: 'ToNAME' }, // Fast version of >NAME - see Forth definition later
+  'debugNA', 'testing3', 'break', 'debugPrintTIB', 'TEST',
+  'MS', 'BYE', { n: 'EXIT', jsNeeds: true }, 'EXECUTE',
+  { n: '?RX', f: 'QRX' }, {  n: 'TX!', f: 'TXbang' }, { n: '!IO', f: 'bangIO' },
+  { n: 'doLIT', jsNeeds: true }, 'next', { n: '?branch', f: 'qBranch' }, 'branch',
+  { n: '!', f: 'store' }, { n: '@', f: 'fetch' }, { n: 'C@', f: 'cFetch' }, { n: 'C!', f: 'cStore' },
+  { n: 'RP@', f: 'RPat' }, { n: 'RP!', f: 'RPbang' }, { n: 'R>', f: 'Rfrom'  }, { n: 'R@', f: 'Rat'  }, { n: '>R', f: 'toR'  },
+  { n: 'SP@', f: 'SPat' }, { n: 'SP!', f: 'SPbang' },
+  'DROP', 'DUP', 'SWAP', 'OVER',
+  { n: '0<', f: 'less0' }, 'AND', 'OR', 'XOR', { n: 'UM+', f: 'UMplus' },
+  'userAreaInit',
+  { n: 'PARSE', replaced: true }, { n: 'TOKEN', replaced: true }, { n: 'NUMBER?', f: 'NUMBERQ', replaced: true },
+  { n: '$COMPILE', replaced: true, jsNeeds: true }, { n: '$INTERPRET', replaced: true, jsNeeds: true },
+  { n: '[', f: 'openBracket', immediate: true, replaced: true }, { n: ']', f: 'closeBracket', replaced: true },
+  { n: ':', f: 'colon', replaced: true }, { n: ';', f: 'semicolon', immediate: true, replaced: true }, { n: "'", f: 'tick', replaced: true },
+  { n: '[COMPILE]', f: 'immCOMPILE', immediate: true, replaced: true }, { n:'CREATE', replaced: true },
+];
+const tokenVocabulary = 0;
+const tokenNextVal = 1;
+const tokenDoList = 2;
+const tokenUser = 3;
+const tokenVar = 4;
 
-/* Naming conventions and abbreviations
- * xt: execution token, points at the token field of a definition
- * na: Name Address, points to the name, (first byte count+flags, then that number of characters, max 31)
- * ca: Is ambiguous, sometimes it is used to refer to the xt, and sometimes to the Codefield Address, the field 2 cells below na that holds the xt
- * la: Linkfield Address, field holding the na of the previously defined word in this vocabulary
- * u: unsigned 16 bit
- * c: character
- * w: word - 16 bit signed
- * n: word - 16 bit signed
- *
- * For routines defined in Javascript there are typically
- * c.foo = func // If the functionary is to be discarded after bootstrap it will be in 'c' else just a function
- * jsFunctions[tok] = func // An array that maps the tokens used in the Forth space to the addresses of the function in JS address space
- * jsFunctionsAttributes[tok] = { name, replaced } // Some attributes to allow management of the functions
- * Name Dictionary:  na-2*CELLL: <xt><link><name> // In the name directory it looks like any other word
- * Code Dictionary:  xt: <tok> // In the code directory its a single cell with the token.
- */
-
-/* Sections below in order
- * Support for Debugging - constants, variables, arrays, functions used by tools
- * Memory Map - constants that lay out the memory array
- * Javascript structures - implement the memory map and record the full state.
- * Other key constants - especially bitmasks
- * Standard Pointers used - esp IP, SP, RP, UP
- * Functions to simplify storing and retrieving 16 bit values into 8 bit stacks etc.
- * Access to the USER variables before they are defined
- * Functions related to building 'find' and its wrappers
- * JS Functions to be able to define words
- * Start the dictionary - includes defining Vocabulary token and 'FORTH'
- * Make some Javascript constants available in FORTH (these look like those defined with CONSTANT later)
- * Add functions defined earlier, now the dictionary is available
- * Code words to support debugging on the console
- * Basic low level key I/O and links to OS
- * INNER INTERPRETER YES THIS IS IT !
- * Literals and Branches - using next value in dictionary
- * Primitive words for memory, stack and return access, arithmetic and logic
- * Define and initialize User variable
- * Outer Interpreter: JS versions of NUMBER? $COMPILE $INTERPRET EVAL
- * A group of words required for the JS interpreter redefined later
-*/
-//eslint-env node
-
-// === Support for Debugging ============
-let testing = 0x0; // 0x01 display words passed to interpreters; 0x02 each word in tokenthread - typically set by 'testing3'
-const testingDepth = 2;
-const padTestLength = 0; // Display pad length
-// function forthNum(n) { return (n < 0) ? 0x10000 + n : n; } // to allow negative numbers in testing etc - but unused
-let debugStack = []; // Maintains a position, like a stack trace, don't manipulate directly use functions below
-let debugName; // Set in threadtoken()
-function debugPush() { debugStack.push(debugName); } // in tokenDoList
-function debugPop() { debugStack.pop(); } // in EXIT
+let stdinBuffer = null; // Local to ?RX do not access directly - but there can be only one so global
 
 // === Memory Map - Zen pg26
 // TODO-27-MEM rework this into separate slots and then check if really need ! and @ into some parts of mem
 // ERRATA Zen doesnt define CELLL (and presumes is 2 in multiple places)
 // ERRATA In Zen the definitions on Zen pg26 dont come close to matching the addresses given as the example below. In particular UPP and RPP overlap !
-const CELLL = 2;  // Using Buffers, but needs to be 2 as needs to be big enough for an address (offset into buffer) if change see CELL+ CELL- CELLS ALIGNED $USER
+const l = {}; // Constants that will get compiled into the dictionary
+l.CELLL = 2;  // Using Buffers, but needs to be 2 as needs to be big enough for an address (offset into buffer) if change see CELL+ CELL- CELLS ALIGNED $USER
 // There is an assumption that memory is Big-Endian (higher byte in lower memory location)
 // Memory is assumed not to be aligned to a CELLL boundary, but this assumption should be confined to $ALIGN()
-const US = 64 * CELLL;  // user area size in cells i.e. 64 variables - standard usage below is using about 37
-const RTS = 0x80 * CELLL; // return stack/TIB size // eFORTH-DIFF was 64 which is tiny for any kind of string handling TODO review this
-const SPS = 0x80 * CELLL; // Size of data stack 256 bytes for now
+l.US = 64 * l.CELLL;  // user area size in cells i.e. 64 variables - standard usage below is using about 37
+const RTS = 0x80 * l.CELLL; // return stack/TIB size // eFORTH-DIFF was 64 which is tiny for any kind of string handling TODO review this
+const SPS = 0x80 * l.CELLL; // Size of data stack 256 bytes for now
 // Now the memory map itself, starting at the top of memory.
 const EM = 0x4000; // top of memory
-const UPP = EM - US; // start of user area // TODO-28-MULTI UP should be a variable, and used in most places UPP is
-const RPP = UPP - (8 * CELLL); // top of return stack RP0 - there is an 8 cell buffer which is probably just for safety.
-const TIBB = RPP - RTS; // Terminal input buffer - shares space with Return stack
-const SPP = TIBB - (8 * CELLL); // start of data stack - grows down, points at top of stack - 8 word buffer for safety
+const UPP = EM - l.US; // start of user area // TODO-28-MULTI UP should be a variable, and used in most places UPP is
+const RPP = UPP - (8 * l.CELLL); // top of return stack RP0 - there is an 8 cell buffer which is probably just for safety.
+l['=TIB'] = RPP - RTS; // Terminal input buffer - shares space with Return stack
+const SPP = l['=TIB'] - (8 * l.CELLL); // start of data stack - grows down, points at top of stack - 8 word buffer for safety
 const NAMEE = SPP - SPS; // name dictionary
 // And then building from the bottom up. The gap in middle is code directory
 const COLDD = 0x100; // cold start vector - its unclear if these bottom 0x100 are useful outside of the DOS context.
 // Above COLDD is a store of initial values for User variables
-const CODEE = COLDD + US; // code dictionary grows up from here towards NAME dictionary.
+const CODEE = COLDD + l.US; // code dictionary grows up from here towards NAME dictionary.
 // PAD is 80 bytes above the current top of the Code directory, and HLD (where numbers are build for output) is a few bytes growing down from PAD.
 
-// === Javascript structures - implement the memory map and record the full state.
-const m = Buffer.alloc(EM); // Allocate as one big buffer for now. TODO-27-MEM try alternatives including Uint8Array Uint16Array
-const jsFunctions = []; // Maps tokens to executable functions - only accessed through tokenFunction or threadToken
-const jsFunctionAttributes = []; // Attributes of the functions, used by the compiler
-let c = {}; // These are functions ONLY used during the compilation process here, and deleted at the end.
-
-// Delete or dereference unused code (including itself)
-c.postBootstrapCleanup = () => {
-  Object.keys(c).forEach(prop => delete c[prop]);
-  c = null; // Remove bootstrap compiler and any attached functions
-  for (let i = 0; i < jsFunctions.length; i++) {
-    if (jsFunctionAttributes[i].replaced) {
-      jsFunctionAttributes[i] = null;
-      jsFunctions[i] = null;
-    }
-  }
-};
 // === Other key constants.
-const bitsCOMP = 0x40; // bit in first char of name field to indicate 'compile-only'
-const bitsIMED = 0x80; // bit in first char of name field to indicate 'immediate'
+l['=COMP'] = 0x40; // bit in first char of name field to indicate 'compile-only'  ERRATA Zen uses this but its not defined
+l['=IMED'] = 0x80; // bit in first char of name field to indicate 'immediate' ERRATA Zen uses this but its not defined
 const bitsSPARE = 0x20; // Unused spare bit in names
-const bitsMASK = 0xFF - bitsCOMP - bitsIMED - bitsSPARE; // bits to mask out of a call with count and first char (
-console.assert(CELLL === 2); // Presuming its 2 TODO-11-CELLL
-const cellMASK = (bitsMASK << 8) + 0xFF; // mask used when masking cells in fast search for name
+l['=BYTEMASK'] = 0xFF - l['=COMP'] - l['=IMED'] - bitsSPARE; // bits to mask out of a call with count and first char. ERRATA Zen uses this but its not defined
+console.assert(l.CELLL === 2); // Presuming its 2 TODO-11-CELLL
+l['=CELLMASK'] = (l['=BYTEMASK'] << 8) + 0xFF; // mask used when masking cells in fast search for name ERRATA Zen uses this but its not defined
 const forthTrue = 0xFFFF; // Forth True is -1, but only 16 bits of it
 const nameMaxLength = 31; // Max number of characters in a name, length needs to be representable after BitMask (we have one spare bit here)
-console.assert(nameMaxLength === bitsMASK); // If this isn't true then check each of the usages below
-
-// === Standard pointers used - Zen pg22
-// TODO-28-MULTI think about how these may need to be Task specific
-let IP = 0;  // Interpreter Pointer
-let SP = SPP;  // Data Stack Pointer
-let RP = RPP;  // Return Stack Pointer (aka BP in 8086)
-const UP = UPP;  // User Area Pointer // TODO-28-MULTI will move this around
-
-// Currently unused register initialization.
-function initRegisters() {
-  SP = SPP;
-  RP = RPP;
-  IP = 0;
-}
-// === Functions to simplify storing and retrieving 16 bit values into 8 bit stacks etc.
-// These aren't part of eForth, but are here to simplify storing 16 bit words into 8 bit bytes in the Buffer.
-console.assert(CELLL === 2); // Presuming its 2 TODO-11-CELLL
-function SPfetch() { return (m[SP] << 8) | m[SP + 1]; }
-function SPpop() { return (m[SP++] << 8) | m[SP++]; }
-function SPpush(u16) { m[--SP] = u16 & 0xFF; m[--SP] = (u16 >> 8); }
-function RPfetch() { return (m[RP] << 8) | m[RP + 1]; }
-function RPpop() { return (m[RP++] << 8) | m[RP++]; }
-function RPpush(u16) { m[--RP] = u16 & 0xFF; m[--RP] = (u16 >> 8); }
-function IPnext() { return (m[IP++] << 8) | m[IP++]; }
-function Mstore(a, v) { m[a++] = v >> 8; m[a] = v & 0xFF; }
-function Mfetch(a) { return (m[a++] << 8) | m[a]; }
-function Ufetch(userindex, offset = 0) { return Mfetch(UP + userindex + offset); }
-function Ustore(userindex, w, offset = 0) { return Mstore(UP + userindex + offset, w); }
-//TODO-11-CELLL add a McharFetch and McharStore and search for uses of m[..] as that code presumes reading single byte
-// TODO-11-CELLL look for m.copy and m.write which assume bytes
-
-// === Access to the USER variables before they are defined
-// Not more const offsets are defined along with the USER definitions.
-// Handle the Code and Namespace \pointer, which always points after last thing compiled into dictionary - in eForthAndZen this is '$'
-const CONTEXToffset = 23 * CELLL;
-const CURRENToffset = 32 * CELLL;
-const CPoffset = 34 * CELLL; // This value is checked during the sequence of USER below
-const NPoffset = 35 * CELLL;
-const LASToffset = 36 * CELLL;
-
-function currentFetch() { return Ufetch(CURRENToffset); }
-function cpFetch() { return Ufetch(CPoffset); }
-function npFetch() { return Ufetch(NPoffset); }
-function lastFetch() { return Ufetch(LASToffset); }
-c.padPtr = () => cpFetch() + 80; // Sometimes JS needs the pad pointer
-
-// === Functions related to building 'find'  and its wrappers ====
-
-// Convert a string made up of a count and that many bytes to a Javascript string.
-// it assumes a maximum of nameMaxLength (31) characters.
-// Mostly used for debugging but also in number conversion.
-function countedToJS(a) {
-  return m.slice(a + 1, a + (m[a] & bitsMASK) + 1).toString('utf8');
-}
-
-// Convert a name address to the code dictionary definition.
-function na2xt(na) {
-  return Mfetch(na - 2 * CELLL);
-}
-
-// Inner function of find, traverses a linked list Name dictionary.
-// name   javascript string looking for
-// va     pointer holding address of first element in the list.
-// cell1  if present, gives it a quick first-cell test to apply.
-// xt     if present we are looking for name pointing at this executable (for decompiler)
-// returns 0 or na
-function _sameq(na1, na2, chars) { // return f
-  // Note this is similar to SAME? but takes a count (not count of cells, and returns boolean
-  for (let i = 0; i < chars; i++) {
-    if (m[na1 + i] !== m[na2 + i]) {
-      return false;
-    }
-  }
-  return true;
-}
-
-function _find(va, na, byte1, xt) { // return na that matches or 0
-  let p = va;
-  while (p = Mfetch(p)) {
-    //console.log('_find: comparing:', countedToJS(p)) // comment out except when debugging find
-    if (xt) {
-      if (na2xt(p) === xt) {
-        return p;
-      }
-    } else { // Searching on na
-      const b1 = m[p] & bitsMASK; // count
-      if (!byte1 || (byte1 === b1)) { // first cell matches (if cell1 not passed then does slow compare
-        if (_sameq(p + 1, na + 1, b1)) {
-          return p;
-        }
-      }
-    }
-    p -= CELLL; // point at link address and loop for next word
-  }
-  // Drop through not found
-  return 0;
-}
-
-// Search a single vocabulary for a string
-// This has same footprint as eForth's 'find' but we do not replace it since this is approx 8x faster
-function find() { // a va -- ca na | a 0
-  const va = SPpop();
-  const a = SPpop();
-  const byte1 = m[a];
-  //console.log('find: Looking for', name) // comment out except when debugging find
-  const na = _find(va, a, byte1);
-  if (na) {
-    SPpush(na2xt(na));
-    SPpush(na);
-  } else {
-    SPpush(a);
-    SPpush(0);
-  }
-}
-
-// Traverse dictionary to convert xt back to a na (for decompiler or debugging)
-function xt2na(xt) {
-  return _find(currentFetch(), undefined, undefined, xt);
-}
-
-// Convert xt to a Javascript string of its name or 'undefined' (only used for debugging).
-function xt2name(xt) {
-  const na = xt2na(xt);
-  return na ? countedToJS(na) : 'undefined';
-}
-
-// === JS Functions to be able to define words ==== in Zen pg30 these are Macros.
-
-c.$ALIGN = () => { }; // Not applicable since using a byte Buffer TODO-11-CELLL
-
-// Compile one or more words into the next consecutive code cells.
-console.assert(CELLL === 2); // Presuming its 2 TODO-11-CELLL
-c.DW = (...words) => {
-  words.forEach((word) => {
-    let cp = cpFetch();
-    m[cp++] = word >> 8;
-    m[cp++] = word & 0xFF;
-    Ustore(CPoffset, cp);
-  });
-};
-
-// a -- a; Check if a definition of the word at 'a' would be unique and display warning (but continue) if it would not be.
-// Same profile as ?UNIQUE but not turned into a code word as not used prior to
-c.qUnique = () => {
-  SPpush(SPfetch());      // DUP
-  SPpush(currentFetch()); // dictionary to search
-  find();                 // a xt na | a a F
-  if (SPpop()) {
-    const xt = SPpop();              // Discard xt
-    const name = countedToJS(SPfetch());
-    if (!['foo', 'bar'].includes(name)) {
-      console.log(jsFunctionAttributes[Mfetch(xt)].replaced ? 'Expected' : '', 'Duplicate definition of', countedToJS(SPfetch())); // Catch duplicates - report, but allow
-    }
-  } else {
-    SPpop();              // DROP a
-  }
-};
-
-// na -- ; Builds bytes around a newly entered name. Same function as $,n on Zen pg94 used by all defining words (c.CODE ':')
-c.dollarCommaN = function dollarCommaN() {
-  if (m[SPfetch()]) {         // DUP C@ IF  ; test for no word
-    c.qUnique();
-    let a = SPpop();
-    Ustore(LASToffset, a);    // DUP LAST ! ; a=na  ; LAST=na
-    a -= CELLL;               // CELL-      ; a=la
-    // Link address points to previous NA (prev value of LAST)
-    // Note that first time this is run, it gets a 0 (CURRENT is 0, @0 is 0) if that changes will need to test Current here.
-    Mstore(a, Mfetch(currentFetch())); // CURRENT @ @ OVER ! ; la = top of current dic
-    a -= CELLL;               // CELL-      ; a=ca
-    Ustore(NPoffset, a);      // DUP NP !   ; NP=ca // adjust name pointer
-    Mstore(a, cpFetch());     // ! EXIT     ; ca=CP ; code field to where will build in dictionary
-  } else {                    // THEN $" name" THROW ;
-    console.log('name error'); // This is an error - in FORTH equivalent its a THROW
-  }
-};
-
-// Make the most recent definition available in the directory. This is part of closing every 'defining word'
-c.OVERT = () => {
-  Mstore(currentFetch(), lastFetch()); // LAST @ CURRENT @ !
-};
-
-//  Build a new definition - part of all defining words.
-c.CODE = (name) => {
-  console.assert(name.length <= nameMaxLength);
-  // <NP-after>CPh CPl <_LINK> LINKh LINKl count name... <NP-BEFORE>
-  c.$ALIGN();
-  // Note this is going to give the name string an integral number of cells.
-  const len = ((name.length / CELLL) + 1) * CELLL;
-  let a = npFetch() - len;
-  Ustore(NPoffset, a);
-  SPpush(a); // so c.dollarCommaN can find it
-  m[a++] = name.length; // This byte will be updated by c.IMMEDIATE() IMMEDIATE or COMPILE-ONLY
-  m.write(name, a, 'utf8');
-  c.dollarCommaN(); // Build the headers that precede the name
-};
-
-// Zen pg31
-// tokenFunction defines a function, puts a pointer to it in jsFunctions and returns the token that should be in the dict
-function tokenFunction(func, attribs = {}) {
-  const x = jsFunctions.length;
-  jsFunctions.push(func);
-  jsFunctionAttributes.push(attribs);
-  return x;
-}
-
-// This is the most important token function - used for a Colon word to iterate over the list.
-const tokenDoList = tokenFunction((payload) => {
-  debugPush(); // Pop is in EXIT. this will be undefined if not 'testing'
-  RPpush(IP);
-  IP = payload; // Point at first word in the definition
-});
-
-// Leaves an address in the user area, note it doesnt compile the actual address since UP will change when multi-tasking
-const tokenUser = tokenFunction(payload => SPpush(Mfetch(payload) + UP));
-
-// Put the contents of the payload (1 word) onto Stack, used for CONSTANT
-const tokenNextVal = tokenFunction(payload => SPpush(Mfetch(payload)));
-
-// Put the address of the payload onto Stack - used for CREATE which is used by VARIABLE
-const tokenVar = tokenFunction(payload => SPpush(payload));
-
-// Define a word that will use a Javascript function for its action.
-c.code = (name, func, attribs = {}) => {
-  const xt = cpFetch();
-  c.CODE(name);                       // Build the name
-  c.DW(tokenFunction(func, attribs));  // The entire definition is the token for the JS function
-  c.OVERT();                          // Make the name usable
-  return xt;                          // Return the XT
-};
-
-// Like code, but for code that will be replaced by a FORTH definition,
-// so need to check its not used in any definition.
-c.replacedCode = (name, func) => c.code(name, func, { name, replaced: true });
-
-// Defining function for constants, Replaced by CONSTANT in FORTH
-c.constant = (name, val) => {
-  c.CODE(name);
-  c.DW(tokenNextVal, val);
-  c.OVERT();
-};
-
-// === Start the dictionary - includes defining Vocabulary token and 'FORTH'
-
-// Setup pointers for first dictionary entries.
-Ustore(CPoffset, CODEE); // Pointer to where compiling into dic
-Ustore(NPoffset, NAMEE); // Pointer to where writing name stack
-
-//TODO-29 define VOCABULARY as CREATE DOES> word then come back and replace this
-
-const tokenVocabulary = tokenFunction((payload) => {
-  // : doVOC R> CONTEXT ! ;
-  Ustore(CONTEXToffset, payload);
-});
-
-// Define the first word in the dictionary, I'm using 'FORTH' for this because we need this variable to define everything else.
-c.CODE('FORTH');
-c.DW(tokenVocabulary);
-Ustore(CURRENToffset, cpFetch()); // Initialize Current. Context & Current+CELLL initialized in USER process Zen pg46
-c.DW(0, 0);
-c.OVERT(); // Uses the initialization done by Ustore(CURRENToffset) above.
-
-// === Make some Javascript constants available in FORTH (these look like those defined with CONSTANT later)
-c.constant('CELLL', CELLL);     // The length of a memory CELLL, use this instead of assuming its 2 bytes
-c.constant('=TIB', TIBB);       // Initial value for TIB buffer
-c.constant('=COMP', bitsCOMP);  // Compile only word ERRATA Zen uses this but its not defined
-c.constant('=IMED', bitsIMED);  // Immediate word - interpreted during compilation ERRATA Zen uses this but its not defined
-c.constant('=BYTEMASK', bitsMASK); // ERRATA Zen uses this but its not defined
-c.constant('=CELLMASK', cellMASK); // ERRATA Zen uses this but its not defined
-c.constant('tokenDoList', tokenDoList); // The first cell in ':' definitions
-c.constant('tokenUser', tokenUser);     // First cell in USER variables
-c.constant('tokenVar', tokenVar);       // First cell in VARIABLE or CREATE definitions
-c.constant('tokenNextVal', tokenNextVal); // First cell in CONSTANT
-c.constant('=US', US); // Size of user area
-
-// === Add functions defined earlier, now the dictionary is available
-c.code('initRegisters', initRegisters);
-c.code('find', find); // Fast version of find - see Forth definition below
-// c.code('OVERT', OVERT);  // Note redefined below in FORTH but not used prior to that
-// c.code('?UNIQUE', c.qUnique); // Note redefined below in FORTH but not used prior to that
-// c.code('$,n', c.dollarCommaN); // Note redefined below in FORTH but not used prior to that
-c.code('>NAME', () => SPpush(xt2na(SPpop()))); // Fast version of >NAME see Forth definition below
-
-// === Code words to support debugging on the console
-// Put debugNA in a definition to print a counted string on the console
-c.code('debugNA', () => console.log('NAME=', countedToJS(SPfetch()))); // Print the NA on console
-// Put testing3 in a definition to start outputing stack trace on console.
-c.code('testing3', () => testing |= 3);
-// Put break in a definition.
-c.code('break', () => {
-  console.log('break in a FORTH word'); }); // Put a breakpoint in your IDE at this line
-// debugPrintTIB will print the current TIB.
-// eslint-disable-next-line no-use-before-define
-c.code('debugPrintTIB', () => console.log('TIB: ', m.slice(Ufetch(TIBoffset) + Ufetch(INoffset), Ufetch(TIBoffset) + Ufetch(nTIBoffset)).toString('utf8')));
-
-// TEST will (destructively) check the stack matches expected result, used for testing the compiler.
-// e.g. c.interpret(`10 DUP 10 10 2 TEST`); // Confirm stack finishes with 2 items (10 10)
-c.replacedCode('TEST', () => { //  a1 a2 a3 b1 b2 b3 n -- ; Check n parameters on stack
-  // eslint-disable-next-line no-unused-vars
-  const mm = m; // Just a trick to bring m into scope in case this fails
-  const stackDepth = SPpop();
-  // Copy stack matching against
-  const b = []; // Store matching stack here
-  for (let i = 0; i < stackDepth; i++) {
-    b.unshift(SPpop());
-  }
-  // Check stack depth matches
-  console.assert((SPP - SP) / CELLL === stackDepth);
-  // Compare stacks
-  for (let i = 0; i < stackDepth; i++) {
-    console.assert(SPpop() === b.pop());
-  }
-  debugStack = []; // Reset Debug Stack as can be mucked up by THROW and CATCH
-});
-
-// === Basic low level key I/O and links to OS - Zen pg 35
-// This section will need editing for other systems.
-/*
- * Input call chain is
- * ?RX  read one char if present
- * ?KEY via '?KEY to ?RX
- * KEY loop till ?KEY
- * accept read a line via KEY, processing control chars via 'TAP  to kTAP
- * QUERY read a line via 'EXPECT to accept into TIB and reset >IN
- * que read an evaluate a line
- * QUIT loop over que, handling errors
- *
- * See https://github.com/mitra42/webForth/issues/17 for strategy for async version
- */
-
-c.code('BYE', 'TODO-bye'); // TODO-30-BYE think thru how to exit
-
-c.code('MS', async () => { // ms --; delay for a period of time.
-  await new Promise(resolve => setTimeout(resolve, SPpop())); });
-
-let inputBuffer = null; // Local to ?RX do not access directly
-// Call chain is ?RX < '?KEY  < ?KEY < KEY < accept < 'EXPECT < QUERY < que < QUIT
-const qRX = c.code('?RX', () => {
-  // If there is no data in the buffer, check the stdin and reload the buffer.
-  if (!(inputBuffer && inputBuffer.length)) {
-    const s = process.stdin.read(); // Synchronous
-    if (s) inputBuffer = Buffer.from(s, 'utf8');
-  }
-  // If there is any data (old or new) in the buffer, return the first character and True
-  if (inputBuffer && inputBuffer.length) {
-    SPpush(inputBuffer[0]);
-    inputBuffer = inputBuffer.slice(1);
-    SPpush(forthTrue);
-  } else {
-    // If there is nothing (old or new) return False
-    SPpush(0);
-  }
-});
-
-// Low level TX!, output one character to stdout, inefficient, but not likely to be bottleneck.
-const TXbang = c.code('TX!',
-  () => process.stdout.write(Uint8Array.from([SPpop()])));
-
-// Setup I/O to the terminal
-c.code('!IO', () => {
-  if (process.stdin.isTTY) {
-    //process.stdout.write('RAW'); //TODO-31-RAW maybe comment out
-    //process.stdin.setRawMode();
-  }
-  process.stdin.setEncoding('utf8');
-  process.stdout.setEncoding('utf8');
-});
-
-// === INNER INTERPRETER YES THIS IS IT ! ==================== eForthAndZen#36
-// This is quite different from eForth as its token-threaded rather than direct threaded
-
-function threadtoken(xt) {
-  // console.assert(xt >= CODEE && xt < NAMEE); // Uncomment to catch bizarre xt values earlier
-  // This next section is only done while testing, and outputs a trace, so set it on (with testing3) immediately before a likely error.
-  if (testing & 0x02) {
-    debugName = xt2name(xt); // Expensive so only done when testing
-    if (testingDepth > debugStack.length) {
-      console.log('R:', RPP === RP ? '' : m.slice(RP, RPP), debugStack, xt2name(xt), 'S:', SPP === SP ? '' : m.slice(SP, SPP),
-        padTestLength ? ('pad: ' + (padTestLength > 0 ? m.slice(c.padPtr(), c.padPtr() + padTestLength) : m.slice(c.padPtr() + padTestLength, c.padPtr())).toString()) : '');
-    }
-  }
-  const tok = ((m[xt++] << 8) + m[xt++]); // TODO-11-CELLL assumes CELLL == 2
-  // console.assert(tok < jsFunctions.length); // commented out for efficiency, a fail will just break in the next line anyway.
-  return jsFunctions[tok](xt); // Run the token function - like tokenDoList or tokenVar - will return null or a Promise
-}
-
-// This is not re-entrant, normally its threadtoken you want ....
-// In particular you cannot use this to nest forth in code in forth
-// If that becomes necessary, it MIGHT work to save IP (where?) and restore after while loop
-// Cant use R or S for it as words use that across calls to the 'EVAL
-async function run(xt) {
-  let waitFrequency = 0;
-  console.assert(IP === 0); // Cant nest run()
-  await threadtoken(xt);
-  // If this returns without changing program Counter, it will exit
-  while (IP) {
-    // console.assert(IP >= CODEE && IP <= NAMEE); // uncomment if tracking down jumping into odd places
-    xt = IPnext();
-    // Comment this out except when needed for debugging, they are slow
-    // debugTIB =  m.slice(Ufetch(TIBoffset) + Ufetch(INoffset), Ufetch(TIBoffset) + Ufetch(nTIBoffset)).toString('utf8');
-    // 'await threadtoken(xt)' would be legit, but creates a stack frame in critical inner loop, when usually not reqd.
-    const maybePromise = threadtoken(xt);
-    if (maybePromise) {
-      await maybePromise;
-    } else if (!waitFrequency--) {
-      await new Promise(resolve => setImmediate(resolve)); //ASYNC: to allow IO to run
-      waitFrequency = 100; // How many cycles to allow a thread swap
-    }
-  }
-}
-
-// Unwind the effect of tokenDoList restoring IP to the next definition out.
-const EXIT = c.code('EXIT', () => {
-  debugPop(); // Pushed in tokenDoList
-  IP = RPpop();
-});
-
-// EXECUTE runs the word on the stack,
-// TODO-ASYNC it works because it itself is a code word, included in colon words
-// and because there is nothing after the return from threadtoken which would get executed out of order
-// Note that it has a return which could be a promise, which the 'run' will await on.
-// This pattern may or may not work in other situations.
-c.code('EXECUTE', () => threadtoken(SPpop()));
-
-// === Literals and Branches - using next value in dictionary === eForthAndZen#37
-
-// push the value in the next code word
-const doLIT = c.code('doLIT', () => SPpush(IPnext()));
-
-// Address Literals (aka branches and jumps) eForthAndZen#38
-
-// decrement count on Return stack, and branch if not decremented past zero (FOR..NEXT)
-c.code('next', () => {
-  let x = RPpop();
-  const destn = IPnext(); // Increments over it
-  if (--x >= 0) {
-    RPpush(x);
-    IP = destn; // Jump back
-  }
-});
-
-// Jump if flag on stack is zero to destn in dictionary
-c.code('?branch', () => {
-  const destn = IPnext();
-  if (!SPpop()) {
-    IP = destn;
-  }
-});
-// Unconditional jump to destn in dictionary
-c.code('branch', () => IP = IPnext());
-
-// === Primitive words for memory, stack and return access.
-
-// Memory access eForthAndZen#39
-c.code('!', () => Mstore(SPpop(), SPpop())); // w a -- , Store
-c.code('@', () => SPpush(Mfetch(SPpop()))); // a -- w, fetch
-c.code('C!', () => m[SPpop()] = SPpop()); // c a -- , Store character
-c.code('C@', () => SPpush(m[SPpop()])); // a -- c, Fetch character
-
-// Return stack words eForthAndZen#40
-c.code('RP@', () => SPpush(RP));
-c.code('RP!', () => RP = SPpop());
-c.code('R>', () => SPpush(RPpop()));
-c.code('R@', () => SPpush(RPfetch()));
-c.code('>R', () => RPpush(SPpop()));
-
-// Data stack initialization eForthAndZen#41
-c.code('SP@', () => SPpush(SP));
-c.code('SP!', () => SP = SPpop());
-
-// Classic Data stack words eForthAndZen#42
-c.code('DROP', () => SP += CELLL);
-c.code('DUP', () => SPpush(SPfetch()));
-c.code('SWAP', () => {
-  const x = SPpop();
-  const y = SPpop();
-  SPpush(x);
-  SPpush(y);
-});
-c.code('OVER', () => {
-  const x = SPpop();
-  const y = SPfetch();
-  SPpush(x);
-  SPpush(y);
-}); // TODO optimize
-
-// Logical Words eForthAndZen43
-console.assert(CELLL === 2); // TODO-11-CELLL
-// noinspection JSBitwiseOperatorUsage
-c.code('0<', () => SPpush((SPpop() & 0x8000) ? -1 : 0));
-c.code('AND', () => SPpush(SPpop() & SPpop()));
-c.code('OR', () => SPpush(SPpop() | SPpop()));
-c.code('XOR', () => SPpush(SPpop() ^ SPpop()));
-
-// Primitive Arithmetic Word eForthAndZen44
-console.assert(CELLL === 2); // TODO-11-CELLL
-c.code('UM+', () => {
-  const x = SPpop() + SPpop();
-  SPpush(x & 0xFFFF);
-  SPpush(x >> 16);
-});
-
-// === Define and initialize User variables Zen pg33 see Zen pg46
-// See Zen pg31 for tokenUser etc and $USER and Zen pg33 for USER initialization values
-
-// TODO-28-MULTITASK will need to think carefully about how to move all, or part of the USER space to task-specific space.
-// TODO-28-MULTITASK this is non-trivial since somethings are clearly across all tasks (e.g. CP and NP)
-
-let _USER = 4 * CELLL; // first user variable offset, skips 4 variables used (I think) by multitasking
+console.assert(nameMaxLength === l['=BYTEMASK']); // If this isn't true then check each of the usages below
+l.BL = 32;
 
 // Defining function for USER variables.
 // later the FORTH word 'USER' works but doesn't setup initialization, nor does it auto-increment to next available user slot.
-c.USER = (name, init) => {
-  Ustore(_USER, init);            // Initialize the variable for live compilation
-  Mstore(COLDD + _USER, init); // Store in initialization area for COLD reboot
-  if (name) {                     // Put into dictionary
-    c.CODE(name);
-    c.DW(tokenUser, _USER);
-    c.OVERT();
-  }
-  _USER += CELLL; // Need to skip to next _USER
-};
-c.code('userAreaInit', () => {
-  for (let a = 0; a < _USER; a += CELLL) {
-    Ustore(a, Mfetch(COLDD + a));
-  }
-});
-
-c.USER('SP0', SPP);       // (--a) Pointer to bottom of the data stack.
-c.USER('RP0', RPP);       // (--a) Pointer to bottom of the return stack.
-c.USER("'?KEY", qRX);     // Execution vector of ?KEY. Default to ?rx.
-c.USER("'EMIT", TXbang);  // Execution vector of EMIT. Default to TX!
-c.USER("'EXPECT", 0);     // Execution vector of EXPECT. Default to 'accept' - initialized when accept defined TODO-23-COLD needs to be in COLDD
-c.USER("'TAP", 0);        // Execution vector of TAP. Default to kTAP. TODO-23-COLD needs to be in COLDD
-c.USER("'ECHO", TXbang);  // Execution vector of ECHO. Default to tx!.
-c.USER("'PROMPT", 0);     // Execution vector of PROMPT.  Default to '.ok'. TODO-23-COLD needs to be in COLDD
-const BASEoffset = _USER;
-c.USER('BASE', 10);
-c.USER('temp', 0);        // A temporary storage location used in parse and find. EFORTH-ZEN-ERRATA its uses as 'temp', listing says 'tmp'
-c.USER('SPAN', 0);        // Hold character count received by EXPECT (strangely it is stored, but not accessed)
-const INoffset = _USER;
-c.USER('>IN', 0);         // Hold the character pointer while parsing input stream.
-const nTIBoffset = _USER;
-c.USER('#TIB', 0);        // Hold the current count of the terminal input buffer.
-const TIBoffset = _USER;
-c.USER(undefined, TIBB);  // Hold current address of Terminal Input Buffer (must be cell after #TIB.)
-c.USER('CSP', 0);         // Hold the stack pointer for error checking.
-const EVALoffset = _USER;
-c.USER("'EVAL", 0);       // Initialized when have JS $INTERPRET, this switches between $INTERPRET and $COMPILE
-const NUMBERoffset = _USER;
-c.USER("'NUMBER", 0);     // Execution vector of number conversion. Default to NUMBER?. TODO-23-COLD needs to be in COLDD
-c.USER('HLD', 0);         // Hold a pointer in building a numeric output string.
-c.USER('HANDLER', 0);     // Hold the return stack pointer for error handling.
-console.assert(CONTEXToffset === _USER);
-c.USER('CONTEXT', currentFetch()); // A area to specify vocabulary search order. Default to FORTH. Vocabulary stack, 8 cells following CONTEXT.
-c.USER(undefined, 0);
-c.USER(undefined, 0);
-c.USER(undefined, 0);
-c.USER(undefined, 0);
-c.USER(undefined, 0);
-c.USER(undefined, 0);
-c.USER(undefined, 0);
-c.USER(undefined, 0);     // Always 0 to indicate no more valid Vocabularies
-console.assert(_USER === CURRENToffset);
-c.USER('CURRENT', currentFetch()); // Point to the vocabulary to be extended. Default to FORTH.
-c.USER(undefined, currentFetch()); // Vocabulary link uses one cell after CURRENT (not clear how this is used)
-console.assert(_USER === CPoffset);
+const jsUsers = []; // Note 4 cells skipped for multitasking but that is in init of _USER to 4*CELLL
+function USER(n, v) { jsUsers.push([n, v]); return (jsUsers.length - 1) * l.CELLL; }
+USER(undefined, 0); // Used for multitasking
+USER(undefined, 0); // Used for multitasking
+USER(undefined, 0); // Used for multitasking
+USER(undefined, 0); // Used for multitasking
+USER('SP0', SPP);      // (--a) Pointer to bottom of the data stack.
+USER('RP0', RPP);      // (--a) Pointer to bottom of the return stack.
+USER("'?KEY", '?RX');    // Execution vector of ?KEY. Default to ?rx.
+USER("'EMIT", 'TX!');  // Execution vector of EMIT. Default to TX!
+USER("'EXPECT", 0);    // Execution vector of EXPECT. Default to 'accept' - initialized when accept defined TODO-23-COLD needs to be in COLDD
+USER("'TAP", 0);       // Execution vector of TAP. Default to kTAP. TODO-23-COLD needs to be in COLDD
+USER("'ECHO", 'TX!');  // Execution vector of ECHO. Default to tx!.
+USER("'PROMPT", 0);    // Execution vector of PROMPT.  Default to '.ok'. TODO-23-COLD needs to be in COLDD
+const BASEoffset = USER('BASE', 10);
+USER('temp', 0);       // A temporary storage location used in parse and find. EFORTH-ZEN-ERRATA its uses as 'temp', listing says 'tmp'
+USER('SPAN', 0);       // Hold character count received by EXPECT (strangely it is stored, but not accessed)
+const INoffset = USER('>IN', 0);        // Hold the character pointer while parsing input stream.
+const nTIBoffset = USER('#TIB', 0);       // Hold the current count of the terminal input buffer.
+const TIBoffset = USER(undefined, l['=TIB']);  // Hold current address of Terminal Input Buffer (must be cell after #TIB.)
+USER('CSP', 0);        // Hold the stack pointer for error checking.
+const EVALoffset = USER("'EVAL", 0);      // Initialized when have JS $INTERPRET, this switches between $INTERPRET and $COMPILE
+const NUMBERoffset = USER("'NUMBER", 'NUMBER?');    // Execution vector of number conversion. Default to NUMBER?. TODO-23-COLD needs to be in COLDD
+USER('HLD', 0);        // Hold a pointer in building a numeric output string.
+USER('HANDLER', 0);    // Hold the return stack pointer for error handling.
+// this is set to result of currentFetch
+const CONTEXToffset = USER('CONTEXT', undefined); // A area to specify vocabulary search order. Default to FORTH. Vocabulary stack, 8 cells following CONTEXT.
+USER(undefined, 0);
+USER(undefined, 0);
+USER(undefined, 0);
+USER(undefined, 0);
+USER(undefined, 0);
+USER(undefined, 0);
+USER(undefined, 0);
+USER(undefined, 0);    // Always 0 to indicate no more valid Vocabularies
+const CURRENToffset = USER('CURRENT', undefined); // Point to the vocabulary to be extended. Default to FORTH.
+// this is set to result of currentFetch
+USER(undefined, undefined); // Vocabulary link uses one cell after CURRENT (not clear how this is used)
 // Note there is a (hidden) assumption that CP and NP are consecutive - used to check free space
-c.USER('CP', cpFetch());  // eForth initializes to CTOP but we have to use this during compilation
-console.assert(_USER === NPoffset);
-c.USER('NP', npFetch());  // normally set on Zen pg106 but we are using it live. Its the bottom of what compiled in name space.
-console.assert(_USER === LASToffset);
-c.USER('LAST', lastFetch()); // normally set on Zen pg106 but using live
-
-// === JS interpreter - will be discarded when done or built out
-// ERRATA ZEN IMMEDIATE COMPILE-ONLY =COMP =IMED is not defined, in EFORTHv5 its defined as 0x80
-c.setHeaderBits = (b) => {
-  const lastNA = lastFetch(); // LAST points at the name field of the last defined word
-  m[lastNA] |= b;
-};
-// Moved early from Zen pg96: : IMMEDIATE =IMED LITERAL LAST @ C@ OR LAST @ C! ;
-c.IMMEDIATE = () => { c.setHeaderBits(bitsIMED); };
-c.replacedCode('IMMEDIATE', c.IMMEDIATE); // Zen pg96
-c.replacedCode('COMPILE-ONLY', () => c.setHeaderBits(bitsCOMP));
-
-const BL = 32;
-c.constant('BL', BL);
-
-c.PARSE = () => { // returns b (address) and u (length)
-  const delimiter = SPpop(); // delimiter
-  const tib = Ufetch(TIBoffset);
-  const ntib = Ufetch(nTIBoffset);
-  let inoffset = Ufetch(INoffset);
-  if (delimiter === BL) {
-    while ((inoffset < ntib) && (m[tib + inoffset] <= BL)) {
-      inoffset++;
-    }  // If blank then skip over leading BL /control chars
-  }
-  // inoffset now points at first non-delimiter or #TIB
-  const b = tib + inoffset; // Save start of string
-  while ((inoffset < ntib) && ((delimiter === BL) ? (delimiter < m[tib + inoffset]) : (delimiter !== m[tib + inoffset]))) {
-    inoffset++;
-  } // Exit with inoffset at #TIB or after delimiter
-  SPpush(b);
-  SPpush(tib + inoffset - b); // Store length not including trailing delimiter
-  Ustore(INoffset, inoffset < ntib ? ++inoffset : inoffset); // Skip over delimiter - TODO its not clear this is what FORTH wants. eForth doc is almost certainly wrong
-};
-
-c.replacedCode('PARSE', c.PARSE);
-
-// JS version of TOKEN - same signature
-c.TOKEN = () => { // -- a; <string>; copy blank delimited string to name buffer, immediately below name dictionary (location is important as ':' take a shortcut in eForth.
-  SPpush(BL);
-  c.PARSE();   // b u (counted string, adjusts >IN)
-  const u = Math.min(SPpop(), nameMaxLength); // length of string
-  const b = SPpop(); // start of string
-  const np = npFetch() - u - CELLL; // Enough space in Name Directory to copy string
-  m.copy(m, np + 1, b, b + u);
-  m[np] = u;  // 1 byte count
-  m[np + u + 1] = 0;  // ERRATA  Zen pg62 - PACK$ does `0 !` which I think will overwrite bottom value of name dict as NP is last byte used
-  SPpush(np); // Note that NP is not updated, the same buffer will be used for each word until hit ':'
-};
-c.replacedCode('TOKEN', c.TOKEN);
-
-// TODO-29-VOCABULARY This just looks up a in the Context vocabulary, it makes no attempt to use multiple vocabularies
-// If required then fixing this to iterate over the context array should not break anything (this is what NAME? does)
-c.findName = () => { // a -- xt na | a F
-  SPpush(Ufetch(CONTEXToffset));  // a va
-  find();                           // xt na | a F
-};
-
-c.NUMBERQ = () => { // Same footprint as NUMBER?
-  const a = SPpop();
-  const w = countedToJS(a); // I believe this is the only place we use countedToJS to make JS strings outside of debugging
-  const base = Ufetch(BASEoffset);
-  const n = parseInt(w, base); // TODO-32-ERRORS handle parsing errors // Needs forth to convert word
-  if (isNaN(n)) {
-    SPpush(a);
-    SPpush(0);
-  } else {
-    SPpush(n);
-    SPpush(forthTrue);
-  }
-};
-// Define NUMBER? and store its xt in 'NUMBER
-Ustore(NUMBERoffset, c.code('NUMBER?', c.NUMBERQ));
-
-// If we are going to compile it, then check its not compiling into the dict, code we plan on replacing. (See same code on "'")
-c.checkNotCompilingReplaceable = (xt, na) => {
-  if (jsFunctionAttributes[Mfetch(xt)].replaced) {
-    const inDefOf = countedToJS(lastFetch());
-    if (inDefOf !== '(') { // We redefine ( so ok with redefinition
-      console.log('Compiling', countedToJS(na), 'in', inDefOf, 'when code will be deleted');
-      console.assert(false); // Break here, shouldn't be happening.
-    }
-  }
-};
-
-c.$COMPILE = async () => { // a -- ...; same signature as to $COMPILE at Zen pg96
-  c.findName(); // xt na | a F
-  const na = SPpop();
-  if (na) { // ca
-    const xt = SPpop();
-    const ch = m[na];
-    // noinspection JSBitwiseOperatorUsage
-    if (ch & bitsIMED) {
-      await run(xt); // This will work as long as this $INTERPRET never called from Forth as cant nest 'run' even indirectly
-    } else {
-      c.checkNotCompilingReplaceable(xt, na);
-      if (testing & 0x02) console.log('COMPILING:', countedToJS(na));
-      c.DW(xt);
-    }
-  } else { // a
-    await run(Ufetch(NUMBERoffset)); // n T | a F // Works as long as NUMBER is code, OR this is called from code.
-    if (SPpop()) {
-      c.DW(doLIT, SPpop());
-    } else {
-      // TODO-32-ERRORS handle error in Forth-ish way (via Throw) - this is harder than it looks !
-      console.log('Number conversion of', countedToJS(SPpop()), 'failed');
-    }
-  }
-};
-const $COMPILE = c.replacedCode('$COMPILE', c.$COMPILE);
-
-c.$INTERPRET = async () => { // a -- ...; Based on signature of $INTERPRET at Zen pg83
-  c.findName(); // xt na | a F
-  const na = SPpop();
-  if (na) { // ca
-    const xt = SPpop();
-    await run(xt); //TODO-ASYNC maybe should be threadToken - but that won't work if this isn't running inside run already
-  } else {
-    await run(Ufetch(NUMBERoffset)); // n T | a F
-    if (!SPpop()) {
-      // TODO-32-ERRORS handle error in Forth-ish way (via Throw) - this is harder than it looks !
-      console.log('Number conversion of', countedToJS(SPpop()), 'failed');
-    }
-  }
-};
-const $INTERPRET = c.replacedCode('$INTERPRET', c.$INTERPRET);
-
-// equivalent to Forth EVAL with few things wrapped around it - so not exact same TODO align it
-c.EVAL = async (inp) => {
-  if (testing & 0x01) {
-    console.log(m.slice(SP, SPP), ' >>', inp);
-  }
-  console.assert(inp.length < (RTS - 10)); // Check for overlong lines
-  Ustore(INoffset, 0); // Start at beginning of TIB
-  Ustore(nTIBoffset, m.write(inp, Ufetch(TIBoffset), 'utf8')); // copy string to TIB, and store length in #TIB
-  while (Ufetch(INoffset) < Ufetch(nTIBoffset)) {
-    c.TOKEN(); // a ; pointing to word in Name Buffer (NB)
-    // There may be case where c.TOKEN returns empty string at end of line or similar
-    if (m[SPfetch()] === 0) { // Skip zero length string
-      SPpop();
-    } else {
-      // This is currently OK since its calling JS routines that may call Forth, there is no Forth-in-Forth
-      await run(Ufetch(EVALoffset));
-    }
-    console.assert(SP <= SPP && RP <= RPP); // Side effect of making SP and SPP available to debugger.
-  }
-};
-
-// Take a multiline string, and pass line by line to EVAL
-c.interpret = async (inp) => {
-  const inputs = inp.split('\n');
-  // eslint-disable-next-line no-restricted-syntax,guard-for-in
-  for (const i in inputs) {
-    await c.EVAL(inputs[i]);
-  }
-};
-
-// === A group of words required for the JS interpreter redefined later
-
-// : [  doLIT $INTERPRET 'EVAL ! ; IMMEDIATE
-c.openBracket = () => {
-  Ustore(EVALoffset, $INTERPRET); // uses JS $INTERPRET
-};
-//Zen pg84 and Zen pg88  redefined below to use FORTH $INTERPRET
-c.replacedCode('[', c.openBracket); c.IMMEDIATE();
-
-// : ] doLIT $COMPILE 'EVAL ! ;
-c.closeBracket = () => {
-  Ustore(EVALoffset, $COMPILE);
-};
-//Zen pg84 and Zen pg95  redefined below to use FORTH $COMPILE
-c.replacedCode(']', c.closeBracket);
-
-// : : TOKEN $,n [ ' doLIST ] LITERAL ] ; see Zen pg96
-c.replacedCode(':', () => {
-  c.TOKEN();  // a; (counted string in named space)
-  c.dollarCommaN();
-  c.DW(tokenDoList); // Must be after creating the name and links etc
-  c.closeBracket();
-});
-
-// : ; doLIT EXIT , OVERT [ ;
-c.replacedCode(';', () => { // Zen pg95
-  c.DW(EXIT);
-  c.OVERT();
-  c.openBracket();
-});
-c.IMMEDIATE();
-
-// : ' ( -- xt ) TOKEN NAME? IF EXIT THEN THROW ; // Zen pg89 needs TOKEN NAME? THROW all of which are advanced
-c.tick = () => { // -- xt; Search for next word in input stream
-  c.TOKEN(); // -- a; String with count in first byte
-  //const a = SPfetch(); // used for debugging
-  c.findName(); // xt na | a 0
-  const na = SPpop();
-  if (!na) {
-    console.error(countedToJS(SPpop()), "not found during '");
-  } else {
-    // For debugging need to make sure we are not including code that will replaced by Forth versions.
-    c.checkNotCompilingReplaceable(SPfetch(), na);
-  }
-};
-c.replacedCode("'", c.tick);
-
-// : [COMPILE] ' , ; IMMEDIATE   - its redefined in FORTH which is important as redefinition uses replaced '
-c.replacedCode('[COMPILE]', () => {
-  c.tick(); // xt
-  c.DW(SPpop());
-});
-c.IMMEDIATE();
-
-// Create a new word that doesnt allocate any space, but will push address of that space. )
-// : CREATE TOKEN $,n OVERT COMPILE tokenVar ; // except tokenVar isn't an accessible value
-c.replacedCode('CREATE', () => {
-  c.TOKEN();
-  c.dollarCommaN();
-  c.OVERT();
-  c.DW(tokenVar);
-});
-
-// TODO-29 define DOES> for CREATE-DOES> and tokenDoes - this is not part of eForth, THEN defined Vocabulary as CREATE-DOES word
-//tokenDoes = tokenFunction(payload => { RPpush(IP); IP = (m[payload++]<<8)+m[payload++]; SPpush(payload++); ); // Almost same as tokenDoList
-
-// === Vocabulary and Sort Order Zen pg47
-// doVOC is not used; and 'FORTH' is moved earlier to be the first word defined
+const CPoffset = USER('CP', undefined);  // eForth initializes to CTOP but we have to use this during compilation
+const NPoffset = USER('NP', undefined);  // normally set on Zen pg106 but we are using it live. Its the bottom of what compiled in name space.
+const LASToffset = USER('LAST', undefined); // normally set on Zen pg106 but using live
 
 const forthInForth = `
 : 2DROP DROP DROP ;
 1 2 2DROP 0 TEST
+
+: setHeaderBits LAST @ C@ OR LAST @ C! ;
+: COMPILE-ONLY =COMP setHeaderBits ;
+: IMMEDIATE =IMED setHeaderBits ;
 
 : ( 41 PARSE 2DROP ; IMMEDIATE ( from Zen pg74, note dont have LITERAL so cant do [ CHAR ( ] LITERAL instead of 41 )
   1 2 ( 3 ) 1 2 2 TEST
@@ -1242,7 +459,7 @@ TIB >R BL PARSE XXX SWAP R> - 3 16 2 TEST
     THEN              ( else continue scanning)
   NEXT 0 ;            ( reach the beginning of b)
 
-( Note there is code in c.TOKEN which does this )
+( Note there is code in this.TOKEN which does this )
 ( DIFF: V5 version used; Zen&Staapl: DUP >R 2DUP C! 1 + 2DUP + 0 SWAP ! SWAP CMOVE R> )
 : PACK$ ( b u a -- a; Build a counted string with u characters from b. Null fill.)
   ALIGNED             ( noop on JS celll=2 where not requiring alignment)
@@ -1257,7 +474,7 @@ TIB >R BL PARSE XXX SWAP R> - 3 16 2 TEST
   ( TODO rework this  test('NP @ 4 + COUNT PAD SWAP CMOVE', [], {pad: 'PACK$'});
   ( TODO rework this  test('PAD 3 + 5 BL FILL', [], {pad: 'PAC     '});
   ( TODO rework this test('PAD 8 -TRAILING >R PAD - R>', [0, 3], {pad: 'PAC'})
-  ( TODO rework this test NP @ 4 + COUNT PAD 1 - PACK$', [c.padPtr(] - 1], {pad: 'PACK$'})
+  ( TODO rework this test NP @ 4 + COUNT PAD 1 - PACK$', [this.padPtr(] - 1], {pad: 'PACK$'})
 
 ( === TEXT INTERPRETER ===  Zen pg63 )
 
@@ -1305,8 +522,8 @@ TIB >R BL PARSE XXX SWAP R> - 3 16 2 TEST
   HLD @         ( address of last digit)
   PAD OVER - ;  ( return address of 1st digit and length)
 
-( TODO rework this test('123 <# DUP SIGN #S #>', [c.padPtr(] - 3, 3], {hold: '123'} )
-( TODO rework this  test('-123 DUP ABS <# #S SWAP SIGN #>', [c.padPtr(] - 4, 4], {hold: '-123'})
+( TODO rework this test('123 <# DUP SIGN #S #>', [this.padPtr(] - 3, 3], {hold: '123'} )
+( TODO rework this  test('-123 DUP ABS <# #S SWAP SIGN #>', [this.padPtr(] - 4, 4], {hold: '-123'})
 
 ( TODO-ZEN-V5-STAAPL - COMPARE ABOVE HERE )
 ( === More definitions moved up )
@@ -1482,7 +699,7 @@ BL PARSE 1234 PAD PACK$ NUMBER? DROP 1234 1 TEST
 ( the version in Zen pg72 is obviously broken as it doesn't even increment the pointer in the FOR loop.)
 
 : parse ( b u c -- b u delta ; <string> ) ( TODO evaluate control structures here)
-  ( Scan string delimited by c. Return found string and its offset. )
+  ( Scan string delimited by this. Return found string and its offset. )
   ( EFORTH-ZEN-ERRATA - delta appears to be to end of string, not start )
   temp !            ( save delimiter in temp )
   OVER >R DUP       ( b u u)
@@ -1551,7 +768,7 @@ CTRL H 8 1 TEST
    #TIB @ >IN ! ( store the length of TIB in >IN )
    ; IMMEDIATE ( in effect ignore the rest of a line )
 
-( Note there is c.TOKEN which does same thing )
+( Note there is this.TOKEN which does same thing )
 : TOKEN ( -- a ; <string> ; Parse a word from input stream and copy it to name dictionary.)
   BL PARSE            ( parse out next space delimited string )
   =BYTEMASK MIN              ( truncate it to 31 characters = nameMaxLength )
@@ -1572,7 +789,7 @@ BL WORD yyyy DUP C@ SWAP CP @ - 4 0 2 TEST
 
 ( TODO Reconstruct this test with the use of testFind below )
 ( 'BL WORD TOKEN CONTEXT @ find SWAP' )
-( const testFind = [SPpop(, SPpop(]; // Get results from old find )
+( const testFind = [this.SPpop(, this.SPpop(]; // Get results from old find )
 
 : NAME> ( na -- ca )
   ( Return a code address given a name address.)
@@ -1950,7 +1167,7 @@ HERE 2 ALLOT HERE SWAP - 2 1 TEST
 
 : foo $" hello" COUNT NIP ; foo 5 1 TEST
 
-( === Name Dictionary Compiler Zen pg94-96: ?UNIQUE $,n $COMPILE OVERT ; ] call, : IMMEDIATE  (see c.dollarCommaN)
+( === Name Dictionary Compiler Zen pg94-96: ?UNIQUE $,n $COMPILE OVERT ; ] call, : IMMEDIATE  (see this.dollarCommaN)
 
 : ?UNIQUE ( a -- a ) ( Redefining code word qUNIQUE in Forth)
   ( Display a warning message if the word already exists.)
@@ -1961,7 +1178,7 @@ HERE 2 ALLOT HERE SWAP - 2 1 TEST
 
 TOKEN foo DUP ?UNIQUE - 0 1 TEST
 
-: $,n ( na -- ) ( See also c.dollarCommaN above)
+: $,n ( na -- ) ( See also this.dollarCommaN above)
   ( Build a new dictionary name using the string at na.)
   DUP C@                      ( null input?)
   IF ?UNIQUE                  ( duplicate name? )
@@ -2018,15 +1235,6 @@ TOKEN foo DUP ?UNIQUE - 0 1 TEST
 
 : foo 1 ; foo 1 1 TEST
 
-( ERRATA v5 has @ instead of C@ )
-: setHeaderBits ( bits -- )
-  LAST @ C@ OR  ( OR it into the length byte )
-  LAST @ C! ;   ( store back to name field )
-: COMPILE-ONLY ( -- ) ( redefining code word)
-  =COMP setHeaderBits ;
-: IMMEDIATE ( -- ) ( redefining code word)  ( Make the last compiled word an immediate word.)
-  =IMED setHeaderBits ; ( immediate bit in the name length)
- 
 
 ( TODO may need JS equivalent - see if used;  : CALL, ( ca -- ; ( DTC 8086 relative call ; [ =CALL ] LITERAL , HERE CELL+ - , ; )
 
@@ -2140,7 +1348,7 @@ foo @ 12 1 TEST
 ( WORDS 0 TEST ; Commented out as expensive )
 
 ( === Search Token Name Zen pg103 >NAME )
-: FORTH>NAME ( ca -- na, F ) ( 
+: FORTH>NAME ( ca -- na, F ) (
   ( Convert code address to a name address. )
   CURRENT             ( search only the current vocab )
   BEGIN CELL+ @ ?DUP  ( end of vocabulary? )
@@ -2178,7 +1386,7 @@ BL WORD DUP NAME? SWAP FORTH>NAME = -1 1 TEST
   THEN
   DROP ;
 
-SEE FORTH>NAME 0 TEST ( Commented out as expensive TODO seems to crash out)
+( SEE FORTH>NAME 0 TEST ( Commented out as expensive TODO seems to crash out)
 
 ( ERRATA Zen uses CONSTANT but doesnt define it )
 ( === Signon Message Zen pg105 VER hi )
@@ -2212,21 +1420,795 @@ CREATE 'BOOT  ' hi , ( application vector )
     ( OVERT         ( And link most recent definition into dictionary  - unclear why this is useful )
     QUIT          ( Invoke Forth "operating system" )
   AGAIN ;         ( Safeguard the Forth interpreter )
-  
+
 : WARM CONSOLE 'BOOT @EXECUTE QUIT ;
 `;
 
-// TESTING ===
-console.log('Javascript loaded:');
-c.openBracket(); // Start off interpreting
-c.interpret(forthInForth)
-  .then(() => console.log('=====forthInForth compiled'))
-  .then(() => console.log('=====debuggingForth compiled'))
-  .then(() => c.interpret("' WARM"))
-  // Cleanup unneeded JS - this has to happen AFTER the ' WARM above
-  .then(() => c.postBootstrapCleanup())
-  // .then(() => { console.log('Code size = ', cpFetch() - CODEE, "; Name size = ", NAMEE - npFetch(), "space = ", npFetch()-cpFetch()  );})
-  .then(() => run(SPpop()))
-  .then(() => console.log('consoleInForth exited'))
-  .catch(err => console.error(err));
-console.log('Main Finished but running promises:');
+class Forth {
+  // Build and return an initialized Forth memory obj
+  constructor() {
+    // Support TODO-11-CELLL TODO-27-MEMORY TODO-28-MULTI
+    // === Support for Debugging ============
+    this.debugStack = []; // Maintains a position, like a stack trace, don't manipulate directly use functions below
+    this.debugName = undefined; // Set in threadtoken()
+    this.testing = 0x0; // 0x01 display words passed to interpreters; 0x02 each word in tokenthread - typically set by 'testing3'
+    this.testingDepth = 2;
+    this.padTestLength = 0; // Display pad length
+    // === Javascript structures - implement the memory map and record the full state.
+    this.m = Buffer.alloc(EM); // Allocate as one big buffer for now. TODO-27-MEM try alternatives including Uint8Array Uint16Array
+    this.jsFunctions = [];  // Maps tokens to executable functions - only accessed through TODO
+
+    // === Standard pointers used - Zen pg22
+    // TODO-28-MULTI think about how these may need to be Task specific
+    this.IP = 0;    // Interpreter Pointer
+    this.SP = SPP;  // Data Stack Pointer
+    this.RP = RPP;  // Return Stack Pointer (aka BP in 8086)
+    this.UP = UPP;  // User Area Pointer // TODO-28-MULTI will move this around
+    this._USER = 0; // Incremented by l.CELLL as define USER's
+    // create data structures
+    this.buildDictionary();
+    // TODO-VM currently compiling forthInForth is done outside this.
+  }
+  // Build dictionary, mostly from jsFunctionAttributes
+  buildDictionary() {
+    // Setup pointers for first dictionary entries.
+    this.Ustore(CPoffset, CODEE); // Pointer to where compiling into dic
+    this.Ustore(NPoffset, NAMEE); // Pointer to where writing name stack
+    this.Ustore(TIBoffset, l['=TIB']); // Need work area before this is initialized
+
+    // Define the first word in the dictionary, I'm using 'FORTH' for this because we need this variable to define everything else.
+    this.CODE('FORTH');
+    this.DW(tokenVocabulary); // Uses assumption that tokenVocabulary is first in jsFunctionAttributes
+    this.Ustore(CURRENToffset, this.cpFetch()); // Initialize Current. Context & Current+CELLL initialized in USER process Zen pg46
+    this.Ustore(CURRENToffset + l.CELLL, this.cpFetch()); // Initialize Current. Context & Current+CELLL initialized in USER process Zen pg46
+    this.Ustore(CONTEXToffset, this.cpFetch()); // Initialize Current. Context & Current+CELLL initialized in USER process Zen pg46
+    this.DW(0, 0);
+    this.OVERT(); // Uses the initialization done by this.Ustore(CURRENToffset) above.
+
+    // copy constants over
+    Object.entries(l).forEach(kv => this.buildConstant(kv[0], kv[1]));
+
+    this.js2xt = {};
+
+    // Make some functions available as Forth words
+    jsFunctionAttributes.forEach((attribs) => {
+      // Shortcut
+      if (typeof attribs === 'string') {
+        attribs = { n: attribs };
+      }
+      const n = attribs.n;
+      const f = this[attribs.f || n];
+      const tok = this.jsFunctions.length; // Where function will be pushed
+      // special case: token Functions that need constants
+      this.jsFunctions.push(f);
+      if (attribs.token) {
+        this.buildConstant(n, tok);
+      // regular code functions that just need a pointer.
+      } else {
+        const xt = this.buildCode(n, tok, attribs);
+        console.assert(xt === this.JSToXT(n)); // TODO-VM just for testing - comment out
+        if (attribs.jsNeeds) { this.js2xt[n] = xt; } //TODO-VM colon table then replace this
+      }
+    });
+
+    // build USER variables
+    jsUsers.forEach(nv => this.buildUser(nv[0], nv[1]));
+
+    //TODO-VM - interpret main Forth file
+  }
+
+  buildConstant(name, val) {
+    // Defining function for constants, Replaced by CONSTANT in FORTH
+    this.CODE(name);
+    // Note assumption that token for constants is 1, i.e. its the 2nd tokenFunction defined
+    this.DW(tokenNextVal, val);
+    this.OVERT();
+  }
+  buildCode(name, tok, attribs) {
+    this.CODE(name);
+    const xt = this.cpFetch();
+    this.DW(tok);  // The entire definition is the token for the JS function
+    this.OVERT();                          // Make the name usable
+    if (attribs.immediate) {
+      this.setHeaderBits(l['=IMED']);
+    }
+    return xt;
+  }
+  buildUser(name, init) {
+    init = typeof init === 'string' ? this.JSToXT(init) : typeof init === 'undefined' ? this.Ufetch(this._USER) : init;
+    console.assert(typeof init !== "undefined");
+    this.Ustore(this._USER, init);         // Initialize the variable for live compilation
+    this.Mstore(COLDD + this._USER, init); // Store in initialization area for COLD reboot
+    if (name) {                       // Put into dictionary
+      this.CODE(name);
+      this.DW(tokenUser, this._USER);
+      this.OVERT();
+    }
+    this._USER += l.CELLL; // Need to skip to next _USER
+  }
+
+  compileForthInForth() {
+    this.openBracket(); // Start off interpreting
+    return this.interpret(forthInForth); // return a Promise
+  }
+  cleanupBootstrap() {
+    // Cleanup - remove routines that shouldnt be being used
+    jsFunctionAttributes.forEach((attribs, i) => {
+      if (attribs.replaced) {
+        this.jsFunctions[i] = null;
+      }
+    });
+  };
+  // === Support for Debugging ============
+  debugClear() { this.debugStack = []; }
+  debugPush() { this.debugStack.push(this.debugName); } // in tokenDoList
+  debugPop() { this.debugStack.pop(); } // in EXIT
+
+  debugThread(xt) {
+    if (this.testing & 0x02) {
+      this.debugName = this.xt2name(xt); // Expensive so only done when testing
+      if (this.testingDepth > this.debugStack.length) {
+        console.log('R:', RPP === this.RP ? '' : this.m.slice(this.RP, RPP), this.debugStack, this.xt2name(xt), 'S:', SPP === this.SP ? '' : this.m.slice(this.SP, SPP),
+          this.padTestLength ? ('pad: ' + (this.padTestLength > 0 ? this.m.slice(this.padPtr(), this.padPtr() + this.padTestLength) : this.m.slice(this.padPtr() + this.padTestLength, this.padPtr())).toString()) : '');
+      }
+    }
+  }
+  // === Code words to support debugging on the console
+  // Put debugNA in a definition to print a counted string on the console
+  debugNA() { console.log('NAME=', this.countedToJS(this.SPfetch())); } // Print the NA on console
+  // Put testing3 in a definition to start outputing stack trace on console.
+  testing3() {
+    this.testing |= 3; }
+  // Put break in a definition.
+  break() {
+    console.log('break in a FORTH word'); } // Put a breakpoint in your IDE at this line
+  // debugPrintTIB will print the current TIB.
+  debugPrintTIB() {
+    console.log('TIB: ', this.m.slice(this.Ufetch(TIBoffset) + this.Ufetch(INoffset),
+      this.Ufetch(TIBoffset) + this.Ufetch(nTIBoffset)).toString('utf8'));
+  }
+  // TEST will (destructively) check the stack matches expected result, used for testing the compiler.
+  // e.g. this.interpret(`10 DUP 10 10 2 TEST`); // Confirm stack finishes with 2 items (10 10)
+  TEST() { //  a1 a2 a3 b1 b2 b3 n -- ; Check n parameters on stack
+    // eslint-disable-next-line no-unused-vars
+    const stackDepth = this.SPpop();
+    // Copy stack matching against
+    const b = []; // Store matching stack here
+    for (let i = 0; i < stackDepth; i++) {
+      b.unshift(this.SPpop());
+    }
+    // Check stack depth matches
+    console.assert((SPP - this.SP) / l.CELLL === stackDepth);
+    // Compare stacks
+    for (let i = 0; i < stackDepth; i++) {
+      console.assert(this.SPpop() === b.pop());
+    }
+    this.debugClear(); // Reset Debug Stack as can be mucked up by THROW and CATCH
+  }
+
+  // === Functions to simplify storing and retrieving 16 bit values into 8 bit stacks etc.
+  // These aren't part of eForth, but are here to simplify storing 16 bit words into 8 bit bytes in the Buffer.
+  //console.assert(l.CELLL === 2); // Presuming its 2 TODO-11-CELLL
+  SPfetch() { return (this.m[this.SP] << 8) | this.m[this.SP + 1]; }
+  SPpop() { return (this.m[this.SP++] << 8) | this.m[this.SP++]; }
+  SPpush(u16) { this.m[--this.SP] = u16 & 0xFF; this.m[--this.SP] = (u16 >> 8); }
+  RPfetch() { return (this.m[this.RP] << 8) | this.m[this.RP + 1]; }
+  RPpop() { return (this.m[this.RP++] << 8) | this.m[this.RP++]; }
+  RPpush(u16) { this.m[--this.RP] = u16 & 0xFF; this.m[--this.RP] = (u16 >> 8); }
+  IPnext() { return (this.m[this.IP++] << 8) | this.m[this.IP++]; }
+  Mstore(a, v) { this.m[a++] = v >> 8; this.m[a] = v & 0xFF; }
+  Mfetch(a) { return (this.m[a++] << 8) | this.m[a]; }
+  Ufetch(userindex, offset = 0) { return this.Mfetch(this.UP + userindex + offset); }
+  Ustore(userindex, w, offset = 0) { return this.Mstore(this.UP + userindex + offset, w); }
+  //TODO-11-CELLL add a McharFetch and McharStore and search for uses of this.m[..] as that code presumes reading single byte
+  // TODO-11-CELLL look for this.m.copy and this.m.write which assume bytes
+
+  currentFetch() { return this.Ufetch(CURRENToffset); }
+  cpFetch() { return this.Ufetch(CPoffset); }
+  npFetch() { return this.Ufetch(NPoffset); }
+  lastFetch() { return this.Ufetch(LASToffset); }
+  padPtr() { return this.cpFetch() + 80; } // Sometimes JS needs the pad pointer
+
+  // === Functions related to building 'find'  and its wrappers ====
+
+  // Convert a string made up of a count and that many bytes to a Javascript string.
+  // it assumes a maximum of nameMaxLength (31) characters.
+  // Mostly used for debugging but also in number conversion.
+  countedToJS(a) {
+    return this.m.slice(a + 1, a + (this.m[a] & l['=BYTEMASK']) + 1).toString('utf8');
+  }
+  // Convert a name address to the code dictionary definition.
+  na2xt(na) {
+    return this.Mfetch(na - 2 * l.CELLL);
+  }
+
+  // Inner function of find, traverses a linked list Name dictionary.
+  // name   javascript string looking for
+  // va     pointer holding address of first element in the list.
+  // cell1  if present, gives it a quick first-cell test to apply.
+  // xt     if present we are looking for name pointing at this executable (for decompiler)
+  // returns 0 or na
+  _sameq(na1, na2, chars) { // return f
+    // Note this is similar to SAME? but takes a count (not count of cells, and returns boolean
+    for (let i = 0; i < chars; i++) {
+      if (this.m[na1 + i] !== this.m[na2 + i]) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  _find(va, na, byte1, xt) { // return na that matches or 0
+    let p = va;
+    while (p = this.Mfetch(p)) {
+      //console.log('_find: comparing:', this.countedToJS(p)) // comment out except when debugging find
+      if (xt) {
+        if (this.na2xt(p) === xt) {
+          return p;
+        }
+      } else { // Searching on na
+        const b1 = this.m[p] & l['=BYTEMASK']; // count
+        if (!byte1 || (byte1 === b1)) { // first cell matches (if cell1 not passed then does slow compare
+          if (this._sameq(p + 1, na + 1, b1)) {
+            return p;
+          }
+        }
+      }
+      p -= l.CELLL; // point at link address and loop for next word
+    }
+    // Drop through not found
+    return 0;
+  }
+
+  // Search a single vocabulary for a string
+  // This has same footprint as eForth's 'find' but we do not replace it since this is approx 8x faster
+  find() { // a va -- ca na | a 0
+    const va = this.SPpop();
+    const a = this.SPpop();
+    const byte1 = this.m[a]; //TODO-CELLL
+    //console.log('find: Looking for', name) // comment out except when debugging find
+    const na = this._find(va, a, byte1);
+    if (na) {
+      this.SPpush(this.na2xt(na));
+      this.SPpush(na);
+    } else {
+      this.SPpush(a);
+      this.SPpush(0);
+    }
+  }
+
+  // Traverse dictionary to convert xt back to a na (for decompiler or debugging)
+  xt2na(xt) {
+    return this._find(this.currentFetch(), undefined, undefined, xt);
+  }
+
+  // Convert xt to a Javascript string of its name or 'undefined' (only used for debugging).
+  xt2name(xt) {
+    const na = this.xt2na(xt);
+    return na ? this.countedToJS(na) : 'undefined';
+  }
+
+  ToNAME() { this.SPpush(this.xt2na(this.SPpop())); }  // Fast version of >NAME see Forth definition below
+
+
+  // TODO-29-VOCABULARY This just looks up a in the Context vocabulary, it makes no attempt to use multiple vocabularies
+  // If required then fixing this to iterate over the context array should not break anything (this is what NAME? does)
+  findName() { // a -- xt na | a F
+    this.SPpush(this.Ufetch(CONTEXToffset));  // a va
+    this.find();                           // xt na | a F
+  }
+
+  findString(s) {
+    // Copy Javascript string to TIB and then search for it
+    // Convert JS and store in TIB, the default to l['=TIB'] is because this is used at the start of the USER variable definition process before
+    const tempBuf = this.cpFetch() + 50; // Above Code below HLD which builds numbers down from PAD which is cpFetch + 80
+    this.m[tempBuf] = s.length;
+    this.m.write(s, tempBuf+1, 'utf8'); // copy string to TIB, and return length
+    this.SPpush(tempBuf);
+    this.findName(); // xt na | a F
+  }
+
+  // Search for a string and return either its XT or 0
+  JSToXT(s) {
+    this.findString(s);
+    return this.SPpop() ? this.SPpop() : 0;
+  }
+
+  // === JS Functions to be able to define words ==== in Zen pg30 these are Macros.
+
+  $ALIGN() { } // Not applicable since using a byte Buffer TODO-11-CELLL
+
+  // Compile one or more words into the next consecutive code cells.
+  //console.assert(l.CELLL === 2); // Presuming its 2 TODO-11-CELLL
+  DW(...words) {
+    words.forEach((word) => {
+      let cp = this.cpFetch();
+      this.m[cp++] = word >> 8;
+      this.m[cp++] = word & 0xFF;
+      this.Ustore(CPoffset, cp);
+    });
+  }
+
+  // a -- a; Check if a definition of the word at 'a' would be unique and display warning (but continue) if it would not be.
+  // Same profile as ?UNIQUE but not turned into a code word as not used prior to
+  qUnique() {
+    this.SPpush(this.SPfetch());      // DUP
+    this.SPpush(this.currentFetch()); // dictionary to search
+    this.find();                 // a xt na | a a F
+    if (this.SPpop()) {
+      const xt = this.SPpop();              // Discard xt
+      const name = this.countedToJS(this.SPfetch());
+      if (!['foo', 'bar'].includes(name)) {
+        console.log(jsFunctionAttributes[this.Mfetch(xt)].replaced ? 'Expected' : '', 'Duplicate definition of', this.countedToJS(this.SPfetch())); // Catch duplicates - report, but allow
+      }
+    } else {
+      this.SPpop(); // DROP a
+    }
+  }
+
+  // na -- ; Builds bytes around a newly entered name. Same function as $,n on Zen pg94 used by all defining words (this.CODE ':')
+  dollarCommaN() {
+    if (this.m[this.SPfetch()]) {         // DUP C@ IF  ; test for no word
+      this.qUnique();
+      let a = this.SPpop();
+      this.Ustore(LASToffset, a);    // DUP LAST ! ; a=na  ; LAST=na
+      a -= l.CELLL;               // CELL-      ; a=la
+      // Link address points to previous NA (prev value of LAST)
+      // Note that first time this is run, it gets a 0 (CURRENT is 0, @0 is 0) if that changes will need to test Current here.
+      this.Mstore(a, this.Mfetch(this.currentFetch())); // CURRENT @ @ OVER ! ; la = top of current dic
+      a -= l.CELLL;               // CELL-      ; a=ca
+      this.Ustore(NPoffset, a);      // DUP NP !   ; NP=ca // adjust name pointer
+      this.Mstore(a, this.cpFetch());     // ! EXIT     ; ca=CP ; code field to where will build in dictionary
+    } else {                    // THEN $" name" THROW ;
+      console.log('name error'); // This is an error - in FORTH equivalent its a THROW
+    }
+  }
+
+  // Make the most recent definition available in the directory. This is part of closing every 'defining word'
+  OVERT() {
+    this.Mstore(this.currentFetch(), this.lastFetch()); // LAST @ CURRENT @ !
+  }
+
+  //  Build a new definition - part of all defining words.
+  CODE(name) {
+    console.assert(name.length <= nameMaxLength);
+    // <NP-after>CPh CPl <_LINK> LINKh LINKl count name... <NP-BEFORE>
+    this.$ALIGN();
+    // Note this is going to give the name string an integral number of cells.
+    const len = ((name.length / l.CELLL) + 1) * l.CELLL;
+    let a = this.npFetch() - len;
+    this.Ustore(NPoffset, a);
+    this.SPpush(a); // so this.dollarCommaN can find it
+    this.m[a++] = name.length; // This byte will be updated by this.IMMEDIATE() IMMEDIATE or COMPILE-ONLY
+    this.m.write(name, a, 'utf8');
+    this.dollarCommaN(); // Build the headers that precede the name
+  }
+
+  // ERRATA ZEN IMMEDIATE COMPILE-ONLY =COMP =IMED is not defined, in EFORTHv5 its defined as 0x80
+  setHeaderBits(b) {
+    const lastNA = this.lastFetch(); // LAST points at the name field of the last defined word
+    this.m[lastNA] |= b;
+  }
+
+  // === Define this tokens used for each kind of defining word
+  // Zen pg31
+  // Tokens are just JS functions with an entry in jsFunctions with token:true
+  // Words that will use a Javascript function for its action are just JS functions with an entry in jsFunctionAttributes
+
+  //TODO-29 define VOCABULARY as CREATE DOES> word then come back and replace this
+  tokenVocabulary(payload) {
+    // : doVOC R> CONTEXT ! ;
+    this.Ustore(CONTEXToffset, payload);
+  }
+
+  // Put the contents of the payload (1 word) onto Stack, used for CONSTANT
+  tokenNextVal(payload) { this.SPpush(this.Mfetch(payload)); }
+
+  // This is the most important token function - used for a Colon word to iterate over the list.
+  tokenDoList(payload) {
+    this.debugPush(); // Pop is in EXIT. this will be undefined if not 'testing'
+    this.RPpush(this.IP);
+    this.IP = payload; // Point at first word in the definition
+  }
+
+  // Leaves an address in the user area, note it doesnt compile the actual address since UP will change when multi-tasking
+  tokenUser(payload) { this.SPpush(this.Mfetch(payload) + this.UP); }
+
+  // Put the address of the payload onto Stack - used for CREATE which is used by VARIABLE
+  tokenVar(payload) { this.SPpush(payload); }
+
+  // === INNER INTERPRETER YES THIS IS IT ! ==================== eForthAndZen#36
+  // This is quite different from eForth as its token-threaded rather than direct threaded
+
+  threadtoken(xt) {
+    // console.assert(xt >= CODEE && xt < NAMEE); // Uncomment to catch bizarre xt values earlier
+    // This next section is only done while testing, and outputs a trace, so set it on (with testing3) immediately before a likely error.
+    this.debugThread(xt);
+    const tok = ((this.m[xt++] << 8) + this.m[xt++]); // TODO-11-CELLL assumes CELLL == 2
+    // console.assert(tok < this.jsFunctions.length); // commented out for efficiency, a fail will just break in the next line anyway.
+    return this.jsFunctions[tok].call(this, xt); // Run the token function - like tokenDoList or tokenVar - will return null or a Promise
+  }
+
+  // This is not re-entrant, normally its threadtoken you want ....
+  // In particular you cannot use this to nest forth in code in forth
+  // If that becomes necessary, it MIGHT work to save IP (where?) and restore after while loop
+  // Cant use R or S for it as words use that across calls to the 'EVAL
+  async run(xt) {
+    let waitFrequency = 0;
+    console.assert(this.IP === 0); // Cant nest run()
+    await this.threadtoken(xt);
+    // If this returns without changing program Counter, it will exit
+    while (this.IP) {
+      // console.assert(this.IP >= CODEE && this.IP <= NAMEE); // uncomment if tracking down jumping into odd places
+      xt = this.IPnext();
+      // Comment this out except when needed for debugging, they are slow
+      // debugTIB =  this.m.slice(this.Ufetch(TIBoffset) + this.Ufetch(INoffset), this.Ufetch(TIBoffset) + this.Ufetch(nTIBoffset)).toString('utf8');
+      // 'await this.threadtoken(xt)' would be legit, but creates a stack frame in critical inner loop, when usually not reqd.
+      const maybePromise = this.threadtoken(xt);
+      if (maybePromise) {
+        await maybePromise;
+      } else if (!waitFrequency--) {
+        await new Promise(resolve => setImmediate(resolve)); //ASYNC: to allow IO to run
+        waitFrequency = 100; // How many cycles to allow a thread swap
+      }
+    }
+  }
+  async MS() { // ms --; delay for a period of time.
+    await new Promise(resolve => setTimeout(resolve, this.SPpop()));
+  }
+
+  BYE() { console.log('TODO-bye'); } // TODO-30-BYE think thru how to exit
+
+  // Unwind the effect of tokenDoList restoring IP to the next definition out.
+  // The XT of this is stored in this.js2xt.EXIT
+  EXIT() {
+    this.debugPop(); // Pushed in tokenDoList
+    this.IP = this.RPpop();
+  }
+  // EXECUTE runs the word on the stack,
+  // TODO-ASYNC it works because it itself is a code word, included in colon words
+  // and because there is nothing after the return from threadtoken which would get executed out of order
+  // Note that it has a return which could be a promise, which the 'run' will await on.
+  // This pattern may or may not work in other situations.
+  EXECUTE() { this.threadtoken(this.SPpop()); }
+
+  // === Basic low level key I/O and links to OS - Zen pg 35
+  // This section will need editing for other systems.
+  /*
+   * Input call chain is
+   * ?RX  read one char if present
+   * ?KEY via '?KEY to ?RX
+   * KEY loop till ?KEY
+   * accept read a line via KEY, processing control chars via 'TAP  to kTAP
+   * QUERY read a line via 'EXPECT to accept into TIB and reset >IN
+   * que read an evaluate a line
+   * QUIT loop over que, handling errors
+   *
+   * See https://github.com/mitra42/webForth/issues/17 for strategy for async version
+   */
+
+  // Call chain is ?RX < '?KEY  < ?KEY < KEY < accept < 'EXPECT < QUERY < que < QUIT
+  QRX() {
+    // If there is no data in the buffer, check the stdin and reload the buffer.
+    if (!(stdinBuffer && stdinBuffer.length)) {
+      const s = process.stdin.read(); // Synchronous
+      if (s) stdinBuffer = Buffer.from(s, 'utf8');
+    }
+    // If there is any data (old or new) in the buffer, return the first character and True
+    if (stdinBuffer && stdinBuffer.length) {
+      this.SPpush(stdinBuffer[0]);
+      stdinBuffer = stdinBuffer.slice(1);
+      this.SPpush(forthTrue);
+    } else {
+      // If there is nothing (old or new) return False
+      this.SPpush(0);
+    }
+  }
+
+  // Low level TX!, output one character to stdout, inefficient, but not likely to be bottleneck.
+  TXbang() {
+    process.stdout.write(Uint8Array.from([this.SPpop()])); }
+
+  // Setup I/O to the terminal
+  bangIO() {
+    if (process.stdin.isTTY) {
+      //process.stdout.write('RAW'); //TODO-31-RAW maybe comment out
+      //process.stdin.setRawMode();
+    }
+    process.stdin.setEncoding('utf8');
+    process.stdout.setEncoding('utf8');
+  }
+
+  // === Literals and Branches - using next value in dictionary === eForthAndZen#37
+
+  // push the value in the next code word
+  // The XT of this is stored in this.doLIT
+  doLIT() { this.SPpush(this.IPnext()); }
+
+  // Address Literals (aka branches and jumps) eForthAndZen#38
+
+  // decrement count on Return stack, and branch if not decremented past zero (FOR..NEXT)
+  next() {
+    let x = this.RPpop();
+    const destn = this.IPnext(); // Increments over it
+    if (--x >= 0) {
+      this.RPpush(x);
+      this.IP = destn; // Jump back
+    }
+  }
+
+  // Jump if flag on stack is zero to destn in dictionary
+  qBranch() {
+    const destn = this.IPnext();
+    if (!this.SPpop()) {
+      this.IP = destn;
+    }
+  }
+  // Unconditional jump to destn in dictionary
+  branch() { this.IP = this.IPnext(); }
+
+  // === Primitive words for memory, stack and return access.
+
+  // Memory access eForthAndZen#39
+  store() { this.Mstore(this.SPpop(), this.SPpop()); } //!  w a -- , Store
+  fetch() { this.SPpush(this.Mfetch(this.SPpop())); }//@ a -- w, fetch
+  cStore() { this.m[this.SPpop()] = this.SPpop(); }//C! c a -- , Store character
+  cFetch() { this.SPpush(this.m[this.SPpop()]); }//C@ a -- c, Fetch character
+
+  // Return stack words eForthAndZen#40
+  RPat() { this.SPpush(this.RP); } //RP@
+  RPbang() { this.RP = this.SPpop(); } // RP!
+  Rfrom() { this.SPpush(this.RPpop()); } // R>
+  Rat() { this.SPpush(this.RPfetch()); } // R@
+  toR() { this.RPpush(this.SPpop()); } // >R
+
+  // Data stack initialization eForthAndZen#41
+  SPat() { this.SPpush(this.SP); } //SP@
+  SPbang() { this.SP = this.SPpop(); } //SP!
+
+  // Classic Data stack words eForthAndZen#42
+  DROP() { this.SP += l.CELLL; }
+  DUP() { this.SPpush(this.SPfetch()); }
+  SWAP() {
+    const x = this.SPpop();
+    const y = this.SPpop();
+    this.SPpush(x);
+    this.SPpush(y);
+  }
+  OVER() {
+    const x = this.SPpop();
+    const y = this.SPfetch();
+    this.SPpush(x);
+    this.SPpush(y);
+  } // TODO optimize
+
+  // Logical Words eForthAndZen43
+  // console.assert(l.CELLL === 2); // TODO-11-CELLL
+  // noinspection JSBitwiseOperatorUsage
+  less0() { this.SPpush((this.SPpop() & 0x8000) ? -1 : 0); } //0<
+  AND() { this.SPpush(this.SPpop() & this.SPpop()); }
+  OR() { this.SPpush(this.SPpop() | this.SPpop()); }
+  XOR() { this.SPpush(this.SPpop() ^ this.SPpop()); }
+
+  // Primitive Arithmetic Word eForthAndZen44
+  //console.assert(l.CELLL === 2); // TODO-11-CELLL
+  UMplus() {
+    const x = this.SPpop() + this.SPpop();
+    this.SPpush(x & 0xFFFF);
+    this.SPpush(x >> 16);
+  }
+  // === Define and initialize User variables Zen pg33 see Zen pg46
+  // See Zen pg31 for tokenUser etc and $USER and Zen pg33 for USER initialization values
+
+  // TODO-28-MULTITASK will need to think carefully about how to move all, or part of the USER space to task-specific space.
+  // TODO-28-MULTITASK this is non-trivial since somethings are clearly across all tasks (e.g. CP and NP)
+  userAreaInit() {
+    for (let a = 0; a < this._USER; a += l.CELLL) {
+      this.Ustore(a, this.Mfetch(COLDD + a));
+    }
+  }
+
+
+  // === JS interpreter - will be discarded when done or built out
+
+  PARSE() { // returns b (address) and u (length)
+    const delimiter = this.SPpop(); // delimiter
+    const tib = this.Ufetch(TIBoffset);
+    const ntib = this.Ufetch(nTIBoffset);
+    let inoffset = this.Ufetch(INoffset);
+    if (delimiter === l.BL) {
+      while ((inoffset < ntib) && (this.m[tib + inoffset] <= l.BL)) {
+        inoffset++;
+      }  // If blank then skip over leading BL /control chars
+    }
+    // inoffset now points at first non-delimiter or #TIB
+    const b = tib + inoffset; // Save start of string
+    while ((inoffset < ntib) && ((delimiter === l.BL) ? (delimiter < this.m[tib + inoffset]) : (delimiter !== this.m[tib + inoffset]))) {
+      inoffset++;
+    } // Exit with inoffset at #TIB or after delimiter
+    this.SPpush(b);
+    this.SPpush(tib + inoffset - b); // Store length not including trailing delimiter
+    this.Ustore(INoffset, inoffset < ntib ? ++inoffset : inoffset); // Skip over delimiter - TODO its not clear this is what FORTH wants. eForth doc is almost certainly wrong
+  }
+
+  // JS version of TOKEN - same signature
+  TOKEN() { // -- a; <string>; copy blank delimited string to name buffer, immediately below name dictionary (location is important as ':' take a shortcut in eForth.
+    this.SPpush(l.BL);
+    this.PARSE();   // b u (counted string, adjusts >IN)
+    const u = Math.min(this.SPpop(), nameMaxLength); // length of string
+    const b = this.SPpop(); // start of string
+    const np = this.npFetch() - u - l.CELLL; // Enough space in Name Directory to copy string
+    this.m.copy(this.m, np + 1, b, b + u);
+    this.m[np] = u;  // 1 byte count
+    this.m[np + u + 1] = 0;  // ERRATA  Zen pg62 - PACK$ does `0 !` which I think will overwrite bottom value of name dict as NP is last byte used
+    this.SPpush(np); // Note that NP is not updated, the same buffer will be used for each word until hit ':'
+  }
+
+  NUMBERQ() { // Same footprint as NUMBER?, this will be stored vectored from 'NUMBER
+    const a = this.SPpop();
+    const w = this.countedToJS(a); // I believe this is the only place we use this.countedToJS to make JS strings outside of debugging
+    const base = this.Ufetch(BASEoffset);
+    const n = parseInt(w, base); // TODO-32-ERRORS handle parsing errors // Needs forth to convert word
+    if (isNaN(n)) {
+      this.SPpush(a);
+      this.SPpush(0);
+    } else {
+      this.SPpush(n);
+      this.SPpush(forthTrue);
+    }
+  }
+
+  // If we are going to compile it, then check its not compiling into the dict, code we plan on replacing. (See same code on "'")
+  checkNotCompilingReplaceable(xt, na) {
+    if (jsFunctionAttributes[this.Mfetch(xt)].replaced) {
+      const inDefOf = this.countedToJS(this.lastFetch());
+      if (inDefOf !== '(') { // We redefine ( so ok with redefinition
+        console.log('Compiling', this.countedToJS(na), 'in', inDefOf, 'when code will be deleted');
+        console.assert(false); // Break here, shouldn't be happening.
+      }
+    }
+  }
+
+  async $COMPILE() { // a -- ...; same signature as to $COMPILE at Zen pg96
+    this.findName(); // xt na | a F
+    const na = this.SPpop();
+    if (na) { // ca
+      const xt = this.SPpop();
+      const ch = this.m[na];
+      // noinspection JSBitwiseOperatorUsage
+      if (ch & l['=IMED']) {
+        await this.run(xt); // This will work as long as this $INTERPRET never called from Forth as cant nest 'run' even indirectly
+      } else {
+        this.checkNotCompilingReplaceable(xt, na);
+        if (this.testing & 0x02) console.log('COMPILING:', this.countedToJS(na));
+        this.DW(xt);
+      }
+    } else { // a
+      await this.run(this.Ufetch(NUMBERoffset)); // n T | a F // Works as long as NUMBER is code, OR this is called from code.
+      if (this.SPpop()) {
+        this.DW(this.js2xt.doLIT, this.SPpop());
+      } else {
+        // TODO-32-ERRORS handle error in Forth-ish way (via Throw) - this is harder than it looks !
+        console.log('Number conversion of', this.countedToJS(this.SPpop()), 'failed');
+      }
+    }
+  }
+
+  async $INTERPRET() { // a -- ...; Based on signature of $INTERPRET at Zen pg83
+    this.findName(); // xt na | a F
+    const na = this.SPpop();
+    if (na) { // ca
+      const xt = this.SPpop();
+      await this.run(xt); //TODO-ASYNC maybe should be threadToken - but that won't work if this isn't running inside run already
+    } else {
+      await this.run(this.Ufetch(NUMBERoffset)); // n T | a F
+      if (!this.SPpop()) {
+        // TODO-32-ERRORS handle error in Forth-ish way (via Throw) - this is harder than it looks !
+        console.log('Number conversion of', this.countedToJS(this.SPpop()), 'failed');
+      }
+    }
+  }
+
+  // equivalent to Forth EVAL with few things wrapped around it - so not exact same TODO align it
+  async EVAL(inp) {
+    if (this.testing & 0x01) {
+      console.log(this.m.slice(this.SP, SPP), ' >>', inp);
+    }
+    console.assert(inp.length < (RTS - 10)); // Check for overlong lines
+    this.Ustore(INoffset, 0); // Start at beginning of TIB
+    this.Ustore(nTIBoffset,  this.m.write(inp, this.Ufetch(TIBoffset), 'utf8')); // copy string to TIB, and store length in #TIB
+    while (this.Ufetch(INoffset) < this.Ufetch(nTIBoffset)) {
+      this.TOKEN(); // a ; pointing to word in Name Buffer (NB)
+      // There may be case where this.TOKEN returns empty string at end of line or similar
+      if (this.m[this.SPfetch()] === 0) { // Skip zero length string
+        this.SPpop();
+      } else {
+        // This is currently OK since its calling JS routines that may call Forth, there is no Forth-in-Forth
+        await this.run(this.Ufetch(EVALoffset));
+      }
+      console.assert(this.SP <= SPP && this.RP <= RPP); // Side effect of making SP and SPP available to debugger.
+    }
+  }
+
+  // Take a multiline string, and pass line by line to EVAL
+  async interpret(inp) {
+    const inputs = inp.split('\n');
+    // eslint-disable-next-line no-restricted-syntax,guard-for-in
+    for (const i in inputs) {
+      await this.EVAL(inputs[i]);
+    }
+  }
+
+  // === A group of words required for the JS interpreter redefined later
+
+  // : [  doLIT $INTERPRET 'EVAL ! ; IMMEDIATE
+  //Zen pg84 and Zen pg88  redefined below to use FORTH $INTERPRET
+  openBracket() {
+    this.Ustore(EVALoffset, this.js2xt.$INTERPRET); // uses JS $INTERPRET
+  }
+
+  // : ] doLIT $COMPILE 'EVAL ! ;
+  //Zen pg84 and Zen pg95  redefined below to use FORTH $COMPILE
+  closeBracket() {
+    this.Ustore(EVALoffset, this.js2xt.$COMPILE);
+  }
+
+  // : : TOKEN $,n [ ' doLIST ] LITERAL ] ; see Zen pg96
+  colon() {
+    this.TOKEN();  // a; (counted string in named space)
+    this.dollarCommaN();
+    this.DW(tokenDoList); // Must be after creating the name and links etc
+    this.closeBracket();
+  }
+
+  // : ; doLIT EXIT , OVERT [ ;
+  semicolon() { // Zen pg95
+    this.DW(this.js2xt.EXIT); //TODO-VM use a simplified interpreter then replace the setting of this.js2xt.EXIT
+    this.OVERT();
+    this.openBracket();
+  }
+
+  // : ' ( -- xt ) TOKEN NAME? IF EXIT THEN THROW ; // Zen pg89 needs TOKEN NAME? THROW all of which are advanced
+  tick() { // -- xt; Search for next word in input stream
+    this.TOKEN(); // -- a; String with count in first byte
+    //const a = this.SPfetch(); // used for debugging
+    this.findName(); // xt na | a 0
+    const na = this.SPpop();
+    if (!na) {
+      console.error(this.countedToJS(this.SPpop()), "not found during '");
+    } else {
+      // For debugging need to make sure we are not including code that will replaced by Forth versions.
+      this.checkNotCompilingReplaceable(this.SPfetch(), na);
+    }
+  }
+
+  // : [COMPILE] ' , ; IMMEDIATE   - its redefined in FORTH which is important as redefinition uses replaced '
+  //TODO-VM can turn this into a colon
+  immCOMPILE() {
+    this.tick(); // xt
+    this.DW(this.SPpop());
+  }
+
+  // Create a new word that doesnt allocate any space, but will push address of that space. )
+  // : CREATE TOKEN $,n OVERT COMPILE tokenVar ; // except tokenVar isn't an accessible value
+  CREATE() {
+    this.TOKEN();
+    this.dollarCommaN();
+    this.OVERT();
+    this.DW(tokenVar);
+  }
+
+  // TODO-29 define DOES> for CREATE-DOES> and tokenDoes - this is not part of eForth, THEN defined Vocabulary as CREATE-DOES word
+  //tokenDoes = Forth.tokenFunction(payload => { this.RPpush(this.IP); this.IP = (this.m[payload++]<<8)+this.m[payload++]; this.SPpush(payload++); ); // Almost same as tokenDoList
+}
+const foo = new Forth();
+foo.compileForthInForth()
+  .then(() => console.log('===forthInForth compiled'))
+  //.then(() => foo.cleanupBootstrap())
+  //.then(() => console.log('===forthInForth cleaned up'))
+  .then(() => foo.interpret("' WARM"))
+  .then(() => foo.run(foo.SPpop()))
+  .then(() => console.log('console exited'));
+
+//TODO-VM where is output going from compileForthInForth
+//TODO-VM check that doing duplicate definition detection
