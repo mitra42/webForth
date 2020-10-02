@@ -24,7 +24,7 @@ const jsFunctionAttributes = [
   { n: '$COMPILE', replaced: true, jsNeeds: true }, { n: '$INTERPRET', replaced: true, jsNeeds: true },
   { n: '[', f: 'openBracket', immediate: true, replaced: true }, { n: ']', f: 'closeBracket', replaced: true },
   { n: ':', f: 'colon', replaced: true }, { n: ';', f: 'semicolon', immediate: true, replaced: true }, { n: "'", f: 'tick', replaced: true },
-  { n: '[COMPILE]', f: 'immCOMPILE', immediate: true, replaced: true }, { n:'CREATE', replaced: true },
+  { n: '[COMPILE]', f: 'immCOMPILE', immediate: true, replaced: true }, { n: 'CREATE', replaced: true },
 ];
 const tokenVocabulary = 0;
 const tokenNextVal = 1;
@@ -1447,7 +1447,7 @@ class Forth {
     this._USER = 0; // Incremented by l.CELLL as define USER's
     // create data structures
     this.buildDictionary();
-    // TODO-VM currently compiling forthInForth is done outside this.
+    // compiling forthInForth is done outside this as it is async TODO-VM API may change.
   }
   // Build dictionary, mostly from jsFunctionAttributes
   buildDictionary() {
@@ -1486,15 +1486,13 @@ class Forth {
       // regular code functions that just need a pointer.
       } else {
         const xt = this.buildCode(n, tok, attribs);
-        console.assert(xt === this.JSToXT(n)); // TODO-VM just for testing - comment out
+        //console.assert(xt === this.JSToXT(n));
         if (attribs.jsNeeds) { this.js2xt[n] = xt; } //TODO-VM colon table then replace this
       }
     });
 
     // build USER variables
     jsUsers.forEach(nv => this.buildUser(nv[0], nv[1]));
-
-    //TODO-VM - interpret main Forth file
   }
 
   buildConstant(name, val) {
@@ -1516,7 +1514,7 @@ class Forth {
   }
   buildUser(name, init) {
     init = typeof init === 'string' ? this.JSToXT(init) : typeof init === 'undefined' ? this.Ufetch(this._USER) : init;
-    console.assert(typeof init !== "undefined");
+    console.assert(typeof init !== 'undefined');
     this.Ustore(this._USER, init);         // Initialize the variable for live compilation
     this.Mstore(COLDD + this._USER, init); // Store in initialization area for COLD reboot
     if (name) {                       // Put into dictionary
@@ -1538,7 +1536,8 @@ class Forth {
         this.jsFunctions[i] = null;
       }
     });
-  };
+  }
+
   // === Support for Debugging ============
   debugClear() { this.debugStack = []; }
   debugPush() { this.debugStack.push(this.debugName); } // in tokenDoList
@@ -1703,7 +1702,7 @@ class Forth {
     // Convert JS and store in TIB, the default to l['=TIB'] is because this is used at the start of the USER variable definition process before
     const tempBuf = this.cpFetch() + 50; // Above Code below HLD which builds numbers down from PAD which is cpFetch + 80
     this.m[tempBuf] = s.length;
-    this.m.write(s, tempBuf+1, 'utf8'); // copy string to TIB, and return length
+    this.m.write(s, tempBuf + 1, 'utf8'); // copy string to TIB, and return length
     this.SPpush(tempBuf);
     this.findName(); // xt na | a F
   }
@@ -2209,6 +2208,3 @@ foo.compileForthInForth()
   .then(() => foo.interpret("' WARM"))
   .then(() => foo.run(foo.SPpop()))
   .then(() => console.log('console exited'));
-
-//TODO-VM where is output going from compileForthInForth
-//TODO-VM check that doing duplicate definition detection

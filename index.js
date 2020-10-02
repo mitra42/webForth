@@ -1,3 +1,4 @@
+TODO-VM merge into index2 the replace index.js
 /*
  * WIP to build a Node API along the lines in https://github.com/mitra42/webForth/issues/23
  * See TODO-23-NODEAPI
