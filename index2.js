@@ -1,4 +1,71 @@
+/*
+ * WIP to build a Node API along the lines in https://github.com/mitra42/webForth/issues/23
+ * See TODO-23-NODEAPI
+ *
+ * const Forth = require('webforth');   // The class or obj with functions
+ * foo = new Forth()                    // Instantiate a new, but incomplete instance
+ * foo.compileForthInForth()            // Load the parts of Forth written in Forth
+ * .then(() => foo.interpret("1 2 DUP .S")); // Run some Forth words in the instance
+ *
+ * And some ideas ... not yet implemented
+ * new({ CELLL: 3, xxxMemSize: 1000000});  // parameterized "new"
+ * .then(() => foo.load('foo.f'))       // TODO Load file into the class
+ * .then(() => foo.load('https://....')) // TODO Load remote file it into the instance
+ * boo = forth.rot([1,2,3]);  // Returns [2,3,1] - will depend what can do with JS API
+ * forth.console(); // Go interactive TODO from WARM and run(pop)
+ */
+
+/*
+ * References see FORTH.md
+ */
+
+/* Naming conventions and abbreviations
+ * xt: execution token, points at the token field of a definition
+ * na: Name Address, points to the name, (first byte count+flags, then that number of characters, max 31)
+ * ca: Is ambiguous, sometimes it is used to refer to the xt, and sometimes to the Codefield Address, the field 2 cells below na that holds the xt
+ * la: Linkfield Address, field holding the na of the previously defined word in this vocabulary
+ * u: unsigned 16 bit
+ * c: character
+ * w: word - 16 bit signed
+ * n: word - 16 bit signed
+ *
+ * For routines defined in Javascript there are typically
+ * c.foo = func // If the functionary is to be discarded after bootstrap it will be in 'c' else just a function
+ * this.jsFunctions[tok] = func // An array that maps the tokens used in the Forth space to the addresses of the function in JS address space
+ * jsFunctionsAttributes[tok] = { name, replaced } // Some attributes to allow management of the functions
+ * Name Dictionary:  na-2*CELLL: <xt><link><name> // In the name directory it looks like any other word
+ * Code Dictionary:  xt: <tok> // In the code directory its a single cell with the token.
+ */
+
+/* Sections below in order
+ * jsFunctionAttributes: maps JS functions to Forth names and other attributes
+ * Memory Map - constants that lay out the memory array
+ * Other key constants - especially bitmasks
+ * Data table used to build users.
+ * Forth written in Forth - loaded after the functions in the class
+ * Support for Debugging - constants, variables, arrays, functions used by tools
+ * Javascript structures - implement the memory map and record the full state.
+ * Standard Pointers used - esp IP, SP, RP, UP
+ * Build dictionary, mostly from jsFunctionAttributes
+ * Support for Debugging
+ * Code words to support debugging on the console
+ * Functions to simplify storing and retrieving 16 bit values into 8 bit stacks etc.
+ * Access to the USER variables before they are defined
+ * Functions related to building 'find' and its wrappers
+ * JS Functions to be able to define words
+ * Define this tokens used for each kind of defining word
+ * INNER INTERPRETER YES THIS IS IT !
+ * Basic low level key I/O and links to OS
+ * Literals and Branches - using next value in dictionary
+ * Primitive words for memory, stack and return access, arithmetic and logic
+ * Define and initialize User variable
+ * JS interpreter - could be discarded when done or built out
+ * A group of words required for the JS interpreter redefined later
+*/
+//eslint-env node
+
 // This is a key table mapping the functions that go in the dictionary to the function names in the instance.
+// it is used to build the dictionary in each instance.
 const jsFunctionAttributes = [
   { n: 'tokenVocabulary', token: true }, // Token used for Vocabularies must be first 0
   { n: 'tokenNextVal', token: true }, // Token used for Constants must be next (1)
@@ -26,13 +93,14 @@ const jsFunctionAttributes = [
   { n: ':', f: 'colon', replaced: true }, { n: ';', f: 'semicolon', immediate: true, replaced: true }, { n: "'", f: 'tick', replaced: true },
   { n: '[COMPILE]', f: 'immCOMPILE', immediate: true, replaced: true }, { n: 'CREATE', replaced: true },
 ];
+
+// Define the tokens used in the first cell of each word.
+// Order must match the order of
 const tokenVocabulary = 0;
 const tokenNextVal = 1;
 const tokenDoList = 2;
 const tokenUser = 3;
 const tokenVar = 4;
-
-let stdinBuffer = null; // Local to ?RX do not access directly - but there can be only one so global
 
 // === Memory Map - Zen pg26
 // TODO-27-MEM rework this into separate slots and then check if really need ! and @ into some parts of mem
@@ -70,7 +138,7 @@ const nameMaxLength = 31; // Max number of characters in a name, length needs to
 console.assert(nameMaxLength === l['=BYTEMASK']); // If this isn't true then check each of the usages below
 l.BL = 32;
 
-// Defining function for USER variables.
+// === Data table used to build users.
 // later the FORTH word 'USER' works but doesn't setup initialization, nor does it auto-increment to next available user slot.
 const jsUsers = []; // Note 4 cells skipped for multitasking but that is in init of _USER to 4*CELLL
 function USER(n, v) { jsUsers.push([n, v]); return (jsUsers.length - 1) * l.CELLL; }
@@ -1424,6 +1492,8 @@ CREATE 'BOOT  ' hi , ( application vector )
 : WARM CONSOLE 'BOOT @EXECUTE QUIT ;
 `;
 
+let stdinBuffer = null; // Local to ?RX do not access directly - but there can be only one so global
+
 class Forth {
   // Build and return an initialized Forth memory obj
   constructor() {
@@ -1449,7 +1519,7 @@ class Forth {
     this.buildDictionary();
     // compiling forthInForth is done outside this as it is async TODO-VM API may change.
   }
-  // Build dictionary, mostly from jsFunctionAttributes
+  // === Build dictionary, mostly from jsFunctionAttributes
   buildDictionary() {
     // Setup pointers for first dictionary entries.
     this.Ustore(CPoffset, CODEE); // Pointer to where compiling into dic
@@ -1602,6 +1672,7 @@ class Forth {
   //TODO-11-CELLL add a McharFetch and McharStore and search for uses of this.m[..] as that code presumes reading single byte
   // TODO-11-CELLL look for this.m.copy and this.m.write which assume bytes
 
+  // === Access to the USER variables before they are defined
   currentFetch() { return this.Ufetch(CURRENToffset); }
   cpFetch() { return this.Ufetch(CPoffset); }
   npFetch() { return this.Ufetch(NPoffset); }
@@ -2007,7 +2078,7 @@ class Forth {
   }
 
 
-  // === JS interpreter - will be discarded when done or built out
+  // === JS interpreter - could be discarded when done or built out
 
   PARSE() { // returns b (address) and u (length)
     const delimiter = this.SPpop(); // delimiter
@@ -2210,3 +2281,5 @@ foo.compileForthInForth()
   .then(() => foo.interpret("' WARM"))
   .then(() => foo.run(foo.SPpop()))
   .then(() => console.log('console exited'));
+
+// module.exports = exports = Forth;
