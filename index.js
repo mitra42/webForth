@@ -6,13 +6,13 @@
  * foo = new Forth()                    // Instantiate a new, but incomplete instance
  * foo.compileForthInForth()            // Load the parts of Forth written in Forth
  * .then(() => foo.interpret("1 2 DUP .S")); // Run some Forth words in the instance
+ * .then(() => forth.console());        // Go interactive
  *
  * And some ideas ... not yet implemented
  * new({ CELLL: 3, xxxMemSize: 1000000});  // parameterized "new"
  * .then(() => foo.load('foo.f'))       // TODO Load file into the class
  * .then(() => foo.load('https://....')) // TODO Load remote file it into the instance
  * boo = forth.rot([1,2,3]);  // Returns [2,3,1] - will depend what can do with JS API
- * forth.console(); // Go interactive TODO from WARM and run(pop)
  */
 
 /*
@@ -2259,6 +2259,9 @@ class Forth {
     }
   }
 
+  console() {
+    return this.run(this.JSToXT('WARM'));
+  }
   // TODO-29 define DOES> for CREATE-DOES> and tokenDoes - this is not part of eForth, THEN defined Vocabulary as CREATE-DOES word
   //tokenDoes = Forth.tokenFunction(payload => { this.RPpush(this.IP); this.IP = (this.m[payload++]<<8)+this.m[payload++]; this.SPpush(payload++); ); // Almost same as tokenDoList
 }
@@ -2267,8 +2270,8 @@ foo.compileForthInForth()
   .then(() => console.log('===forthInForth compiled'))
   //.then(() => foo.cleanupBootstrap())
   //.then(() => console.log('===forthInForth cleaned up'))
-  .then(() => foo.interpret("' WARM"))
-  .then(() => foo.run(foo.SPpop()))
+  //.then(() => foo.interpret("WARM"));
+  .then(() => foo.console())
   .then(() => console.log('console exited'));
 
 // module.exports = exports = Forth;
