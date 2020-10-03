@@ -14,10 +14,16 @@ npm install webforth
 Installs webforth, note there are intentionally no dependencies in the minimal version.
 
 ## Running
-You will need to be running Node v13 or later, 
-OR in v12 `node --experimental-modules`
+
 ```
-import Forth from webforth;
+const Forth = require('webforth');
+```
+Or alternatively if running node v13, or `node --experimental-modules`
+```
+import Forth from 'webforth';
+```
+Then ...
+```
 const foo = new Forth();
 foo.compileForthInForth()
   .then(() => foo.interpret('1 2 3 ROT .S')) // Pass forth to interpret
