@@ -73,9 +73,9 @@ const jsFunctionAttributes = [
   { n: 'tokenUser', token: true },
   { n: 'tokenVar', token: true },
   { n: 'find' }, // Fast version of find - see Forth definition later
-  // { n: 'OVERT'}, // Not used yet
+  { n: 'OVERT', replaced: true },
   // { n: '?UNIQUE', f: 'qUnique' }, // Not used yet
-  // { n: '$,n', f: 'dollarCommaN' }, // Not used yet
+  { n: '$,n', f: 'dollarCommaN', replaced: true },
   { n: '>NAME', f: 'ToNAME' }, // Fast version of >NAME - see Forth definition later
   'debugNA', 'testing3', 'break', 'debugPrintTIB', 'TEST',
   'MS', 'BYE', { n: 'EXIT', jsNeeds: true }, 'EXECUTE',
@@ -91,7 +91,6 @@ const jsFunctionAttributes = [
   { n: '$COMPILE', replaced: true, jsNeeds: true }, { n: '$INTERPRET', replaced: true, jsNeeds: true },
   { n: '[', f: 'openBracket', immediate: true, replaced: true }, { n: ']', f: 'closeBracket', replaced: true },
   { n: ':', f: 'colon', replaced: true }, { n: ';', f: 'semicolon', immediate: true, replaced: true }, { n: "'", f: 'tick', replaced: true },
-  { n: '[COMPILE]', f: 'immCOMPILE', immediate: true, replaced: true }, { n: 'CREATE', replaced: true },
 ];
 
 // Define the tokens used in the first cell of each word.
@@ -246,12 +245,17 @@ BL 32 1 TEST
 : , ( w --; Compile an integer into the code dictionary. Zen pg 89)
   HERE ALIGNED DUP CELL+ CP ! ! ;
 
+: [COMPILE] ( -- ; <string> ) ' , ; IMMEDIATE ( Needs redefining pg87 to use new "'" )
+
 : COMPILE ( --; Compile the next address in colon list to code dictionary. Zen pg 90)
   R> DUP @ , CELL+ >R ; COMPILE-ONLY
 
 : LITERAL ( w -- ) ( Compile tos to code dictionary as an integer literal.)
   COMPILE doLIT ( compile doLIT to head lit )
   , ; IMMEDIATE ( compile literal itself )
+
+( This definition of CREATE is redefined pg97 to use new, rather than JS versions of TOKEN $,n OVERT and COMPILE)
+: CREATE TOKEN $,n OVERT tokenVar , ; 
 
 ( TODO-TEST test of above group non-obvious as writing to dictionary. )
 
@@ -1277,7 +1281,7 @@ TOKEN foo DUP ?UNIQUE - 0 1 TEST
   THEN          ( not a number either )
   COUNT TYPE SPACE ." Not found" ( TODO remove line when have better handling of THROW)
   THROW ;       ( generate an error condition )
-
+  
 : OVERT ( -- ) ( Redefining code word in Forth)
   ( Link a successfully defined word into the current vocabulary. )
   LAST @        ( name field address of last word )
@@ -1312,7 +1316,8 @@ TOKEN foo DUP ?UNIQUE - 0 1 TEST
 
 : USER ( u -- ; <string> ) TOKEN $,n OVERT tokenUser , ;
 
-: CREATE ( -- ; <string> ) TOKEN $,n OVERT tokenVar , ; ( redefines code word )
+( Create a new word that doesnt allocate any space, but will push address of that space. )
+: CREATE ( -- ; <string> ) TOKEN $,n OVERT tokenVar , ; ( redefines definition moved up so that it will use new TOKEN etc)
 
 : VARIABLE ( -- ; <string> ) CREATE 0 , ;
 
@@ -2131,7 +2136,7 @@ class Forth {
   checkNotCompilingReplaceable(xt, na) {
     if (jsFunctionAttributes[this.Mfetch(xt)].replaced) {
       const inDefOf = this.countedToJS(this.lastFetch());
-      if (inDefOf !== '(') { // We redefine ( so ok with redefinition
+      if (!['[COMPILE]', '(', 'CREATE'].includes(inDefOf)) { // We redefine ( so ok with redefinition
         console.log('Compiling', this.countedToJS(na), 'in', inDefOf, 'when code will be deleted');
         console.assert(false); // Break here, shouldn't be happening.
       }
@@ -2252,22 +2257,6 @@ class Forth {
       // For debugging need to make sure we are not including code that will replaced by Forth versions.
       this.checkNotCompilingReplaceable(this.SPfetch(), na);
     }
-  }
-
-  // : [COMPILE] ' , ; IMMEDIATE   - its redefined in FORTH which is important as redefinition uses replaced '
-  //TODO-VM can turn this into a colon
-  immCOMPILE() {
-    this.tick(); // xt
-    this.DW(this.SPpop());
-  }
-
-  // Create a new word that doesnt allocate any space, but will push address of that space. )
-  // : CREATE TOKEN $,n OVERT COMPILE tokenVar ; // except tokenVar isn't an accessible value
-  CREATE() {
-    this.TOKEN();
-    this.dollarCommaN();
-    this.OVERT();
-    this.DW(tokenVar);
   }
 
   // TODO-29 define DOES> for CREATE-DOES> and tokenDoes - this is not part of eForth, THEN defined Vocabulary as CREATE-DOES word
