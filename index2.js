@@ -1697,20 +1697,19 @@ class Forth {
     this.find();                           // xt na | a F
   }
 
-  findString(s) {
-    // Copy Javascript string to TIB and then search for it
-    // Convert JS and store in TIB, the default to l['=TIB'] is because this is used at the start of the USER variable definition process before
+  // -- a; Push a Javascript string to a temporary location as a counted string, and put its address on the stack
+  JStoCounted(s) {
     const tempBuf = this.cpFetch() + 50; // Above Code below HLD which builds numbers down from PAD which is cpFetch + 80
     this.m[tempBuf] = s.length;
     this.m.write(s, tempBuf + 1, 'utf8'); // copy string to TIB, and return length
     this.SPpush(tempBuf);
-    this.findName(); // xt na | a F
   }
 
   // Search for a string and return either its XT or 0
   JSToXT(s) {
-    this.findString(s);
-    return this.SPpop() ? this.SPpop() : 0;
+    this.JStoCounted(s);
+    this.findName(); // xt na | a F
+    return this.SPpop() ? this.SPpop() : undefined;
   }
 
   // === JS Functions to be able to define words ==== in Zen pg30 these are Macros.
@@ -2108,14 +2107,17 @@ class Forth {
     }
   }
 
+  JStoTIB(s) {
+    console.assert(s.length < (RTS - 10)); // Check for overlong lines
+    this.Ustore(INoffset, 0); // Start at beginning of TIB
+    this.Ustore(nTIBoffset,  this.m.write(s, this.Ufetch(TIBoffset), 'utf8')); // copy string to TIB, and store length in #TIB
+  }
   // equivalent to Forth EVAL with few things wrapped around it - so not exact same TODO align it
   async EVAL(inp) {
     if (this.testing & 0x01) {
       console.log(this.m.slice(this.SP, SPP), ' >>', inp);
     }
-    console.assert(inp.length < (RTS - 10)); // Check for overlong lines
-    this.Ustore(INoffset, 0); // Start at beginning of TIB
-    this.Ustore(nTIBoffset,  this.m.write(inp, this.Ufetch(TIBoffset), 'utf8')); // copy string to TIB, and store length in #TIB
+    this.JStoTIB(inp);
     while (this.Ufetch(INoffset) < this.Ufetch(nTIBoffset)) {
       this.TOKEN(); // a ; pointing to word in Name Buffer (NB)
       // There may be case where this.TOKEN returns empty string at end of line or similar
