@@ -1464,14 +1464,12 @@ BL WORD DUP NAME? SWAP FORTH>NAME = -1 1 TEST
 ( ERRATA Zen uses CONSTANT but doesnt define it )
 ( === Signon Message Zen pg105 VER hi )
 
-$001 CONSTANT VER ( Return the version number of this implementation.)
+3 CONSTANT VER ( Return the version number of this implementation.)
 
 ( ERRATA v5 'hi' doesnt restore BASE )
 : hi ( -- )
   !IO           ( initialize terminal I/O )
-  BASE @ HEX    ( Save BASE and switch to HEX)
-  CR ." webFORTH V" VER <# # # 46 HOLD # #> TYPE ( display sign-on text and version )
-  BASE !        ( Restore BASE)
+  CR ." webFORTH V" VER <# # # 46 HOLD # # 46 HOLD # #> TYPE ( display sign-on text and version )
   CR ; COMPILE-ONLY
 
 ( === Hardware Reset Zen pg106 COLD )
@@ -2265,6 +2263,7 @@ class Forth {
   // TODO-29 define DOES> for CREATE-DOES> and tokenDoes - this is not part of eForth, THEN defined Vocabulary as CREATE-DOES word
   //tokenDoes = Forth.tokenFunction(payload => { this.RPpush(this.IP); this.IP = (this.m[payload++]<<8)+this.m[payload++]; this.SPpush(payload++); ); // Almost same as tokenDoList
 }
+/*
 const foo = new Forth();
 foo.compileForthInForth()
   .then(() => console.log('===forthInForth compiled'))
@@ -2273,5 +2272,5 @@ foo.compileForthInForth()
   //.then(() => foo.interpret("WARM"));
   .then(() => foo.console())
   .then(() => console.log('console exited'));
-
-// module.exports = exports = Forth;
+*/
+module.exports = exports = Forth;
