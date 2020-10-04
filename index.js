@@ -550,9 +550,6 @@ TIB >R BL PARSE XXX SWAP R> - 3 16 2 TEST
 
 ( === TEXT INTERPRETER ===  Zen pg63 )
 
-( TODO-ZEN-V5-STAAPL - COMPARE BELOW HERE )
-
-
 ( === Numeric Output Zen pg64 DIGIT EXTRACT )
 : DIGIT ( u -- c ; Convert digit u to a character.)
   9 OVER <    ( if u is greater than 9)
@@ -597,7 +594,6 @@ TIB >R BL PARSE XXX SWAP R> - 3 16 2 TEST
 ( TODO rework this test('123 <# DUP SIGN #S #>', [this.padPtr(] - 3, 3], {hold: '123'} )
 ( TODO rework this  test('-123 DUP ABS <# #S SWAP SIGN #>', [this.padPtr(] - 4, 4], {hold: '-123'})
 
-( TODO-ZEN-V5-STAAPL - COMPARE ABOVE HERE )
 ( === More definitions moved up )
 
 : EMIT ( c--;  Send a character to the output device. Zen pg69)
@@ -615,7 +611,6 @@ TIB >R BL PARSE XXX SWAP R> - 3 16 2 TEST
 60 EMIT SPACE 2 SPACES 61 EMIT 0 TEST
 ( .$ is tested by ."| and others )
 
-( TODO-ZEN-V5-STAAPL - COMPARE BELOW HERE )
 ( === Number output Zen pg66 str HEX DECIMAL .R U.R U. . ? )
 
 : str ( n -- b u ; Convert a signed integer to a numeric string)
@@ -697,8 +692,8 @@ TIB >R BL PARSE XXX SWAP R> - 3 16 2 TEST
       BASE @ * +    ( multiply it by radix and add to sum )
       R> 1 +        ( increment b, pointing to next digit )
     NEXT            ( loop back to convert the next digit )
-      R@ ( ?sign)   ( completely convert the string.get sign )
-      NIP ( a sum ) ( discard string address b )
+      DROP ( a sum ) ( discard string address b )
+      R@ ( b ?sign)  ( completely convert the string.get sign )
       IF NEGATE THEN ( negate the sum if - flag is true )
       SWAP          ( sum a )
     ELSE            ( a non-digit was encountered )
@@ -720,17 +715,19 @@ BL PARSE 1234 PAD PACK$ NUMBER? DROP 1234 1 TEST
 ( === Serial I/O Zen pg69 ?KEY KEY EMIT NUF? )
 
 ( === Derived I/O Zen pg70 PACE SPACE SPACES TYPE CR )
+( ERRATA Staapl calls it "KEY?" )
 : ?KEY ( -- c T | F) ( Return input character and true, or a false if no input.)
   '?KEY @EXECUTE ;
 : KEY ( -- c ) ( Wait for and return an input character.)
-  0 ( Initial delay )
+  0           ( Initial delay )
   BEGIN
-    DUP MS        ( Introduce a delay, drops CPU from 100% to insignificant)
-    1 + 1000 MAX  ( Ramp to a max delay of 1S )
-    ?KEY          ( delay c T | delay F; Check for key )
+    MS        ( Introduce a delay, drops CPU from 100% to insignificant)
+    1000      ( Ramp to a max delay of 1S )
+    ?KEY      ( delay c T | delay F; Check for key )
   UNTIL
-  NIP ;           ( Drop delay )
+  NIP ;       ( Drop delay )
 ( EMIT moved up )
+( ERRATA Staapl has different flow, probably wrong)
 : NUF? ( -- t) ( Return false if no input, else pause and if CR return true)
   ?KEY DUP ( -- c T T | F F;  wait for a key-stroke)
   IF 2DROP KEY
@@ -762,13 +759,14 @@ BL PARSE 1234 PAD PACK$ NUMBER? DROP 1234 1 TEST
   do$ ; ( return string address only)
 : ."| ( -- ) ( Run time routine of ." . Output a compiled string.)
   do$        ( get string address)
-.$ ;       ( print the compiled string)
+  .$ ;       ( print the compiled string)
 
 ( ."| tested by ."; $"| tested by $" )
 
-( === Word Parser Zen pg72-73 PARSE parse  TODO come back and get this working
+( === Word Parser Zen pg72-73 PARSE parse )
 ( ERRATA Zen this doesnt set >IN past the string, but the callers clearly assume it does.)
-( the version in Zen pg72 is obviously broken as it doesn't even increment the pointer in the FOR loop.)
+( ERRATA Zen pg72 is obviously broken as it doesn't even increment the pointer in the FOR loop)
+( This version is based on v5, Staapl is significantly different )
 
 : parse ( b u c -- b u delta ; <string> ) ( TODO evaluate control structures here)
   ( Scan string delimited by this. Return found string and its offset. )
@@ -822,7 +820,7 @@ BL PARSE 1234 PAD PACK$ NUMBER? DROP 1234 1 TEST
   R> parse        ( parse the desired string )
   >IN +! ;        ( move parser pointer to end of string )
 
-
+( ====== TODO COMPARE VERSIONS ZEN STAAPL V5 BELOW HERE )
 
 ( === Parsing Words Zen pg74 .( ( \\ CHAR TOKEN WORD )
 
