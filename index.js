@@ -108,6 +108,7 @@ const tokenVar = 4;
 const l = {}; // Constants that will get compiled into the dictionary
 l.CELLL = 2;  // Using Buffers, but needs to be 2 as needs to be big enough for an address (offset into buffer) if change see CELL+ CELL- CELLS ALIGNED $USER
 l.CELLbits = l.CELLL * 8;
+l.MEMSIZE = 8;
 // There is an assumption that memory is Big-Endian (higher byte in lower memory location)
 // Memory is assumed not to be aligned to a CELLL boundary, but this assumption should be confined to $ALIGN()
 l.US = 64 * l.CELLL;  // user area size in cells i.e. 64 variables - standard usage below is using about 37
@@ -131,7 +132,7 @@ l['=COMP'] = 0x40; // bit in first char of name field to indicate 'compile-only'
 l['=IMED'] = 0x80; // bit in first char of name field to indicate 'immediate' ERRATA Zen uses this but its not defined
 const bitsSPARE = 0x20; // Unused spare bit in names
 l['=BYTEMASK'] = 0xFF - l['=COMP'] - l['=IMED'] - bitsSPARE; // bits to mask out of a call with count and first char. ERRATA Zen uses this but its not defined
-const forthTrue = (2 ** (l.CELLL*8)) - 1; // Also used to mask numbers
+const forthTrue = (2 ** (l.CELLL * 8)) - 1; // Also used to mask numbers
 // mask used when masking cells in fast search for name ERRATA Zen uses this but its not defined e.g. 0x1FFFFF if CELLL = 3
 l['=CELLMASK'] = forthTrue ^ ((0xFF ^ l['=BYTEMASK']) << (l.CELLbits - 8));
 const nameMaxLength = 31; // Max number of characters in a name, length needs to be representable after BitMask (we have one spare bit here)
@@ -1506,10 +1507,60 @@ CREATE 'BOOT  ' hi , ( application vector )
 
 let stdinBuffer = null; // Local to ?RX do not access directly - but there can be only one so global
 
+/*
+  This group of classes encapsulate memory management to hide it from the Forth code that is common
+  to all of them.
+ */
+class Mem8 extends Uint8Array {
+  constructor(...args) {
+    if (args[0] instanceof ArrayBuffer) { // Its a call to subarray,
+      super(...args);
+    } else {
+      const {length, celll} = args[0];
+      super(length);
+      this.fetchCell = {
+        2: a => (this[a++] << 8) | this[a],
+        3: a => (((this[a++] << 8) | this[a++]) << 8) | this[a],
+        4: a => (((((this[a++] << 8) | this[a++]) << 8) | this[a++]) << 8) | this[a],
+      }[celll];
+      this.pushCell = {
+        2: this.push16,
+        3: this.push24,
+        4: this.push32,
+      }[celll];
+    }
+  } // Pointless constructor
+
+  fetch8(a) {
+    return this[a];
+  }
+  push8(a, v) { this[--a] = v; return a; } // Note implicit & 0xFF when storing to Uint8
+  push16(a, v) { this[--a] = v; return this.push8(a, v >> 8); }
+  push24(a, v) { this[--a] = v; return this.push16(a, v >> 8); }
+  push32(a, v) { this[--a] = v; return this.push24(a, v >> 8); }
+
+  // TODO-11-CELLL check that the caller expects Bytes, not Characters
+  encodeString(a, s) {
+    //return this.m.write(s, a, 'utf8');
+    return new TextEncoder().encodeInto(s, this.subarray(a)).written;
+  }
+  // Encode a string into an address and return the number of bytes written
+  decodeString(a, end) {
+    // return this.m.slice(a, end).toString('utf8'); // Buffer
+    return new TextDecoder().decode(this.subarray(a, end));
+  }
+}
+//TODO-11-CELL note Mem16 could either do >> on length, or not?
+
+MemClasses = {
+  8: Mem8,
+}
+
+// noinspection JSBitwiseOperatorUsage
 class Forth {
   // Build and return an initialized Forth memory obj
   constructor() {
-    // Support paramaters for TODO-11-CELLL TODO-27-MEMORY TODO-28-MULTI
+    // Support parameters for TODO-11-CELLL TODO-27-MEMORY TODO-28-MULTI
     // === Support for Debugging ============
     this.debugStack = []; // Maintains a position, like a stack trace, don't manipulate directly use functions below
     this.debugName = undefined; // Set in threadtoken()
@@ -1517,7 +1568,7 @@ class Forth {
     this.testingDepth = 2;
     this.padTestLength = 0; // Display pad length
     // === Javascript structures - implement the memory map and record the full state.
-    this.m = Buffer.alloc(EM); // Allocate as one big buffer for now. TODO-27-MEM try alternatives including Uint8Array Uint16Array
+    this.m = new MemClasses[l.MEMSIZE]({ length: EM, celll: l.CELLL }); // TODO-11-CELL parameterise
     this.jsFunctions = [];  // Maps tokens to executable functions - only accessed through TODO
 
     // === Standard pointers used - Zen pg22
@@ -1531,6 +1582,8 @@ class Forth {
     this.buildDictionary();
     // compiling forthInForth is done outside this as it is async TODO-VM API may change.
   }
+  // Extract some memory writing functions
+
   // === Build dictionary, mostly from jsFunctionAttributes
   buildDictionary() {
     // Setup pointers for first dictionary entries.
@@ -1630,7 +1683,7 @@ class Forth {
       this.debugName = this.xt2name(xt); // Expensive so only done when testing
       if (this.testingDepth > this.debugStack.length) {
         console.log('R:', RPP === this.RP ? '' : this.m.slice(this.RP, RPP), this.debugStack, this.xt2name(xt), 'S:', SPP === this.SP ? '' : this.m.slice(this.SP, SPP),
-          this.padTestLength ? ('pad: ' + (this.padTestLength > 0 ? this.m.slice(this.padPtr(), this.padPtr() + this.padTestLength) : this.m.slice(this.padPtr() + this.padTestLength, this.padPtr())).toString()) : '');
+          this.padTestLength ? ('pad: ' + (this.padTestLength > 0 ? this.m.decodeString(this.padPtr(), this.padPtr() + this.padTestLength) : this.m.decodeString(this.padPtr() + this.padTestLength, this.padPtr()))) : '');
       }
     }
   }
@@ -1645,8 +1698,8 @@ class Forth {
     console.log('break in a FORTH word'); } // Put a breakpoint in your IDE at this line
   // debugPrintTIB will print the current TIB.
   debugPrintTIB() {
-    console.log('TIB: ', this.m.slice(this.Ufetch(TIBoffset) + this.Ufetch(INoffset),
-      this.Ufetch(TIBoffset) + this.Ufetch(nTIBoffset)).toString('utf8'));
+    console.log('TIB: ', this.m.decodeString(this.Ufetch(TIBoffset) + this.Ufetch(INoffset),
+      this.Ufetch(TIBoffset) + this.Ufetch(nTIBoffset)));
   }
   // TEST will (destructively) check the stack matches expected result, used for testing the compiler.
   // e.g. this.interpret(`10 DUP 10 10 2 TEST`); // Confirm stack finishes with 2 items (10 10)
@@ -1670,9 +1723,9 @@ class Forth {
   // === Functions to simplify storing and retrieving 16 bit values into 8 bit stacks etc.
   // These aren't part of eForth, but are here to simplify storing multi-byte words into 8 bit bytes in the Buffer.
   //console.assert(l.CELLL === 2); // Presuming its 2 TODO-11-CELLL will need reworking for Uint16Array
-  Mfetch(a) { let v = this.m[a++]; let i = l.CELLL - 1; while (i-- > 0) v = (v << 8) | this.m[a++]; return v; }
+  Mfetch(a) { return this.m.fetchCell(a); }
   // Push below address a, return new pointer (where its stored)
-  Mpush(a, v) { let i = l.CELLL; while (i-- > 0) { this.m[--a] = v & 0xFF; v >>= 8; }; return a; }
+  Mpush(a, v) { return this.m.pushCell(a, v); }
   // Push at address a, return new pointer above where its stored
   Mstore(a, v) { const a2 = a + l.CELLL; this.Mpush(a2, v); return a2; } // Returns address after the store
   SPfetch() { return this.Mfetch(this.SP); }
@@ -1685,7 +1738,6 @@ class Forth {
   Ufetch(userindex, offset = 0) { return this.Mfetch(this.UP + userindex + offset); }
   Ustore(userindex, w, offset = 0) { return this.Mstore(this.UP + userindex + offset, w); }
   //TODO-11-CELLL add a McharFetch and McharStore and search for uses of this.m[..] as that code presumes reading single byte
-  // TODO-11-CELLL look for this.m.copy and this.m.write which assume bytes
 
   // === Access to the USER variables before they are defined
   currentFetch() { return this.Ufetch(CURRENToffset); }
@@ -1700,7 +1752,7 @@ class Forth {
   // it assumes a maximum of nameMaxLength (31) characters.
   // Mostly used for debugging but also in number conversion.
   countedToJS(a) { //TODO-11-CELLL
-    return this.m.slice(a + 1, a + (this.m[a] & l['=BYTEMASK']) + 1).toString('utf8');
+    return this.m.decodeString(a + 1, a + (this.m[a] & l['=BYTEMASK']) + 1);
   }
   // Convert a name address to the code dictionary definition.
   na2xt(na) {
@@ -1788,7 +1840,7 @@ class Forth {
   JStoCounted(s) {
     const tempBuf = this.cpFetch() + 50; // Above Code below HLD which builds numbers down from PAD which is cpFetch + 80
     this.m[tempBuf] = s.length;
-    this.m.write(s, tempBuf + 1, 'utf8'); // copy string to TIB, and return length
+    this.m.encodeString(tempBuf + 1, s); // copy string to TIB, and return length
     this.SPpush(tempBuf);
   }
 
@@ -1805,7 +1857,7 @@ class Forth {
 
   // Compile one or more words into the next consecutive code cells.
   DW(...words) {
-    words.forEach((word) => this.Ustore(CPoffset, this.Mstore(this.cpFetch(), word)));
+    words.forEach(word => this.Ustore(CPoffset, this.Mstore(this.cpFetch(), word)));
   }
 
   // a -- a; Check if a definition of the word at 'a' would be unique and display warning (but continue) if it would not be.
@@ -1857,7 +1909,7 @@ class Forth {
     this.Ustore(NPoffset, a);
     this.SPpush(a); // so this.dollarCommaN can find it
     this.m[a++] = name.length; // This byte will be updated by this.IMMEDIATE() IMMEDIATE or COMPILE-ONLY
-    this.m.write(name, a, 'utf8');
+    this.m.encodeString(a, name);
     this.dollarCommaN(); // Build the headers that precede the name
   }
 
@@ -1920,7 +1972,7 @@ class Forth {
       // console.assert(this.IP >= CODEE && this.IP <= NAMEE); // uncomment if tracking down jumping into odd places
       xt = this.IPnext();
       // Comment this out except when needed for debugging, they are slow
-      // debugTIB =  this.m.slice(this.Ufetch(TIBoffset) + this.Ufetch(INoffset), this.Ufetch(TIBoffset) + this.Ufetch(nTIBoffset)).toString('utf8');
+      // debugTIB =  this.m.decodeString(this.Ufetch(TIBoffset) + this.Ufetch(INoffset), this.Ufetch(TIBoffset) + this.Ufetch(nTIBoffset));
       // 'await this.threadtoken(xt)' would be legit, but creates a stack frame in critical inner loop, when usually not reqd.
       const maybePromise = this.threadtoken(xt);
       if (maybePromise) {
@@ -2074,9 +2126,9 @@ class Forth {
     const b = this.SPpop();
     if (l.CELLL === 4) {
       // JS truncates to 32 bits before shift, so use it here rather than getting bitten below
-      const x = (a>>>0)+(b>>>0);
-      this.SPpush(x>>>0);
-      this.SPpush(x >= 0x100000000) ? 1 : 0;
+      const x = (a >>> 0)+(b >>> 0);
+      this.SPpush(x >>> 0);
+      this.SPpush(x >= 0x100000000 ? 1 : 0);
     } else {
       // Note there is also what I believe is a JS bug where x >> 32 is a noop
       const x = a + b;
@@ -2125,7 +2177,7 @@ class Forth {
     const u = Math.min(this.SPpop(), nameMaxLength); // length of string
     const b = this.SPpop(); // start of string
     const np = this.npFetch() - u - l.CELLL; // Enough space in Name Directory to copy string
-    this.m.copy(this.m, np + 1, b, b + u);
+    this.m.copyWithin(np + 1, b, b + u);
     this.m[np] = u;  // 1 byte count
     this.m[np + u + 1] = 0;  // ERRATA  Zen pg62 - PACK$ does `0 !` which I think will overwrite bottom value of name dict as NP is last byte used
     this.SPpush(np); // Note that NP is not updated, the same buffer will be used for each word until hit ':'
@@ -2199,7 +2251,7 @@ class Forth {
   JStoTIB(s) {
     console.assert(s.length < (RTS - 10)); // Check for overlong lines
     this.Ustore(INoffset, 0); // Start at beginning of TIB
-    this.Ustore(nTIBoffset,  this.m.write(s, this.Ufetch(TIBoffset), 'utf8')); // copy string to TIB, and store length in #TIB
+    this.Ustore(nTIBoffset,  this.m.encodeString(this.Ufetch(TIBoffset), s)); // copy string to TIB, and store length in #TIB
   }
   // equivalent to Forth EVAL with few things wrapped around it - so not exact same TODO align it
   async EVAL(inp) {
