@@ -126,7 +126,7 @@ const COLDD = 0x100; // cold start vector - its unclear if these bottom 0x100 ar
 const CODEE = COLDD + l.US; // code dictionary grows up from here towards NAME dictionary.
 // PAD is 80 bytes above the current top of the Code directory, and HLD (where numbers are build for output) is a few bytes growing down from PAD.
 
-// === Other key constants. //TODO-11-CELLL
+// === Other key constants. //TODO-11-CELLL move into Instance so configured with CELLL
 l['=COMP'] = 0x40; // bit in first char of name field to indicate 'compile-only'  ERRATA Zen uses this but its not defined
 l['=IMED'] = 0x80; // bit in first char of name field to indicate 'immediate' ERRATA Zen uses this but its not defined
 const bitsSPARE = 0x20; // Unused spare bit in names
