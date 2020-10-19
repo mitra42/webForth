@@ -831,8 +831,6 @@ BL PARSE 1234 PAD PACK$ NUMBER? DROP 1234 1 TEST
   R> parse        ( parse the desired string )
   >IN +! ;        ( move parser pointer to end of string )
 
-( ====== TODO COMPARE VERSIONS ZEN STAAPL V5 BELOW HERE )
-
 ( === Parsing Words Zen pg74 .( ( \\ CHAR TOKEN WORD )
 
 : CHAR BL PARSE DROP C@ ; ( Parse a word and return its first character )
@@ -919,7 +917,7 @@ BL WORD yyyy DUP C@ SWAP CP @ - 4 0 2 TEST
       THEN
     ELSE              ( end of vocabulary )
       R> DROP         ( discard the 1st cell )
-      SWAP CELL- SWAP ( restore the string address )
+      SWAP CELL- SWAP ( restore the string address ERRATA v2 & Staapl misses this - Zen has it)
       EXIT            ( exit with ca na, na=0 is false flag )
     THEN
   WHILE               ( if the name does not match the string )
@@ -935,7 +933,7 @@ BL WORD yyyy DUP C@ SWAP CP @ - 4 0 2 TEST
   CONTEXT       ( address of context vocabulary stack )
   DUP 2@ XOR    ( are two top vocabularies the same? )
   IF            ( if not same )
-    1 CELLS -   ( backup the vocab address for looping )
+    CELL-   ( backup the vocab address for looping )
   THEN
   >R            ( save the prior vocabulary address )
   BEGIN
@@ -957,6 +955,9 @@ BL WORD xxx DUP C@ 1 + PAD SWAP CMOVE PAD BL WORD xzx 4 SAME? >R 2DROP R> 0= 0 1
 FORTH 0 TEST
 ( TODO convert test now dont have testFind ; BL WORD TOKEN CONTEXT @ FORTHfind', testFind.map(k => k ; (Compare with results from old version of find )
 ( TODO convert this test - now dont have testFind - BL WORD TOKEN NAME?', testFind ; // Name searches all vocabs )
+
+( ====== TODO COMPARE VERSIONS ZEN STAAPL V5 BELOW HERE )
+
 ( === Text input from terminal Zen pg 78: ^H TAP kTAP accept EXPECT QUERY )
 ( EFORTH-ZEN-ERRATA CTRL used here but not defined. )
 
