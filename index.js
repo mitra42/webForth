@@ -107,6 +107,7 @@ const tokenVar = 4;
 // ERRATA In Zen the definitions on Zen pg26 dont come close to matching the addresses given as the example below. In particular UPP and RPP overlap !
 const l = {}; // Constants that will get compiled into the dictionary
 l.CELLL = 2;  // Using Buffers, but needs to be 2 as needs to be big enough for an address (offset into buffer) if change see CELL+ CELL- CELLS ALIGNED $USER
+l.CELLbits = l.CELLL * 8;
 // There is an assumption that memory is Big-Endian (higher byte in lower memory location)
 // Memory is assumed not to be aligned to a CELLL boundary, but this assumption should be confined to $ALIGN()
 l.US = 64 * l.CELLL;  // user area size in cells i.e. 64 variables - standard usage below is using about 37
@@ -125,14 +126,14 @@ const COLDD = 0x100; // cold start vector - its unclear if these bottom 0x100 ar
 const CODEE = COLDD + l.US; // code dictionary grows up from here towards NAME dictionary.
 // PAD is 80 bytes above the current top of the Code directory, and HLD (where numbers are build for output) is a few bytes growing down from PAD.
 
-// === Other key constants.
+// === Other key constants. //TODO-11-CELLL
 l['=COMP'] = 0x40; // bit in first char of name field to indicate 'compile-only'  ERRATA Zen uses this but its not defined
 l['=IMED'] = 0x80; // bit in first char of name field to indicate 'immediate' ERRATA Zen uses this but its not defined
 const bitsSPARE = 0x20; // Unused spare bit in names
 l['=BYTEMASK'] = 0xFF - l['=COMP'] - l['=IMED'] - bitsSPARE; // bits to mask out of a call with count and first char. ERRATA Zen uses this but its not defined
-console.assert(l.CELLL === 2); // Presuming its 2 TODO-11-CELLL
-l['=CELLMASK'] = (l['=BYTEMASK'] << 8) + 0xFF; // mask used when masking cells in fast search for name ERRATA Zen uses this but its not defined
-const forthTrue = 0xFFFF; // Forth True is -1, but only 16 bits of it
+const forthTrue = (2 ** (l.CELLL*8)) - 1; // Also used to mask numbers
+// mask used when masking cells in fast search for name ERRATA Zen uses this but its not defined e.g. 0x1FFFFF if CELLL = 3
+l['=CELLMASK'] = forthTrue ^ ((0xFF ^ l['=BYTEMASK']) << (l.CELLbits - 8));
 const nameMaxLength = 31; // Max number of characters in a name, length needs to be representable after BitMask (we have one spare bit here)
 console.assert(nameMaxLength === l['=BYTEMASK']); // If this isn't true then check each of the usages below
 l.BL = 32;
@@ -183,6 +184,7 @@ const NPoffset = USER('NP', undefined);  // normally set on Zen pg106 but we are
 const LASToffset = USER('LAST', undefined); // normally set on Zen pg106 but using live
 
 const forthInForth = `
+0 TEST
 : 2DROP DROP DROP ;
 1 2 2DROP 0 TEST
 
@@ -198,7 +200,7 @@ const forthInForth = `
 ( EXIT & EXECUTE tested with ' )
 ( doLIT implicitly tested by all literals )
 ( next, ?branch, branch implicitly tested by control structures )
-CELLL 2 1 TEST ( Assuming small cell, otherwise it should be 2 )
+( CELLL 2 1 TEST ( Assuming small cell, otherwise it should be 2 )
 123 HLD ! HLD @ 123 1 TEST ( Also tests user variables )
 111 HLD ! 222 HLD C! HLD C@ 0 HLD C! HLD @ 222, 111 2 TEST
 ( R> >R R@ SP@ SP! tested after arithmetic operators )
@@ -210,7 +212,10 @@ CELLL 2 1 TEST ( Assuming small cell, otherwise it should be 2 )
 16 BASE !
 5050 6060 AND 5050 6060 OR 5050 6060 XOR 4040 7070 3030 3 TEST
 0A BASE !
-12 34 UM+ 60000 60000 UM+ 46 0 54464 1 4 TEST
+
+12 34 UM+ 46 0 2 TEST
+( Next test is contrived to work with any CELLL size )
+-1 -1 UM+ -2 1 2 TEST
 ( IMMEDIATE implicitly tested )
 32 PARSE ABC SWAP DROP 3 1 TEST
 !IO 62 TX! 0 TEST ( Should output > )
@@ -234,7 +239,7 @@ BL 32 1 TEST
 
 ( Note eForth has +, but that isn't defined till Zen pg50 )
 : CELL+ CELLL UM+ DROP ;
-1 CELL+ 3 1 TEST
+( 1 CELL+ 3 1 TEST ) ( Only valid if CELLL=2)
 
 ( ERRATA - Zen pg57 presumes CELLL==2 and need to align, not case with JS and byte Buffer )
 ( : ALIGNED DUP 0 CELLL UM/MOD DROP DUP IF CELLL SWAP - THEN + ; )
@@ -310,13 +315,13 @@ BL 32 1 TEST
 : 0= IF 0 ELSE -1 THEN ;
 
 1 2 + 3 1 TEST
-40000 1 40000 3 D+ 14464 5 2 TEST
-257 INVERT 65278 1 TEST ( 257 is 0x101 65278 is 0xFEFE )
+-1 1 -1 3 D+ -2 5 2 TEST ( Test contrived to be CELLL independent )
+257 INVERT -258 1 TEST ( 257 is 0x101 65278 is 0xFEFE )
 53 NEGATE 53 + 0 1 TEST
 456 123 - 456 -123 - 333 579 2 TEST
 -456 ABS 456 ABS - 0 1 TEST
-111 >R R@ RP@ R> SWAP RP@ SWAP - 111 111 2 3 TEST
-1 2 SP@ 2 + SP! 1 1 TEST
+111 >R R@ RP@ R> SWAP RP@ SWAP - 111 111 CELLL 3 TEST
+1 2 SP@ CELL+ SP! 1 1 TEST
 
 ( === More comparison Zen pg51-52 )
 : = XOR IF 0 EXIT THEN -1 ; ( w w -- t)
@@ -338,19 +343,21 @@ BL 32 1 TEST
   ( Unsigned divide of a double by a single. Return mod and quotient)
   2DUP U<
   IF NEGATE         ( negate u for subtraction )
-    15 FOR          ( repeat 16 times for 16 bits)
-      >R            ( save -u)
-      DUP UM+       ( left shift udh)
-      >R >R DUP UM+ ( left shift udl)
-      R> + DUP      ( add carry to udh)
-      R> R@ SWAP    ( retrieve -u)
-      >R UM+        ( subtract u from udh)
-      R> OR         ( a borrow?)
-      IF >R DROP    ( yes add a bit to quotient)
-        1 + R>
-      ELSE DROP     ( no borrow)
-      THEN R>       ( retrieve -u)
-    NEXT            ( repeat for 16 bits)
+    CELLbits FOR          ( repeat 16 times for 16 bits)
+      AFT             ( 
+        >R            ( save -u)
+        DUP UM+       ( left shift udh)
+        >R >R DUP UM+ ( left shift udl)
+        R> + DUP      ( add carry to udh)
+        R> R@ SWAP    ( retrieve -u)
+        >R UM+        ( subtract u from udh)
+        R> OR         ( a borrow?)
+        IF >R DROP    ( yes add a bit to quotient)
+          1 + R>
+        ELSE DROP     ( no borrow)
+        THEN R>       ( retrieve -u)
+      THEN
+    NEXT            ( repeat for CELLbits bits)
     DROP SWAP EXIT  ( return remainder and quotient)
   THEN DROP 2DROP   ( overflow, return -1's)
   -1 DUP
@@ -384,13 +391,15 @@ BL 32 1 TEST
 : UM* ( u1 u2 -- ud)
   ( Unsigned multiply. Return double product.)
   0 SWAP          ( u1 sum u2)
-  15 FOR          ( repeat for 16 bits)
-    DUP UM+ >R >R ( left shift u2)
-    DUP UM+       ( left shift sum)
-    R> +          ( add carry to u2)
-    R>            ( carry shifted out of u2?)
-    IF >R OVER UM+  ( add u1 to sum)
-      R> +        ( carry into u2)
+  CELLbits FOR    ( repeat for 16 bits)
+    AFT
+      DUP UM+ >R >R ( left shift u2)
+      DUP UM+       ( left shift sum)
+      R> +          ( add carry to u2)
+      R>            ( carry shifted out of u2?)
+      IF >R OVER UM+  ( add u1 to sum)
+        R> +        ( carry into u2)
+      THEN
     THEN
   NEXT            ( repeat 16 time to form ud)
   ROT DROP ;        ( discard u1)
@@ -405,14 +414,15 @@ BL 32 1 TEST
   ABS SWAP ABS UM*  ( multiply absolutes)
   R> IF DNEGATE THEN ;  ( negate if signs are different)
 
-1 2 4 UM/MOD 1 32768 2 TEST
-1 2 4 M/MOD 1 32768 2 TEST
+-1 1 2 UM/MOD 1 -1 2 TEST
+-1 1 2 M/MOD 1 -1 2 TEST
+9 0 4 UM/MOD 1 2 2 TEST
 9 4 /MOD 1 2 2 TEST
 9 4 MOD 1 1 TEST
 9 4 / 2 1 TEST
-256 256 UM* 0 1 2 TEST
+2 -1 UM* -2 1 2 TEST
 3 4 * 12 1 TEST
-256 256 M* 0 1 2 TEST ( TODO add a negative test)
+-2 -3 M* 6 0 2 TEST
 
 ( === Scaling Words Zen pg56 */MOD */ )
 
@@ -439,8 +449,8 @@ BL 32 1 TEST
   ( Multiply n by cell size in bytes)
   CELLL * ;
 
-123 CELL- 121 1 TEST
-123 CELLS 246 1 TEST
+123 CELL- CELLL + 123 1 TEST
+123 CELLS CELLL / 123 1 TEST
 
 ( === Special Characters Zen pg58 BL >CHAR )
 
@@ -542,7 +552,8 @@ TIB >R BL PARSE XXX SWAP R> - 3 16 2 TEST
   1 + SWAP CMOVE      ( ; store characters in cells - 0 padded to end of cell)
   R> ;        ( leave only word buffer address )
 
-  NP @ 4 + COUNT NIP 5 1 TEST
+  NP @ CELL+ CELL+ COUNT NIP 5 1 TEST
+  ( TODO-11-CELLL - need these tests)
   ( TODO rework this  test('NP @ 4 + COUNT PAD SWAP CMOVE', [], {pad: 'PACK$'});
   ( TODO rework this  test('PAD 3 + 5 BL FILL', [], {pad: 'PAC     '});
   ( TODO rework this test('PAD 8 -TRAILING >R PAD - R>', [0, 3], {pad: 'PAC'})
@@ -1498,7 +1509,7 @@ let stdinBuffer = null; // Local to ?RX do not access directly - but there can b
 class Forth {
   // Build and return an initialized Forth memory obj
   constructor() {
-    // Support TODO-11-CELLL TODO-27-MEMORY TODO-28-MULTI
+    // Support paramaters for TODO-11-CELLL TODO-27-MEMORY TODO-28-MULTI
     // === Support for Debugging ============
     this.debugStack = []; // Maintains a position, like a stack trace, don't manipulate directly use functions below
     this.debugName = undefined; // Set in threadtoken()
@@ -1657,17 +1668,20 @@ class Forth {
   }
 
   // === Functions to simplify storing and retrieving 16 bit values into 8 bit stacks etc.
-  // These aren't part of eForth, but are here to simplify storing 16 bit words into 8 bit bytes in the Buffer.
-  //console.assert(l.CELLL === 2); // Presuming its 2 TODO-11-CELLL
-  SPfetch() { return (this.m[this.SP] << 8) | this.m[this.SP + 1]; }
-  SPpop() { return (this.m[this.SP++] << 8) | this.m[this.SP++]; }
-  SPpush(u16) { this.m[--this.SP] = u16 & 0xFF; this.m[--this.SP] = (u16 >> 8); }
-  RPfetch() { return (this.m[this.RP] << 8) | this.m[this.RP + 1]; }
-  RPpop() { return (this.m[this.RP++] << 8) | this.m[this.RP++]; }
-  RPpush(u16) { this.m[--this.RP] = u16 & 0xFF; this.m[--this.RP] = (u16 >> 8); }
-  IPnext() { return (this.m[this.IP++] << 8) | this.m[this.IP++]; }
-  Mstore(a, v) { this.m[a++] = v >> 8; this.m[a] = v & 0xFF; }
-  Mfetch(a) { return (this.m[a++] << 8) | this.m[a]; }
+  // These aren't part of eForth, but are here to simplify storing multi-byte words into 8 bit bytes in the Buffer.
+  //console.assert(l.CELLL === 2); // Presuming its 2 TODO-11-CELLL will need reworking for Uint16Array
+  Mfetch(a) { let v = this.m[a++]; let i = l.CELLL - 1; while (i-- > 0) v = (v << 8) | this.m[a++]; return v; }
+  // Push below address a, return new pointer (where its stored)
+  Mpush(a, v) { let i = l.CELLL; while (i-- > 0) { this.m[--a] = v & 0xFF; v >>= 8; }; return a; }
+  // Push at address a, return new pointer above where its stored
+  Mstore(a, v) { const a2 = a + l.CELLL; this.Mpush(a2, v); return a2; } // Returns address after the store
+  SPfetch() { return this.Mfetch(this.SP); }
+  SPpop() { const v = this.Mfetch(this.SP); this.SP += l.CELLL; return v; }
+  SPpush(v) { this.SP = this.Mpush(this.SP, v); }
+  RPfetch() { return this.Mfetch(this.RP); }
+  RPpop() { const v = this.Mfetch(this.RP); this.RP += l.CELLL; return v; }
+  RPpush(v) { this.RP = this.Mpush(this.RP, v); }
+  IPnext() { const v = this.Mfetch(this.IP); this.IP += l.CELLL; return v; }
   Ufetch(userindex, offset = 0) { return this.Mfetch(this.UP + userindex + offset); }
   Ustore(userindex, w, offset = 0) { return this.Mstore(this.UP + userindex + offset, w); }
   //TODO-11-CELLL add a McharFetch and McharStore and search for uses of this.m[..] as that code presumes reading single byte
@@ -1685,7 +1699,7 @@ class Forth {
   // Convert a string made up of a count and that many bytes to a Javascript string.
   // it assumes a maximum of nameMaxLength (31) characters.
   // Mostly used for debugging but also in number conversion.
-  countedToJS(a) {
+  countedToJS(a) { //TODO-11-CELLL
     return this.m.slice(a + 1, a + (this.m[a] & l['=BYTEMASK']) + 1).toString('utf8');
   }
   // Convert a name address to the code dictionary definition.
@@ -1699,6 +1713,7 @@ class Forth {
   // cell1  if present, gives it a quick first-cell test to apply.
   // xt     if present we are looking for name pointing at this executable (for decompiler)
   // returns 0 or na
+  // TODO-11-CELLL
   _sameq(na1, na2, chars) { // return f
     // Note this is similar to SAME? but takes a count (not count of cells, and returns boolean
     for (let i = 0; i < chars; i++) {
@@ -1718,7 +1733,7 @@ class Forth {
           return p;
         }
       } else { // Searching on na
-        const b1 = this.m[p] & l['=BYTEMASK']; // count
+        const b1 = this.m[p] & l['=BYTEMASK']; // count TODO-11-CELLL
         if (!byte1 || (byte1 === b1)) { // first cell matches (if cell1 not passed then does slow compare
           if (this._sameq(p + 1, na + 1, b1)) {
             return p;
@@ -1736,7 +1751,7 @@ class Forth {
   find() { // a va -- ca na | a 0
     const va = this.SPpop();
     const a = this.SPpop();
-    const byte1 = this.m[a]; //TODO-CELLL
+    const byte1 = this.m[a]; //TODO-11-CELLL
     //console.log('find: Looking for', name) // comment out except when debugging find
     const na = this._find(va, a, byte1);
     if (na) {
@@ -1789,14 +1804,8 @@ class Forth {
   $ALIGN() { } // Not applicable since using a byte Buffer TODO-11-CELLL
 
   // Compile one or more words into the next consecutive code cells.
-  //console.assert(l.CELLL === 2); // Presuming its 2 TODO-11-CELLL
   DW(...words) {
-    words.forEach((word) => {
-      let cp = this.cpFetch();
-      this.m[cp++] = word >> 8;
-      this.m[cp++] = word & 0xFF;
-      this.Ustore(CPoffset, cp);
-    });
+    words.forEach((word) => this.Ustore(CPoffset, this.Mstore(this.cpFetch(), word)));
   }
 
   // a -- a; Check if a definition of the word at 'a' would be unique and display warning (but continue) if it would not be.
@@ -1822,13 +1831,11 @@ class Forth {
       this.qUnique();
       let a = this.SPpop();
       this.Ustore(LASToffset, a);    // DUP LAST ! ; a=na  ; LAST=na
-      a -= l.CELLL;               // CELL-      ; a=la
       // Link address points to previous NA (prev value of LAST)
       // Note that first time this is run, it gets a 0 (CURRENT is 0, @0 is 0) if that changes will need to test Current here.
-      this.Mstore(a, this.Mfetch(this.currentFetch())); // CURRENT @ @ OVER ! ; la = top of current dic
-      a -= l.CELLL;               // CELL-      ; a=ca
-      this.Ustore(NPoffset, a);      // DUP NP !   ; NP=ca // adjust name pointer
-      this.Mstore(a, this.cpFetch());     // ! EXIT     ; ca=CP ; code field to where will build in dictionary
+      a = this.Mpush(a, this.Mfetch(this.currentFetch())); // CURRENT @ @ OVER ! ; a = la = top of current dic
+      // Push CP (code field to where will build in dictionary) into ca, below a and store that ca into NP
+      this.Ustore(NPoffset, this.Mpush(a, this.cpFetch())); // ca=CP ;
     } else {                    // THEN $" name" THROW ;
       console.log('name error'); // This is an error - in FORTH equivalent its a THROW
     }
@@ -1894,7 +1901,8 @@ class Forth {
     // console.assert(xt >= CODEE && xt < NAMEE); // Uncomment to catch bizarre xt values earlier
     // This next section is only done while testing, and outputs a trace, so set it on (with testing3) immediately before a likely error.
     this.debugThread(xt);
-    const tok = ((this.m[xt++] << 8) + this.m[xt++]); // TODO-11-CELLL assumes CELLL == 2
+    const tok = this.Mfetch(xt);
+    xt += l.CELLL;
     // console.assert(tok < this.jsFunctions.length); // commented out for efficiency, a fail will just break in the next line anyway.
     return this.jsFunctions[tok].call(this, xt); // Run the token function - like tokenDoList or tokenVar - will return null or a Promise
   }
@@ -2022,6 +2030,7 @@ class Forth {
   // Memory access eForthAndZen#39
   store() { this.Mstore(this.SPpop(), this.SPpop()); } //!  w a -- , Store
   fetch() { this.SPpush(this.Mfetch(this.SPpop())); }//@ a -- w, fetch
+  // TODO-11-CELLL character access
   cStore() { this.m[this.SPpop()] = this.SPpop(); }//C! c a -- , Store character
   cFetch() { this.SPpush(this.m[this.SPpop()]); }//C@ a -- c, Fetch character
 
@@ -2053,19 +2062,27 @@ class Forth {
   } // TODO optimize
 
   // Logical Words eForthAndZen43
-  // console.assert(l.CELLL === 2); // TODO-11-CELLL
   // noinspection JSBitwiseOperatorUsage
-  less0() { this.SPpush((this.SPpop() & 0x8000) ? -1 : 0); } //0<
+  less0() { this.SPpush((this.SPpop() & (1 << (l.CELLbits - 1))) ? -1 : 0); } //0<  e.g. 0x8000 for CELLL=2
   AND() { this.SPpush(this.SPpop() & this.SPpop()); }
   OR() { this.SPpush(this.SPpop() | this.SPpop()); }
   XOR() { this.SPpush(this.SPpop() ^ this.SPpop()); }
 
   // Primitive Arithmetic Word eForthAndZen44
-  //console.assert(l.CELLL === 2); // TODO-11-CELLL
   UMplus() {
-    const x = this.SPpop() + this.SPpop();
-    this.SPpush(x & 0xFFFF);
-    this.SPpush(x >> 16);
+    const a = this.SPpop();
+    const b = this.SPpop();
+    if (l.CELLL === 4) {
+      // JS truncates to 32 bits before shift, so use it here rather than getting bitten below
+      const x = (a>>>0)+(b>>>0);
+      this.SPpush(x>>>0);
+      this.SPpush(x >= 0x100000000) ? 1 : 0;
+    } else {
+      // Note there is also what I believe is a JS bug where x >> 32 is a noop
+      const x = a + b;
+      this.SPpush(x & forthTrue);
+      this.SPpush(x >> (l.CELLL * 8));
+    }
   }
   // === Define and initialize User variables Zen pg33 see Zen pg46
   // See Zen pg31 for tokenUser etc and $USER and Zen pg33 for USER initialization values
