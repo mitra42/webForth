@@ -1529,9 +1529,9 @@ class Mem8 extends Uint8Array {
     return this[a];
   }
   push8(a, v) { this[--a] = v; return a; } // Note implicit & 0xFF when storing to Uint8
-  push16(a, v) { this[--a] = v; return this.push8(a, v >> 8); }
-  push24(a, v) { this[--a] = v; return this.push16(a, v >> 8); }
-  push32(a, v) { this[--a] = v; return this.push24(a, v >> 8); }
+  push16(a, v) { this[--a] = v; return this.push8(a, v >>> 8); }
+  push24(a, v) { this[--a] = v; return this.push16(a, v >>> 8); }
+  push32(a, v) { this[--a] = v; return this.push24(a, v >>> 8); }
 
   align(byteaddr) { return byteaddr; }
   assertAlign() { }
@@ -1591,13 +1591,9 @@ class Mem16 extends Uint16Array {
   }
 
   fetch8(byteAddr) {
-    // Assuming its LittleEndian (my Mac is, I don't have a BigEndian system to test on)
-    // Byte at a (where a is Even) is stored in low byte of cell at a/2
-    // Byte at a (where a is Odd) is stored in high byte of cell at a/2
-    // Note this is the OPPOSITE of the BigEndian assumption of
     const offset = byteAddr & 0x01;
     const cell = this[byteAddr >> 1]; // Does not have to be aligned
-    return (offset ^ this.littleEndian) ? (cell & 0xFF) : cell >> 8;
+    return (offset ^ this.littleEndian) ? (cell & 0xFF) : cell >>> 8;
   }
 
   fetch16(byteAddr) {
@@ -1625,14 +1621,10 @@ class Mem16 extends Uint16Array {
 
   // Encode a string into an address and return the number of bytes written
   // Does not check the start address, which will most often NOT be a cell boundary as will have length first
-  encodeString(byteAddr, s, pad) {
+  encodeString(byteAddr, s) {
     const startWriteInBuffer = byteAddr + this.byteOffset;
     const U8onM = new Uint8Array(this.buffer, startWriteInBuffer, this.byteLength - startWriteInBuffer);
-    const written = new TextEncoder().encodeInto(s, U8onM).written; // Uint8Array
-    if (pad && (s.length & 0x01)) {
-      U8onM[s.length] = 0;
-    }
-    return written;
+    return new TextEncoder().encodeInto(s, U8onM).written; // Uint8Array
   }
 
   decodeString(byteStart, byteEnd) {
@@ -1654,8 +1646,8 @@ class Mem16_16 extends Mem16 {
 class Mem16_32 extends Mem16 {
   pushCell(byteAddr, v) {
     return this.littleEndian
-      ? this.push16(this.push16(byteAddr, v >> 16), v & 0xFFFF)
-      : this.push16(this.push16(byteAddr, v & 0xFFFF), v >> 16);
+      ? this.push16(this.push16(byteAddr, v >>> 16), v & 0xFFFF)
+      : this.push16(this.push16(byteAddr, v & 0xFFFF), v >>> 16);
   }
 
   fetchCell(byteAddr) {
@@ -1666,12 +1658,116 @@ class Mem16_32 extends Mem16 {
   }
   debug(start,end) { return new Uint32Array(this.buffer, start,(end-start)>>2).toString(); }
 }
+class Mem32 extends Uint32Array {
+  // The actual pushCell and fetchCell should take care of endian issues and support littleEndian or bigEndian
+  constructor(...args) {
+    if (args[0] instanceof ArrayBuffer) { // Its a call to subarray,
+      super(...args);
+    } else {
+      const { length, celll } = args[0]; // length in BYTES, and size of each CELL
+      super(length);
+      this.littleEndian = true;
+    }
+  } // Pointless constructor
+
+  cellAddr(byteAddr) {
+    this.assertAlign(byteAddr);
+    return byteAddr >> 2;
+  }
+
+  fetch8(byteAddr) {
+    const offset = byteAddr & 0x03;
+    const cell = this[byteAddr >> 2]; // Does not have to be aligned
+    const shift = 8 * (this.littleEndian ? offset : (3-offset));
+    return (cell >> shift) & 0xFF;
+  }
+
+  fetch16(byteAddr) {
+    console.assert(!(byteAddr & 0x01)); // Has to be aligned 16 bit but not 32 bit
+    const offset = (byteAddr & 0x03) >> 1; // Will be 0 or 1
+    const cell = this[byteAddr >> 2];
+    return (offset ^ this.littleEndian) ? (cell & 0xFFFF) : cell >>> 16;
+  }
+  fetch32(byteAddr) {
+    return this[this.cellAddr(byteAddr)];
+  }
+
+  push8(byteAddr, v) { // a is 1 after address we want to store in, which could be start of next cell
+    console.assert(!(v & 0xFFFFFF00)); // Check never try and store something > a byte
+    const cellAddr = --byteAddr >> 2; // A points at cell (in both cases
+    const offset = byteAddr & 0x03;
+    const shift = 8 * (this.littleEndian ? offset : (3-offset));
+    const cell = this[cellAddr];
+    this[cellAddr] = (cell & (0xFFFFFFFF ^ (0xFF << shift))) | (v << shift);
+    return byteAddr; // Has been decremented by 1
+  }
+
+  push16(byteAddr, v) { // a is 1 after address we want to store in, which could be start of next cell
+    v &= 0xFFFF;
+    console.assert(!(byteAddr & 0x01)); // Should be 16 bit aligned
+    byteAddr -= 2;
+    const cellAddr = byteAddr >> 2; // A points at cell (in all cases
+    const offset = (byteAddr & 0x03) >> 1; // Will be 0 or 1
+    const cell = this[cellAddr];
+    if (offset ^ this.littleEndian ) {
+      this[cellAddr] = (cell & 0xFFFF0000) | v;
+    } else {
+      this[cellAddr] = (cell & 0x0000FFFF) | (v << 16);
+    }
+    return byteAddr; // Has been decremented by 1
+ }
+
+  push32(byteAddr, v) {
+    let cellAddr = this.cellAddr(byteAddr);
+    this[--cellAddr] = v;
+    return cellAddr << 2;
+  }
+
+  // Encode a string into an address and return the number of bytes written
+  // Does not check the start address, which will most often NOT be a cell boundary as will have length first
+  // Any padding should be done in caller
+  encodeString(byteAddr, s) {
+    const startWriteInBuffer = byteAddr + this.byteOffset;
+    const U8onM = new Uint8Array(this.buffer, startWriteInBuffer, this.byteLength - startWriteInBuffer);
+    return new TextEncoder().encodeInto(s, U8onM).written; // Uint8Array
+  }
+
+  decodeString(byteStart, byteEnd) {
+    const U8onM = new Uint8Array(this.buffer, byteStart, byteEnd - byteStart);
+    return new TextDecoder().decode(U8onM);
+  }
+  // Only used in token - which is bytes and never aligned
+  copyWithin(byteDestn, byteSource, byteEnd) {
+    const U8onM = new Uint8Array(this.buffer); // Whole thing as dont know how used necessarily
+    U8onM.copyWithin(byteDestn, byteSource, byteEnd);
+  }
+}
+
+class Mem32_16 extends Mem32 {
+  pushCell(a, v) { return this.push16(a, v); }
+  fetchCell(a) { return this.fetch16(a); }
+  // Alignment is to the smaller of cellsize or memory size, in this case 16 bit
+  align(byteAddr) { return (((byteAddr - 1) >> 1) + 1) << 1; }
+  assertAlign(byteAddr) { console.assert(!(byteAddr & 0x01));}
+  debug(start,end) { return new Uint16Array(this.buffer, start,(end-start)>>1).toString(); }
+}
+class Mem32_32 extends Mem32 {
+  pushCell(a, v) { return this.push32(a, v); }
+  fetchCell(a) { return this.fetch32(a); }
+  // Alignment is to the smaller of cellsize or memory size in this case 32
+  align(byteAddr) { return (((byteAddr - 1) >> 2) + 1) << 2; }
+  assertAlign(byteAddr) { console.assert(!(byteAddr & 0x03)); }
+  debug(start,end) { return new Uint32Array(this.buffer, start,(end-start)>>2).toString(); }
+}
+
 const MemClasses = {
   '8_16': Mem8_16,
   '8_24': Mem8_24,
   '8_32': Mem8_32,
   '16_16': Mem16_16,
   '16_32': Mem16_32,
+  '32_16': Mem32_16,
+  '32_32': Mem32_32,
 };
 
 // noinspection JSBitwiseOperatorUsage
@@ -1709,6 +1805,8 @@ class Forth {
     this.Ustore(NPoffset, NAMEE); // Pointer to where writing name stack
     this.Ustore(TIBoffset, l['=TIB']); // Need work area before this is initialized
 
+    console.assert(this.Ufetch(NPoffset) === NAMEE);
+
     // Define the first word in the dictionary, I'm using 'FORTH' for this because we need this variable to define everything else.
     this.CODE('FORTH');
     this.DW(tokenVocabulary); // Uses assumption that tokenVocabulary is first in jsFunctionAttributes
@@ -1744,8 +1842,11 @@ class Forth {
       }
     });
 
+    // Bracket building users with a check
+    console.assert(this.Ufetch(NPoffset) > 0);
     // build USER variables
     jsUsers.forEach(nv => this.buildUser(nv[0], nv[1]));
+    console.assert(this.Ufetch(NPoffset) > 0);
   }
 
   buildConstant(name, val) {
@@ -1966,7 +2067,7 @@ class Forth {
 
   // -- a; Push a Javascript string to a temporary location as a counted string, and put its address on the stack
   JStoCounted(s) {
-    const tempBuf = this.cpFetch() + 50; // Above Code below HLD which builds numbers down from PAD which is cpFetch + 80
+    const tempBuf = this.cpFetch() + 52; // Above Code below HLD which builds numbers down from PAD which is cpFetch + 80
     this.Mstore8(tempBuf, s.length);
     this.m.encodeString(tempBuf + 1, s); // copy string to TIB, and return length
     this.SPpush(tempBuf);
@@ -2424,6 +2525,7 @@ class Forth {
   // : : TOKEN $,n [ ' doLIST ] LITERAL ] ; see Zen pg96
   colon() {
     this.TOKEN();  // a; (counted string in named space)
+    this.cpAlign(); // Before dollarCommaN so code field in Name dictioanry correct
     this.dollarCommaN();
     this.DW(tokenDoList); // Must be after creating the name and links etc
     this.closeBracket();
