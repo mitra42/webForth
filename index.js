@@ -72,6 +72,7 @@ const jsFunctionAttributes = [
   { n: 'tokenDoList', token: true },
   { n: 'tokenUser', token: true },
   { n: 'tokenVar', token: true },
+  'ALIGNED',
   { n: 'find' }, // Fast version of find - see Forth definition later
   { n: 'OVERT', replaced: true },
   // { n: '?UNIQUE', f: 'qUnique' }, // Not used yet
@@ -108,9 +109,13 @@ const tokenVar = 4;
 const l = {}; // Constants that will get compiled into the dictionary
 l.CELLL = 2;  // Using Buffers, but needs to be 2 as needs to be big enough for an address (offset into buffer) if change see CELL+ CELL- CELLS ALIGNED $USER
 l.CELLbits = l.CELLL * 8;
-l.MEMSIZE = 8;
+//CELLSHIFT is a nice idea but invalid for CELLL=3
+//l.CELLSHIFT = 0;
+//for (let c = l.CELLL; c > 1; l.CELLSHIFT++) { c>>=1 }
+l.MEMSIZE = 16;
+l.CELLMEM = `${l.MEMSIZE}_${l.CELLL*8}`;
 // There is an assumption that memory is Big-Endian (higher byte in lower memory location)
-// Memory is assumed not to be aligned to a CELLL boundary, but this assumption should be confined to $ALIGN()
+// Memory may be aligned to a boundary depending on underlying mem store (which may or may not match CELLL), this assumption should be confined to ALIGNED
 l.US = 64 * l.CELLL;  // user area size in cells i.e. 64 variables - standard usage below is using about 37
 const RTS = 0x80 * l.CELLL; // return stack/TIB size // eFORTH-DIFF was 64 which is tiny for any kind of string handling TODO review this
 const SPS = 0x80 * l.CELLL; // Size of data stack 256 bytes for now
@@ -134,7 +139,7 @@ const bitsSPARE = 0x20; // Unused spare bit in names
 l['=BYTEMASK'] = 0xFF - l['=COMP'] - l['=IMED'] - bitsSPARE; // bits to mask out of a call with count and first char. ERRATA Zen uses this but its not defined
 const forthTrue = (2 ** (l.CELLL * 8)) - 1; // Also used to mask numbers
 // mask used when masking cells in fast search for name ERRATA Zen uses this but its not defined e.g. 0x1FFFFF if CELLL = 3
-l['=CELLMASK'] = forthTrue ^ ((0xFF ^ l['=BYTEMASK']) << (l.CELLbits - 8));
+l['=CELLMASK'] = forthTrue ^ ((0xFF ^ l['=BYTEMASK']) << (l.CELLbits - 8)); // TODO-11-CELLL will be endian dependent
 const nameMaxLength = 31; // Max number of characters in a name, length needs to be representable after BitMask (we have one spare bit here)
 console.assert(nameMaxLength === l['=BYTEMASK']); // If this isn't true then check each of the usages below
 l.BL = 32;
@@ -203,7 +208,7 @@ const forthInForth = `
 ( next, ?branch, branch implicitly tested by control structures )
 ( CELLL 2 1 TEST ( Assuming small cell, otherwise it should be 2 )
 123 HLD ! HLD @ 123 1 TEST ( Also tests user variables )
-111 HLD ! 222 HLD C! HLD C@ 0 HLD C! HLD @ 222, 111 2 TEST
+222 HLD C! HLD C@ 222 1 TEST
 ( R> >R R@ SP@ SP! tested after arithmetic operators )
 30 20 DROP 30 1 TEST
 30 20 DUP 30 20 20 3 TEST
@@ -242,10 +247,7 @@ BL 32 1 TEST
 : CELL+ CELLL UM+ DROP ;
 ( 1 CELL+ 3 1 TEST ) ( Only valid if CELLL=2)
 
-( ERRATA - Zen pg57 presumes CELLL==2 and need to align, not case with JS and byte Buffer )
-( : ALIGNED DUP 0 CELLL UM/MOD DROP DUP IF CELLL SWAP - THEN + ; )
-: ALIGNED ; ( TODO-11-CELLL)
-( 101 ALIGNED 101 1 TEST
+( ERRATA - Zen pg57 presumes CELLL==2 and need to align, not case with JS and byte Buffer, moved to code )
 
 ( ERRATA v5 skips ALIGNED form this definition)
 : , ( w --; Compile an integer into the code dictionary. Zen pg 89)
@@ -863,7 +865,7 @@ CTRL H 8 1 TEST
 
 1 2 ( 3 ) 4 \\ commenting
 1 2 4 3 TEST
-TOKEN xxx C@ 3 1 TEST
+: foo TOKEN C@ ; foo xxx 3 1 TEST
 BL WORD yyyy DUP C@ SWAP CP @ - 4 0 2 TEST
 : foo .( output at compile time) ; 0 TEST
 
@@ -910,7 +912,7 @@ BL WORD yyyy DUP C@ SWAP CP @ - 4 0 2 TEST
     ( debugNA )       ( uncomment for debugging find - will report each name as checked)
     IF                ( na=0 at the end of a vocabulary )
       DUP @           ( not end of vocabulary, test 1st cell )
-      [ =CELLMASK ] LITERAL AND ( mask off lexicon bits )
+      [ =CELLMASK ] LITERAL AND ( mask off lexicon bits ) ( TODO-11-CELLL may fail if endian wrong unless assumption matches what comparing against and CELLMASK correct endian)
       R@ XOR          ( compare with 1st cell in string )
       IF              ( 1st cells do not match )
         CELL+ -1      ( try the next name in the vocabulary )
@@ -1511,23 +1513,15 @@ let stdinBuffer = null; // Local to ?RX do not access directly - but there can b
   This group of classes encapsulate memory management to hide it from the Forth code that is common
   to all of them.
  */
+// Mem8 assumes bigEndian
+// TODO could easily built a version of Mem8 that just used a raw Buffer or possibly Array Buffer (underlying buffer at Uint8Array.buffer )
 class Mem8 extends Uint8Array {
   constructor(...args) {
     if (args[0] instanceof ArrayBuffer) { // Its a call to subarray,
       super(...args);
     } else {
-      const {length, celll} = args[0];
+      const { length, celll } = args[0]; // length in BYTES, and size of each CELL
       super(length);
-      this.fetchCell = {
-        2: a => (this[a++] << 8) | this[a],
-        3: a => (((this[a++] << 8) | this[a++]) << 8) | this[a],
-        4: a => (((((this[a++] << 8) | this[a++]) << 8) | this[a++]) << 8) | this[a],
-      }[celll];
-      this.pushCell = {
-        2: this.push16,
-        3: this.push24,
-        4: this.push32,
-      }[celll];
     }
   } // Pointless constructor
 
@@ -1538,6 +1532,9 @@ class Mem8 extends Uint8Array {
   push16(a, v) { this[--a] = v; return this.push8(a, v >> 8); }
   push24(a, v) { this[--a] = v; return this.push16(a, v >> 8); }
   push32(a, v) { this[--a] = v; return this.push24(a, v >> 8); }
+
+  align(byteaddr) { return byteaddr; }
+  assertAlign() { }
 
   // TODO-11-CELLL check that the caller expects Bytes, not Characters
   encodeString(a, s) {
@@ -1550,11 +1547,132 @@ class Mem8 extends Uint8Array {
     return new TextDecoder().decode(this.subarray(a, end));
   }
 }
+class Mem8_16 extends Mem8 {
+  pushCell(a, v) { return this.push16(a, v); }
+  fetchCell(a) { return (this[a++] << 8) | this[a]; }
+  debug(start,end) { return new Uint16Array(this.buffer, start,(end-start)>>1).toString(); }
+}
+class Mem8_24 extends Mem8 {
+  pushCell(a, v) { return this.push24(a, v); }
+  fetchCell(a) { return (((this[a++] << 8) | this[a++]) << 8) | this[a]; }
+  debug(start,end) { return new Uint8Array(this.buffer, start,end-start).toString(); }
+}
+class Mem8_32 extends Mem8 {
+  pushCell(a, v) { return this.push32(a, v); }
+  fetchCell(a) { return  (((((this[a++] << 8) | this[a++]) << 8) | this[a++]) << 8) | this[a]; }
+  debug(start,end) { return new Uint32Array(this.buffer, start,(end-start)>>2).toString(); }
+}
+
 //TODO-11-CELL note Mem16 could either do >> on length, or not?
 
-MemClasses = {
-  8: Mem8,
+class Mem16 extends Uint16Array {
+  // The actual pushCell and fetchCell should take care of endian issues and support littleEndian or bigEndian
+  constructor(...args) {
+    if (args[0] instanceof ArrayBuffer) { // Its a call to subarray,
+      super(...args);
+    } else {
+      const { length, celll } = args[0]; // length in BYTES, and size of each CELL
+      super(length);
+      this.littleEndian = true;
+    }
+  } // Pointless constructor
+
+  cellAddr(byteAddr) {
+    this.assertAlign(byteAddr);
+    return byteAddr >> 1;
+  }
+
+  align(byteAddr) {
+    return (((byteAddr - 1) >> 1) + 1) << 1;
+  }
+  assertAlign(byteAddr) {
+    // Check expectation already aligned, can comment out for speed
+    console.assert(!(byteAddr & 0x01));
+  }
+
+  fetch8(byteAddr) {
+    // Assuming its LittleEndian (my Mac is, I don't have a BigEndian system to test on)
+    // Byte at a (where a is Even) is stored in low byte of cell at a/2
+    // Byte at a (where a is Odd) is stored in high byte of cell at a/2
+    // Note this is the OPPOSITE of the BigEndian assumption of
+    const offset = byteAddr & 0x01;
+    const cell = this[byteAddr >> 1]; // Does not have to be aligned
+    return (offset ^ this.littleEndian) ? (cell & 0xFF) : cell >> 8;
+  }
+
+  fetch16(byteAddr) {
+    return this[this.cellAddr(byteAddr)];
+  }
+
+  push8(byteAddr, v) { // a is 1 after address we want to store in, which could be start of next cell
+    console.assert(!(v & 0xFF00)); // Check never try and store something > a byte
+    const cellAddr = --byteAddr >> 1; // A points at cell (in both cases
+    const offset = byteAddr & 0x01;
+    const cell = this[cellAddr];
+    if (offset ^ this.littleEndian ) {
+      this[cellAddr] = (cell & 0xFF00) | v;
+    } else {
+      this[cellAddr] = (cell & 0x00FF) | (v << 8);
+    }
+    return byteAddr; // Has been decremented by 1
+  }
+
+  push16(byteAddr, v) {
+    let cellAddr = this.cellAddr(byteAddr);
+    this[--cellAddr] = v;
+    return cellAddr << 1;
+  }
+
+  // Encode a string into an address and return the number of bytes written
+  // Does not check the start address, which will most often NOT be a cell boundary as will have length first
+  encodeString(byteAddr, s, pad) {
+    const startWriteInBuffer = byteAddr + this.byteOffset;
+    const U8onM = new Uint8Array(this.buffer, startWriteInBuffer, this.byteLength - startWriteInBuffer);
+    const written = new TextEncoder().encodeInto(s, U8onM).written; // Uint8Array
+    if (pad && (s.length & 0x01)) {
+      U8onM[s.length] = 0;
+    }
+    return written;
+  }
+
+  decodeString(byteStart, byteEnd) {
+    const U8onM = new Uint8Array(this.buffer, byteStart, byteEnd - byteStart);
+    return new TextDecoder().decode(U8onM);
+  }
+  // Only used in token - which is bytes and never aligned
+  copyWithin(byteDestn, byteSource, byteEnd) {
+    const U8onM = new Uint8Array(this.buffer); // Whole thing as dont know how used necessarily
+    U8onM.copyWithin(byteDestn, byteSource, byteEnd);
+  }
 }
+
+class Mem16_16 extends Mem16 {
+  pushCell(a, v) { return this.push16(a, v); }
+  fetchCell(a) { return this.fetch16(a); }
+  debug(start,end) { return new Uint16Array(this.buffer, start,(end-start)>>1).toString(); }
+}
+class Mem16_32 extends Mem16 {
+  pushCell(byteAddr, v) {
+    return this.littleEndian
+      ? this.push16(this.push16(byteAddr, v >> 16), v & 0xFFFF)
+      : this.push16(this.push16(byteAddr, v & 0xFFFF), v >> 16);
+  }
+
+  fetchCell(byteAddr) {
+    let cellAddr = this.cellAddr(byteAddr);
+    return this.littleEndian
+      ? (this[cellAddr++] | (this[cellAddr] << 16))
+      : ((this[cellAddr++] << 16) | this[cellAddr]);
+  }
+  debug(start,end) { return new Uint32Array(this.buffer, start,(end-start)>>2).toString(); }
+}
+const MemClasses = {
+  '8_16': Mem8_16,
+  '8_24': Mem8_24,
+  '8_32': Mem8_32,
+  '16_16': Mem16_16,
+  '16_32': Mem16_32,
+};
 
 // noinspection JSBitwiseOperatorUsage
 class Forth {
@@ -1568,7 +1686,7 @@ class Forth {
     this.testingDepth = 2;
     this.padTestLength = 0; // Display pad length
     // === Javascript structures - implement the memory map and record the full state.
-    this.m = new MemClasses[l.MEMSIZE]({ length: EM, celll: l.CELLL }); // TODO-11-CELL parameterise
+    this.m = new MemClasses[l.CELLMEM]({ length: EM, celll: l.CELLL }); // TODO-11-CELL parameterise
     this.jsFunctions = [];  // Maps tokens to executable functions - only accessed through TODO
 
     // === Standard pointers used - Zen pg22
@@ -1682,7 +1800,7 @@ class Forth {
     if (this.testing & 0x02) {
       this.debugName = this.xt2name(xt); // Expensive so only done when testing
       if (this.testingDepth > this.debugStack.length) {
-        console.log('R:', RPP === this.RP ? '' : this.m.slice(this.RP, RPP), this.debugStack, this.xt2name(xt), 'S:', SPP === this.SP ? '' : this.m.slice(this.SP, SPP),
+        console.log('R:', RPP === this.RP ? '' : this.m.debug(this.RP, RPP), this.debugStack, this.xt2name(xt), 'S:', SPP === this.SP ? '' : this.m.debug(this.SP, SPP),
           this.padTestLength ? ('pad: ' + (this.padTestLength > 0 ? this.m.decodeString(this.padPtr(), this.padPtr() + this.padTestLength) : this.m.decodeString(this.padPtr() + this.padTestLength, this.padPtr()))) : '');
       }
     }
@@ -1712,7 +1830,7 @@ class Forth {
       b.unshift(this.SPpop());
     }
     // Check stack depth matches
-    console.assert((SPP - this.SP) / l.CELLL === stackDepth);
+    console.assert(((SPP - this.SP) / l.CELLL) === stackDepth);
     // Compare stacks
     for (let i = 0; i < stackDepth; i++) {
       console.assert(this.SPpop() === b.pop());
@@ -1728,6 +1846,14 @@ class Forth {
   Mpush(a, v) { return this.m.pushCell(a, v); }
   // Push at address a, return new pointer above where its stored
   Mstore(a, v) { const a2 = a + l.CELLL; this.Mpush(a2, v); return a2; } // Returns address after the store
+  // 8 bit equivalents
+  Mfetch8(a) { return this.m.fetch8(a); } // Returns address after the store
+  Mpush8(a, v) { return this.m.push8(a); } // Returns address after the store
+  Mstore8(a, v) {
+    const a2 = a + 1;
+    this.m.push8(a2, v);
+    return a2; } // Returns address after the store
+  ALIGNED() { this.SPpush(this.m.align(this.SPpop())); }
   SPfetch() { return this.Mfetch(this.SP); }
   SPpop() { const v = this.Mfetch(this.SP); this.SP += l.CELLL; return v; }
   SPpush(v) { this.SP = this.Mpush(this.SP, v); }
@@ -1742,6 +1868,7 @@ class Forth {
   // === Access to the USER variables before they are defined
   currentFetch() { return this.Ufetch(CURRENToffset); }
   cpFetch() { return this.Ufetch(CPoffset); }
+  cpAlign() { this.Ustore(CPoffset, this.m.align(this.cpFetch())); }
   npFetch() { return this.Ufetch(NPoffset); }
   lastFetch() { return this.Ufetch(LASToffset); }
   padPtr() { return this.cpFetch() + 80; } // Sometimes JS needs the pad pointer
@@ -1752,11 +1879,11 @@ class Forth {
   // it assumes a maximum of nameMaxLength (31) characters.
   // Mostly used for debugging but also in number conversion.
   countedToJS(a) { //TODO-11-CELLL
-    return this.m.decodeString(a + 1, a + (this.m[a] & l['=BYTEMASK']) + 1);
+    return this.m.decodeString(a + 1, a + (this.Mfetch8(a) & l['=BYTEMASK']) + 1);
   }
   // Convert a name address to the code dictionary definition.
   na2xt(na) {
-    return this.Mfetch(na - 2 * l.CELLL);
+    return this.Mfetch(na - (2 * l.CELLL));
   }
 
   // Inner function of find, traverses a linked list Name dictionary.
@@ -1765,11 +1892,11 @@ class Forth {
   // cell1  if present, gives it a quick first-cell test to apply.
   // xt     if present we are looking for name pointing at this executable (for decompiler)
   // returns 0 or na
-  // TODO-11-CELLL
+  // TODO-11-CELLL optimize to cells
   _sameq(na1, na2, chars) { // return f
     // Note this is similar to SAME? but takes a count (not count of cells, and returns boolean
     for (let i = 0; i < chars; i++) {
-      if (this.m[na1 + i] !== this.m[na2 + i]) {
+      if (this.Mfetch8(na1 + i) !== this.Mfetch8(na2 + i)) {
         return false;
       }
     }
@@ -1785,7 +1912,7 @@ class Forth {
           return p;
         }
       } else { // Searching on na
-        const b1 = this.m[p] & l['=BYTEMASK']; // count TODO-11-CELLL
+        const b1 = this.Mfetch8(p) & l['=BYTEMASK']; // count TODO-11-CELLL optimize to use cells use CELLMASK but careful of mask endian-ness (
         if (!byte1 || (byte1 === b1)) { // first cell matches (if cell1 not passed then does slow compare
           if (this._sameq(p + 1, na + 1, b1)) {
             return p;
@@ -1803,7 +1930,8 @@ class Forth {
   find() { // a va -- ca na | a 0
     const va = this.SPpop();
     const a = this.SPpop();
-    const byte1 = this.m[a]; //TODO-11-CELLL
+    this.m.assertAlign(a);
+    const byte1 = this.Mfetch8(a); //TODO-11-CELLL optimize >> _find >> sameq to use cells
     //console.log('find: Looking for', name) // comment out except when debugging find
     const na = this._find(va, a, byte1);
     if (na) {
@@ -1839,7 +1967,7 @@ class Forth {
   // -- a; Push a Javascript string to a temporary location as a counted string, and put its address on the stack
   JStoCounted(s) {
     const tempBuf = this.cpFetch() + 50; // Above Code below HLD which builds numbers down from PAD which is cpFetch + 80
-    this.m[tempBuf] = s.length;
+    this.Mstore8(tempBuf, s.length);
     this.m.encodeString(tempBuf + 1, s); // copy string to TIB, and return length
     this.SPpush(tempBuf);
   }
@@ -1852,8 +1980,6 @@ class Forth {
   }
 
   // === JS Functions to be able to define words ==== in Zen pg30 these are Macros.
-
-  $ALIGN() { } // Not applicable since using a byte Buffer TODO-11-CELLL
 
   // Compile one or more words into the next consecutive code cells.
   DW(...words) {
@@ -1879,7 +2005,7 @@ class Forth {
 
   // na -- ; Builds bytes around a newly entered name. Same function as $,n on Zen pg94 used by all defining words (this.CODE ':')
   dollarCommaN() {
-    if (this.m[this.SPfetch()]) {         // DUP C@ IF  ; test for no word
+    if (this.Mfetch8(this.SPfetch())) {         // DUP C@ IF  ; test for no word
       this.qUnique();
       let a = this.SPpop();
       this.Ustore(LASToffset, a);    // DUP LAST ! ; a=na  ; LAST=na
@@ -1902,13 +2028,13 @@ class Forth {
   CODE(name) {
     console.assert(name.length <= nameMaxLength);
     // <NP-after>CPh CPl <_LINK> LINKh LINKl count name... <NP-BEFORE>
-    this.$ALIGN();
+    this.cpAlign(); // If required by memory store, align to boundary.
     // Note this is going to give the name string an integral number of cells.
-    const len = ((name.length / l.CELLL) + 1) * l.CELLL;
+    const len = (((name.length / l.CELLL) >>0) + 1) * l.CELLL;
     let a = this.npFetch() - len;
     this.Ustore(NPoffset, a);
     this.SPpush(a); // so this.dollarCommaN can find it
-    this.m[a++] = name.length; // This byte will be updated by this.IMMEDIATE() IMMEDIATE or COMPILE-ONLY
+    a = this.Mstore8(a, name.length); // This byte will be updated by this.IMMEDIATE() IMMEDIATE or COMPILE-ONLY
     this.m.encodeString(a, name);
     this.dollarCommaN(); // Build the headers that precede the name
   }
@@ -1916,7 +2042,7 @@ class Forth {
   // ERRATA ZEN IMMEDIATE COMPILE-ONLY =COMP =IMED is not defined, in EFORTHv5 its defined as 0x80
   setHeaderBits(b) {
     const lastNA = this.lastFetch(); // LAST points at the name field of the last defined word
-    this.m[lastNA] |= b;
+    this.Mstore8(lastNA, this.Mfetch8(lastNA) | b);
   }
 
   // === Define this tokens used for each kind of defining word
@@ -2083,8 +2209,8 @@ class Forth {
   store() { this.Mstore(this.SPpop(), this.SPpop()); } //!  w a -- , Store
   fetch() { this.SPpush(this.Mfetch(this.SPpop())); }//@ a -- w, fetch
   // TODO-11-CELLL character access
-  cStore() { this.m[this.SPpop()] = this.SPpop(); }//C! c a -- , Store character
-  cFetch() { this.SPpush(this.m[this.SPpop()]); }//C@ a -- c, Fetch character
+  cStore() { this.Mstore8(this.SPpop(), this.SPpop()); }//C! c a -- , Store character
+  cFetch() { this.SPpush(this.Mfetch8(this.SPpop())); }//C@ a -- c, Fetch character
 
   // Return stack words eForthAndZen#40
   RPat() { this.SPpush(this.RP); } //RP@
@@ -2126,7 +2252,7 @@ class Forth {
     const b = this.SPpop();
     if (l.CELLL === 4) {
       // JS truncates to 32 bits before shift, so use it here rather than getting bitten below
-      const x = (a >>> 0)+(b >>> 0);
+      const x = (a >>> 0) + (b >>> 0);
       this.SPpush(x >>> 0);
       this.SPpush(x >= 0x100000000 ? 1 : 0);
     } else {
@@ -2156,13 +2282,13 @@ class Forth {
     const ntib = this.Ufetch(nTIBoffset);
     let inoffset = this.Ufetch(INoffset);
     if (delimiter === l.BL) {
-      while ((inoffset < ntib) && (this.m[tib + inoffset] <= l.BL)) {
+      while ((inoffset < ntib) && (this.Mfetch8(tib + inoffset) <= l.BL)) {
         inoffset++;
       }  // If blank then skip over leading BL /control chars
     }
     // inoffset now points at first non-delimiter or #TIB
     const b = tib + inoffset; // Save start of string
-    while ((inoffset < ntib) && ((delimiter === l.BL) ? (delimiter < this.m[tib + inoffset]) : (delimiter !== this.m[tib + inoffset]))) {
+    while ((inoffset < ntib) && ((delimiter === l.BL) ? (delimiter < this.Mfetch8(tib + inoffset)) : (delimiter !== this.Mfetch8(tib + inoffset)))) {
       inoffset++;
     } // Exit with inoffset at #TIB or after delimiter
     this.SPpush(b);
@@ -2176,10 +2302,10 @@ class Forth {
     this.PARSE();   // b u (counted string, adjusts >IN)
     const u = Math.min(this.SPpop(), nameMaxLength); // length of string
     const b = this.SPpop(); // start of string
-    const np = this.npFetch() - u - l.CELLL; // Enough space in Name Directory to copy string
+    const np = this.m.align(this.npFetch() - u - l.CELLL); // Enough space in Name Directory to copy string optionally with one zero after
+    this.m.pushCell(this.m.align(np + u + 1), 0); // Write a zero in the last cell where the last letter of word will be written
     this.m.copyWithin(np + 1, b, b + u);
-    this.m[np] = u;  // 1 byte count
-    this.m[np + u + 1] = 0;  // ERRATA  Zen pg62 - PACK$ does `0 !` which I think will overwrite bottom value of name dict as NP is last byte used
+    this.Mstore8(np, u);  // 1 byte count
     this.SPpush(np); // Note that NP is not updated, the same buffer will be used for each word until hit ':'
   }
 
@@ -2213,7 +2339,7 @@ class Forth {
     const na = this.SPpop();
     if (na) { // ca
       const xt = this.SPpop();
-      const ch = this.m[na];
+      const ch = this.Mfetch8(na);
       // noinspection JSBitwiseOperatorUsage
       if (ch & l['=IMED']) {
         await this.run(xt); // This will work as long as this $INTERPRET never called from Forth as cant nest 'run' even indirectly
@@ -2256,13 +2382,13 @@ class Forth {
   // equivalent to Forth EVAL with few things wrapped around it - so not exact same TODO align it
   async EVAL(inp) {
     if (this.testing & 0x01) {
-      console.log(this.m.slice(this.SP, SPP), ' >>', inp);
+      console.log(this.m.debug(this.SP, SPP), ' >>', inp);
     }
     this.JStoTIB(inp);
     while (this.Ufetch(INoffset) < this.Ufetch(nTIBoffset)) {
       this.TOKEN(); // a ; pointing to word in Name Buffer (NB)
       // There may be case where this.TOKEN returns empty string at end of line or similar
-      if (this.m[this.SPfetch()] === 0) { // Skip zero length string
+      if (this.Mfetch8(this.SPfetch()) === 0) { // Skip zero length string
         this.SPpop();
       } else {
         // This is currently OK since its calling JS routines that may call Forth, there is no Forth-in-Forth
@@ -2328,7 +2454,7 @@ class Forth {
     return this.run(this.JSToXT('WARM'));
   }
   // TODO-29 define DOES> for CREATE-DOES> and tokenDoes - this is not part of eForth, THEN defined Vocabulary as CREATE-DOES word
-  //tokenDoes = Forth.tokenFunction(payload => { this.RPpush(this.IP); this.IP = (this.m[payload++]<<8)+this.m[payload++]; this.SPpush(payload++); ); // Almost same as tokenDoList
+  //tokenDoes = Forth.tokenFunction(payload => { this.RPpush(this.IP); this.IP = (this.Mfetch8(payload++)<<8)+this.Mfetch8(payload++); this.SPpush(payload++); ); // Almost same as tokenDoList
 }
 /*
 const foo = new Forth();
