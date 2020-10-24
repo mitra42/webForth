@@ -1537,7 +1537,8 @@ class Mem8 extends Uint8Array {
   align(byteaddr) { return byteaddr; }
   assertAlign() { }
 
-  // TODO-11-CELLL check that the caller expects Bytes, not Characters
+  // Write a Jabascript string into the memory, note that string length is in characters,
+  // while it returns the amount of bytes written, which could be different given UTF8 encoding
   encodeString(a, s) {
     //return this.m.write(s, a, 'utf8');
     return new TextEncoder().encodeInto(s, this.subarray(a)).written;
@@ -1563,8 +1564,6 @@ class Mem8_32 extends Mem8 {
   fetchCell(a) { return  (((((this[a++] << 8) | this[a++]) << 8) | this[a++]) << 8) | this[a]; }
   debug(start,end) { return new Uint32Array(this.buffer, start,(end-start)>>2).toString(); }
 }
-
-//TODO-11-CELL note Mem16 could either do >> on length, or not?
 
 class Mem16 extends Uint16Array {
   // The actual pushCell and fetchCell should take care of endian issues and support littleEndian or bigEndian
@@ -1942,7 +1941,6 @@ class Forth {
 
   // === Functions to simplify storing and retrieving 16 bit values into 8 bit stacks etc.
   // These aren't part of eForth, but are here to simplify storing multi-byte words into 8 bit bytes in the Buffer.
-  //console.assert(l.CELLL === 2); // Presuming its 2 TODO-11-CELLL will need reworking for Uint16Array
   Mfetch(a) { return this.m.fetchCell(a); }
   // Push below address a, return new pointer (where its stored)
   Mpush(a, v) { return this.m.pushCell(a, v); }
@@ -1965,7 +1963,6 @@ class Forth {
   IPnext() { const v = this.Mfetch(this.IP); this.IP += l.CELLL; return v; }
   Ufetch(userindex, offset = 0) { return this.Mfetch(this.UP + userindex + offset); }
   Ustore(userindex, w, offset = 0) { return this.Mstore(this.UP + userindex + offset, w); }
-  //TODO-11-CELLL add a McharFetch and McharStore and search for uses of this.m[..] as that code presumes reading single byte
 
   // === Access to the USER variables before they are defined
   currentFetch() { return this.Ufetch(CURRENToffset); }
@@ -1980,7 +1977,7 @@ class Forth {
   // Convert a string made up of a count and that many bytes to a Javascript string.
   // it assumes a maximum of nameMaxLength (31) characters.
   // Mostly used for debugging but also in number conversion.
-  countedToJS(a) { //TODO-11-CELLL
+  countedToJS(a) {
     return this.m.decodeString(a + 1, a + (this.Mfetch8(a) & l['=BYTEMASK']) + 1);
   }
   // Convert a name address to the code dictionary definition.
@@ -2069,8 +2066,8 @@ class Forth {
   // -- a; Push a Javascript string to a temporary location as a counted string, and put its address on the stack
   JStoCounted(s) {
     const tempBuf = this.cpFetch() + 52; // Above Code below HLD which builds numbers down from PAD which is cpFetch + 80
-    this.Mstore8(tempBuf, s.length);
-    this.m.encodeString(tempBuf + 1, s); // copy string to TIB, and return length
+    // copy string to TIB, and return length in bytes (which may not be same as s.length if UTF8;
+    this.Mstore8(tempBuf, this.m.encodeString(tempBuf + 1, s));
     this.SPpush(tempBuf);
   }
 
@@ -2136,8 +2133,9 @@ class Forth {
     let a = this.npFetch() - len;
     this.Ustore(NPoffset, a);
     this.SPpush(a); // so this.dollarCommaN can find it
-    a = this.Mstore8(a, name.length); // This byte will be updated by this.IMMEDIATE() IMMEDIATE or COMPILE-ONLY
-    this.m.encodeString(a, name);
+    // This byte will be updated by this.IMMEDIATE() IMMEDIATE or COMPILE-ONLY
+    // Note that the result of m.encodeString may not be same as name.length because of unicode issues
+    this.Mstore8(a, this.m.encodeString(a + 1, name));
     this.dollarCommaN(); // Build the headers that precede the name
   }
 
@@ -2310,7 +2308,6 @@ class Forth {
   // Memory access eForthAndZen#39
   store() { this.Mstore(this.SPpop(), this.SPpop()); } //!  w a -- , Store
   fetch() { this.SPpush(this.Mfetch(this.SPpop())); }//@ a -- w, fetch
-  // TODO-11-CELLL character access
   cStore() { this.Mstore8(this.SPpop(), this.SPpop()); }//C! c a -- , Store character
   cFetch() { this.SPpush(this.Mfetch8(this.SPpop())); }//C@ a -- c, Fetch character
 
