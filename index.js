@@ -9,7 +9,7 @@
  * .then(() => forth.console());        // Go interactive
  *
  * And some ideas ... not yet implemented
- * new({ CELLL: 3, xxxMemSize: 1000000});  // parameterized "new"
+ * new({ CELLL: 3, xxxMemSize: 1000000});  // parameterized "xxxMemSize"
  * .then(() => foo.load('foo.f'))       // TODO Load file into the class
  * .then(() => foo.load('https://....')) // TODO Load remote file it into the instance
  * boo = forth.rot([1,2,3]);  // Returns [2,3,1] - will depend what can do with JS API
@@ -103,43 +103,13 @@ const tokenUser = 3;
 const tokenVar = 4;
 
 // === Memory Map - Zen pg26
-// TODO-27-MEM rework this into separate slots and then check if really need ! and @ into some parts of mem
-// ERRATA Zen doesnt define CELLL (and presumes is 2 in multiple places)
-// ERRATA In Zen the definitions on Zen pg26 dont come close to matching the addresses given as the example below. In particular UPP and RPP overlap !
 const l = {}; // Constants that will get compiled into the dictionary
-l.CELLL = 2;  // Using Buffers, but needs to be 2 as needs to be big enough for an address (offset into buffer) if change see CELL+ CELL- CELLS ALIGNED $USER
-l.CELLbits = l.CELLL * 8;
-//CELLSHIFT is a nice idea but invalid for CELLL=3
-//l.CELLSHIFT = 0;
-//for (let c = l.CELLL; c > 1; l.CELLSHIFT++) { c>>=1 }
-l.MEMSIZE = 16;
-l.CELLMEM = `${l.MEMSIZE}_${l.CELLL*8}`;
-// There is an assumption that memory is Big-Endian (higher byte in lower memory location)
-// Memory may be aligned to a boundary depending on underlying mem store (which may or may not match CELLL), this assumption should be confined to ALIGNED
-l.US = 64 * l.CELLL;  // user area size in cells i.e. 64 variables - standard usage below is using about 37
-const RTS = 0x80 * l.CELLL; // return stack/TIB size // eFORTH-DIFF was 64 which is tiny for any kind of string handling TODO review this
-const SPS = 0x80 * l.CELLL; // Size of data stack 256 bytes for now
-// Now the memory map itself, starting at the top of memory.
-const EM = 0x4000; // top of memory
-const UPP = EM - l.US; // start of user area // TODO-28-MULTI UP should be a variable, and used in most places UPP is
-const RPP = UPP - (8 * l.CELLL); // top of return stack RP0 - there is an 8 cell buffer which is probably just for safety.
-l['=TIB'] = RPP - RTS; // Terminal input buffer - shares space with Return stack
-const SPP = l['=TIB'] - (8 * l.CELLL); // start of data stack - grows down, points at top of stack - 8 word buffer for safety
-const NAMEE = SPP - SPS; // name dictionary
-// And then building from the bottom up. The gap in middle is code directory
-const COLDD = 0x100; // cold start vector - its unclear if these bottom 0x100 are useful outside of the DOS context.
-// Above COLDD is a store of initial values for User variables
-const CODEE = COLDD + l.US; // code dictionary grows up from here towards NAME dictionary.
-// PAD is 80 bytes above the current top of the Code directory, and HLD (where numbers are build for output) is a few bytes growing down from PAD.
-
-// === Other key constants. //TODO-11-CELLL move into Instance so configured with CELLL
 l['=COMP'] = 0x40; // bit in first char of name field to indicate 'compile-only'  ERRATA Zen uses this but its not defined
 l['=IMED'] = 0x80; // bit in first char of name field to indicate 'immediate' ERRATA Zen uses this but its not defined
 const bitsSPARE = 0x20; // Unused spare bit in names
 l['=BYTEMASK'] = 0xFF - l['=COMP'] - l['=IMED'] - bitsSPARE; // bits to mask out of a call with count and first char. ERRATA Zen uses this but its not defined
-const forthTrue = (2 ** (l.CELLL * 8)) - 1; // Also used to mask numbers
-// mask used when masking cells in fast search for name ERRATA Zen uses this but its not defined e.g. 0x1FFFFF if CELLL = 3
-l['=CELLMASK'] = forthTrue ^ ((0xFF ^ l['=BYTEMASK']) << (l.CELLbits - 8)); // TODO-11-CELLL will be endian dependent
+//const forthTrue = (2 ** (l.CELLL * 8)) - 1; // Also used to mask numbers
+const forthTrue = -1; // Not quite correct, should be masked BUT when pushed that it is done underneath
 const nameMaxLength = 31; // Max number of characters in a name, length needs to be representable after BitMask (we have one spare bit here)
 console.assert(nameMaxLength === l['=BYTEMASK']); // If this isn't true then check each of the usages below
 l.BL = 32;
@@ -147,28 +117,28 @@ l.BL = 32;
 // === Data table used to build users.
 // later the FORTH word 'USER' works but doesn't setup initialization, nor does it auto-increment to next available user slot.
 const jsUsers = []; // Note 4 cells skipped for multitasking but that is in init of _USER to 4*CELLL
-function USER(n, v) { jsUsers.push([n, v]); return (jsUsers.length - 1) * l.CELLL; }
+function USER(n, v) { jsUsers.push([n, v]); return (jsUsers.length - 1); }
 USER(undefined, 0); // Used for multitasking
 USER(undefined, 0); // Used for multitasking
 USER(undefined, 0); // Used for multitasking
 USER(undefined, 0); // Used for multitasking
-USER('SP0', SPP);      // (--a) Pointer to bottom of the data stack.
-USER('RP0', RPP);      // (--a) Pointer to bottom of the return stack.
+USER('SP0', 'SPP');      // (--a) Pointer to bottom of the data stack.
+const RP0offset = USER('RP0', undefined);      // (--a) Pointer to bottom of the return stack.
 USER("'?KEY", '?RX');    // Execution vector of ?KEY. Default to ?rx.
 USER("'EMIT", 'TX!');  // Execution vector of EMIT. Default to TX!
-USER("'EXPECT", 0);    // Execution vector of EXPECT. Default to 'accept' - initialized when accept defined TODO-23-COLD needs to be in COLDD
-USER("'TAP", 0);       // Execution vector of TAP. Default to kTAP. TODO-23-COLD needs to be in COLDD
+USER("'EXPECT", 0);    // Execution vector of EXPECT. Default to 'accept' - initialized when accept defined TODO-23-COLD needs to be in UZERO
+USER("'TAP", 0);       // Execution vector of TAP. Default to kTAP. TODO-23-COLD needs to be in UZERO
 USER("'ECHO", 'TX!');  // Execution vector of ECHO. Default to tx!.
-USER("'PROMPT", 0);    // Execution vector of PROMPT.  Default to '.ok'. TODO-23-COLD needs to be in COLDD
+USER("'PROMPT", 0);    // Execution vector of PROMPT.  Default to '.ok'. TODO-23-COLD needs to be in UZERO
 const BASEoffset = USER('BASE', 10);
 USER('temp', 0);       // A temporary storage location used in parse and find. EFORTH-ZEN-ERRATA its uses as 'temp', listing says 'tmp'
 USER('SPAN', 0);       // Hold character count received by EXPECT (strangely it is stored, but not accessed)
 const INoffset = USER('>IN', 0);        // Hold the character pointer while parsing input stream.
 const nTIBoffset = USER('#TIB', 0);       // Hold the current count of the terminal input buffer.
-const TIBoffset = USER(undefined, l['=TIB']);  // Hold current address of Terminal Input Buffer (must be cell after #TIB.)
+const TIBoffset = USER(undefined, 'TIB0');  // Hold current address of Terminal Input Buffer (must be cell after #TIB.)
 USER('CSP', 0);        // Hold the stack pointer for error checking.
 const EVALoffset = USER("'EVAL", 0);      // Initialized when have JS $INTERPRET, this switches between $INTERPRET and $COMPILE
-const NUMBERoffset = USER("'NUMBER", 'NUMBER?');    // Execution vector of number conversion. Default to NUMBER?. TODO-23-COLD needs to be in COLDD
+const NUMBERoffset = USER("'NUMBER", 'NUMBER?');    // Execution vector of number conversion. Default to NUMBER?. TODO-23-COLD needs to be in UZERO
 USER('HLD', 0);        // Hold a pointer in building a numeric output string.
 USER('HANDLER', 0);    // Hold the return stack pointer for error handling.
 // this is set to result of currentFetch
@@ -910,7 +880,7 @@ BL WORD yyyy DUP C@ SWAP CP @ - 4 0 2 TEST
     ( debugNA )       ( uncomment for debugging find - will report each name as checked)
     IF                ( na=0 at the end of a vocabulary )
       DUP @           ( not end of vocabulary, test 1st cell )
-      [ =CELLMASK ] LITERAL AND ( mask off lexicon bits ) ( TODO-11-CELLL may fail if endian wrong unless assumption matches what comparing against and CELLMASK correct endian)
+      [ CELLMASK ] LITERAL AND ( mask off lexicon bits ) ( TODO-11-CELLL may fail if endian wrong unless assumption matches what comparing against and CELLMASK correct endian)
       R@ XOR          ( compare with 1st cell in string )
       IF              ( 1st cells do not match )
         CELL+ -1      ( try the next name in the vocabulary )
@@ -1008,7 +978,7 @@ FORTH 0 TEST
   OVER -
   ;          ( b u; leave actual count)
 
-' accept 'EXPECT ! ( TODO needs to also be in COLDD area for COLD )
+' accept 'EXPECT ! ( TODO needs to also be in UZERO area for COLD )
 
 : EXPECT ( b u -- )
   ( Accept input stream and store count in SPAN.)
@@ -1153,11 +1123,11 @@ BL PARSE 123 PAD PACK$ $INTERPRET 123 1 TEST
 ( === Operating System Zen pg85-86 PRESET XIO FILE HAND I/O CONSOLE QUIT)
 
 ( EFORTH-V5-ERRATA uses TIB #TIB CELL+ ! which since ' TIB #TIB CELL+ @' is a NOOP )
-( EFORTH-ZEN-ERRATA uses =TIB but doesnt define =TIB which is TIBB)
+( EFORTH-ZEN-ERRATA uses =TIB but doesnt define =TIB which is TIB0)
 : PRESET ( -- )
   ( Reset data stack pointer and the terminal input buffer. )
   SP0 @ SP!   ( initialize data stack )
-  [ =TIB ] LITERAL #TIB CELL+ ! ; ( initialize terminal input buffer )
+  TIB0 #TIB CELL+ ! ; ( initialize terminal input buffer )
 
 : XIO ( prompt echo tap -- )
   ( Reset the I/O vectors 'EXPECT, 'TAP, 'ECHO and 'PROMPT.)
@@ -1773,50 +1743,82 @@ const MemClasses = {
 // noinspection JSBitwiseOperatorUsage
 class Forth {
   // Build and return an initialized Forth memory obj
-  constructor() {
-    // Support parameters for TODO-11-CELLL TODO-27-MEMORY TODO-28-MULTI
+  constructor({ CELLL = 2, memClass = undefined, EM = undefined }) {
+    // ERRATA Zen doesnt define CELLL (and presumes is 2 in multiple places)
+    this.CELLL = CELLL;  // 2,3 or 4. Needs to be big enough for an address
+    this.CELLbits = CELLL * 8; // Number of bits in a cell - used for loops and shifts
+    // mask used when masking cells in fast search for name ERRATA Zen uses this but its not defined e.g. 0x1FFFFF if CELLL = 3
+    this.CELLMASK = forthTrue ^ ((0xFF ^ l['=BYTEMASK']) << (this.CELLbits - 8)); // TODO-11-CELLL will be endian dependent
+
+    // Support parameters for TODO-27-MEMORY TODO-28-MULTI
     // === Support for Debugging ============
+
     this.debugStack = []; // Maintains a position, like a stack trace, don't manipulate directly use functions below
     this.debugName = undefined; // Set in threadtoken()
     this.testing = 0x0; // 0x01 display words passed to interpreters; 0x02 each word in tokenthread - typically set by 'testing3'
     this.testingDepth = 2;
     this.padTestLength = 0; // Display pad length
     // === Javascript structures - implement the memory map and record the full state.
-    this.m = new MemClasses[l.CELLMEM]({ length: EM, celll: l.CELLL }); // TODO-11-CELL parameterise
+
+    // === Memory layout
+    // Memory may be aligned to a boundary depending on underlying mem store (which may or may not match CELLL), this assumption should be confined to ALIGNED
+    // Now the memory map itself, starting at the top of memory.
+    // ERRATA In Zen the definitions on Zen pg26 dont come close to matching the addresses given as the example below. In particular UPP and RPP(RP0) overlap !
+    //TODO-11-CELLL move EM to parameters
+    EM = EM || (0x2000 * this.CELLL); // top of memory default to 4K cells
+    const US = 64 * this.CELLL;  // user area size in cells i.e. 64 variables - standard usage below is using about 37
+    const UPP = EM - US; // start of user area // TODO-28-MULTI UP should be a variable, and used in most places UPP is
+    const RP0 = UPP - (8 * this.CELLL);  // top of return stack RP0 - there is an 8 cell buffer which is probably just for safety.
+    const RTS = 0x80 * this.CELLL; // return stack/TIB size // eFORTH-DIFF was 64 which is tiny for any kind of string handling TODO review this
+    this.TIB0 = RP0 - RTS; // Terminal input buffer - shares space with Return stack //TODO-28-MULTITASK will move
+    this.SPP = this.TIB0 - (8 * this.CELLL); // start of data stack - grows down, points at top of stack - 8 word buffer for safety
+    const SPS = 0x80 * this.CELLL; // Size of data stack 256 bytes for now
+    const NAMEE = this.SPP - SPS; // name dictionary
+    // And then building from the bottom up. The gap in middle is code directory
+    // cold start vector - its unclear if these bottom 0x100 are useful outside of the DOS context and for DOS it would need code at this address I think?
+    // const COLDD = 0x100;
+    this.UZERO = 0;
+    // Above UZERO is a store of initial values for User variables
+    const CODEE = this.UZERO + US; // code dictionary grows up from here towards NAME dictionary.
+    // PAD is 80 bytes above the current top of the Code directory, and HLD (where numbers are build for output) is a few bytes growing down from PAD.
+    console.log('Space for',NAMEE-CODEE, 'bytes for code and names');
+
+    // Get a instance of a class to store in
+    this.m = new MemClasses[memClass || `8_${this.CELLLbits}`]({ length: EM, celll: this.CELLL }); // TODO-11-CELL parameterise
     this.jsFunctions = [];  // Maps tokens to executable functions - only accessed through TODO
 
     // === Standard pointers used - Zen pg22
     // TODO-28-MULTI think about how these may need to be Task specific
     this.IP = 0;    // Interpreter Pointer
-    this.SP = SPP;  // Data Stack Pointer
-    this.RP = RPP;  // Return Stack Pointer (aka BP in 8086)
+    this.SP = this.SPP;  // Data Stack Pointer
+    this.RP = RP0;  // Return Stack Pointer (aka BP in 8086)
     this.UP = UPP;  // User Area Pointer // TODO-28-MULTI will move this around
-    this._USER = 0; // Incremented by l.CELLL as define USER's
+    this._USER = 0; // Incremented by this.CELLL as define USER's
     // create data structures
+    // Setup pointers for first dictionary entries.
+    this.Ustore(CPoffset, CODEE); // Pointer to where compiling into dic
+    this.Ustore(NPoffset, NAMEE); // Pointer to where writing name stack
+    this.Ustore(RP0offset, RP0);
     this.buildDictionary();
     // compiling forthInForth is done outside this as it is async TODO-VM API may change.
   }
   // Extract some memory writing functions
 
+
   // === Build dictionary, mostly from jsFunctionAttributes
   buildDictionary() {
-    // Setup pointers for first dictionary entries.
-    this.Ustore(CPoffset, CODEE); // Pointer to where compiling into dic
-    this.Ustore(NPoffset, NAMEE); // Pointer to where writing name stack
-    this.Ustore(TIBoffset, l['=TIB']); // Need work area before this is initialized
-
-    console.assert(this.Ufetch(NPoffset) === NAMEE);
 
     // Define the first word in the dictionary, I'm using 'FORTH' for this because we need this variable to define everything else.
     this.CODE('FORTH');
     this.DW(tokenVocabulary); // Uses assumption that tokenVocabulary is first in jsFunctionAttributes
     this.Ustore(CURRENToffset, this.cpFetch()); // Initialize Current. Context & Current+CELLL initialized in USER process Zen pg46
-    this.Ustore(CURRENToffset + l.CELLL, this.cpFetch()); // Initialize Current. Context & Current+CELLL initialized in USER process Zen pg46
+    this.Ustore(CURRENToffset + 1, this.cpFetch()); // Initialize Current. Context & Current+CELLL initialized in USER process Zen pg46
     this.Ustore(CONTEXToffset, this.cpFetch()); // Initialize Current. Context & Current+CELLL initialized in USER process Zen pg46
     this.DW(0, 0);
     this.OVERT(); // Uses the initialization done by this.Ustore(CURRENToffset) above.
 
     // copy constants over
+    ['CELLL', 'CELLbits', 'CELLMASK'].forEach(k => this.buildConstant(k, this[k]));
     Object.entries(l).forEach(kv => this.buildConstant(kv[0], kv[1]));
 
     this.js2xt = {};
@@ -1844,7 +1846,7 @@ class Forth {
 
     // Bracket building users with a check
     console.assert(this.Ufetch(NPoffset) > 0);
-    // build USER variables
+    // build USER variables - also initializes TIB0 from this.TIB0
     jsUsers.forEach(nv => this.buildUser(nv[0], nv[1]));
     console.assert(this.Ufetch(NPoffset) > 0);
   }
@@ -1867,16 +1869,20 @@ class Forth {
     return xt;
   }
   buildUser(name, init) {
-    init = typeof init === 'string' ? this.JSToXT(init) : typeof init === 'undefined' ? this.Ufetch(this._USER) : init;
+    init = typeof init === 'string'
+      ? (typeof this[init] !== 'undefined' ? this[init] : this.JSToXT(init)) // Either field of this, or function
+      : typeof init === 'undefined' ? this.Ufetch(this._USER) // Already storing during build (e.g. NP)
+      : init;
     console.assert(typeof init !== 'undefined');
     this.Ustore(this._USER, init);         // Initialize the variable for live compilation
-    this.Mstore(COLDD + this._USER, init); // Store in initialization area for COLD reboot
+    const offsetInBytes = this._USER * this.CELLL;
+    this.Mstore(this.UZERO + offsetInBytes, init); // Store in initialization area for COLD reboot
     if (name) {                       // Put into dictionary
       this.CODE(name);
-      this.DW(tokenUser, this._USER);
+      this.DW(tokenUser, offsetInBytes);
       this.OVERT();
     }
-    this._USER += l.CELLL; // Need to skip to next _USER
+    this._USER++; // Need to skip to next _USER
   }
 
   compileForthInForth() {
@@ -1901,7 +1907,8 @@ class Forth {
     if (this.testing & 0x02) {
       this.debugName = this.xt2name(xt); // Expensive so only done when testing
       if (this.testingDepth > this.debugStack.length) {
-        console.log('R:', RPP === this.RP ? '' : this.m.debug(this.RP, RPP), this.debugStack, this.xt2name(xt), 'S:', SPP === this.SP ? '' : this.m.debug(this.SP, SPP),
+        //TODO-28-MULTITASK RPP(RP0) and SPP will move
+        console.log('R:', this.RP0 === this.RP ? '' : this.m.debug(this.RP, this.Ufetch(RP0offset)), this.debugStack, this.xt2name(xt), 'S:', this.SPP === this.SP ? '' : this.m.debug(this.SP, this.SPP),
           this.padTestLength ? ('pad: ' + (this.padTestLength > 0 ? this.m.decodeString(this.padPtr(), this.padPtr() + this.padTestLength) : this.m.decodeString(this.padPtr() + this.padTestLength, this.padPtr()))) : '');
       }
     }
@@ -1931,7 +1938,7 @@ class Forth {
       b.unshift(this.SPpop());
     }
     // Check stack depth matches
-    console.assert(((SPP - this.SP) / l.CELLL) === stackDepth);
+    console.assert(((this.SPP - this.SP) / this.CELLL) === stackDepth);
     // Compare stacks
     for (let i = 0; i < stackDepth; i++) {
       console.assert(this.SPpop() === b.pop());
@@ -1945,7 +1952,7 @@ class Forth {
   // Push below address a, return new pointer (where its stored)
   Mpush(a, v) { return this.m.pushCell(a, v); }
   // Push at address a, return new pointer above where its stored
-  Mstore(a, v) { const a2 = a + l.CELLL; this.Mpush(a2, v); return a2; } // Returns address after the store
+  Mstore(a, v) { const a2 = a + this.CELLL; this.Mpush(a2, v); return a2; } // Returns address after the store
   // 8 bit equivalents
   Mfetch8(a) { return this.m.fetch8(a); } // Returns address after the store
   Mpush8(a, v) { return this.m.push8(a); } // Returns address after the store
@@ -1955,14 +1962,16 @@ class Forth {
     return a2; } // Returns address after the store
   ALIGNED() { this.SPpush(this.m.align(this.SPpop())); }
   SPfetch() { return this.Mfetch(this.SP); }
-  SPpop() { const v = this.Mfetch(this.SP); this.SP += l.CELLL; return v; }
+  SPpop() { const v = this.Mfetch(this.SP); this.SP += this.CELLL; return v; }
   SPpush(v) { this.SP = this.Mpush(this.SP, v); }
   RPfetch() { return this.Mfetch(this.RP); }
-  RPpop() { const v = this.Mfetch(this.RP); this.RP += l.CELLL; return v; }
+  RPpop() { const v = this.Mfetch(this.RP); this.RP += this.CELLL; return v; }
   RPpush(v) { this.RP = this.Mpush(this.RP, v); }
-  IPnext() { const v = this.Mfetch(this.IP); this.IP += l.CELLL; return v; }
-  Ufetch(userindex, offset = 0) { return this.Mfetch(this.UP + userindex + offset); }
-  Ustore(userindex, w, offset = 0) { return this.Mstore(this.UP + userindex + offset, w); }
+  IPnext() { const v = this.Mfetch(this.IP); this.IP += this.CELLL; return v; }
+  Ufetch(userindex) {
+    return this.Mfetch(this.UP + userindex * this.CELLL); }
+  Ustore(userindex, w) {
+    return this.Mstore(this.UP + userindex * this.CELLL, w); }
 
   // === Access to the USER variables before they are defined
   currentFetch() { return this.Ufetch(CURRENToffset); }
@@ -1982,7 +1991,7 @@ class Forth {
   }
   // Convert a name address to the code dictionary definition.
   na2xt(na) {
-    return this.Mfetch(na - (2 * l.CELLL));
+    return this.Mfetch(na - (2 * this.CELLL));
   }
 
   // Inner function of find, traverses a linked list Name dictionary.
@@ -2018,7 +2027,7 @@ class Forth {
           }
         }
       }
-      p -= l.CELLL; // point at link address and loop for next word
+      p -= this.CELLL; // point at link address and loop for next word
     }
     // Drop through not found
     return 0;
@@ -2129,7 +2138,7 @@ class Forth {
     // <NP-after>CPh CPl <_LINK> LINKh LINKl count name... <NP-BEFORE>
     this.cpAlign(); // If required by memory store, align to boundary.
     // Note this is going to give the name string an integral number of cells.
-    const len = (((name.length / l.CELLL) >>0) + 1) * l.CELLL;
+    const len = (((name.length / this.CELLL) >>0) + 1) * this.CELLL;
     let a = this.npFetch() - len;
     this.Ustore(NPoffset, a);
     this.SPpush(a); // so this.dollarCommaN can find it
@@ -2180,7 +2189,7 @@ class Forth {
     // This next section is only done while testing, and outputs a trace, so set it on (with testing3) immediately before a likely error.
     this.debugThread(xt);
     const tok = this.Mfetch(xt);
-    xt += l.CELLL;
+    xt += this.CELLL;
     // console.assert(tok < this.jsFunctions.length); // commented out for efficiency, a fail will just break in the next line anyway.
     return this.jsFunctions[tok].call(this, xt); // Run the token function - like tokenDoList or tokenVar - will return null or a Promise
   }
@@ -2323,7 +2332,7 @@ class Forth {
   SPbang() { this.SP = this.SPpop(); } //SP!
 
   // Classic Data stack words eForthAndZen#42
-  DROP() { this.SP += l.CELLL; }
+  DROP() { this.SP += this.CELLL; }
   DUP() { this.SPpush(this.SPfetch()); }
   SWAP() {
     const x = this.SPpop();
@@ -2340,7 +2349,7 @@ class Forth {
 
   // Logical Words eForthAndZen43
   // noinspection JSBitwiseOperatorUsage
-  less0() { this.SPpush((this.SPpop() & (1 << (l.CELLbits - 1))) ? -1 : 0); } //0<  e.g. 0x8000 for CELLL=2
+  less0() { this.SPpush((this.SPpop() & (1 << (this.CELLbits - 1))) ? -1 : 0); } //0<  e.g. 0x8000 for CELLL=2
   AND() { this.SPpush(this.SPpop() & this.SPpop()); }
   OR() { this.SPpush(this.SPpop() | this.SPpop()); }
   XOR() { this.SPpush(this.SPpop() ^ this.SPpop()); }
@@ -2349,16 +2358,16 @@ class Forth {
   UMplus() {
     const a = this.SPpop();
     const b = this.SPpop();
-    if (l.CELLL === 4) {
+    if (this.CELLL === 4) {
       // JS truncates to 32 bits before shift, so use it here rather than getting bitten below
       const x = (a >>> 0) + (b >>> 0);
       this.SPpush(x >>> 0);
       this.SPpush(x >= 0x100000000 ? 1 : 0);
     } else {
-      // Note there is also what I believe is a JS bug where x >> 32 is a noop
+      // Note there is what I believe is a JS bug where x >> 32 is a noop so do th double shift
       const x = a + b;
-      this.SPpush(x & forthTrue);
-      this.SPpush(x >> (l.CELLL * 8));
+      this.SPpush(x); // This should only push the bottom cell.
+      this.SPpush(x >> (this.CELLL * 4) >> (this.CELLL * 4));
     }
   }
   // === Define and initialize User variables Zen pg33 see Zen pg46
@@ -2367,8 +2376,8 @@ class Forth {
   // TODO-28-MULTITASK will need to think carefully about how to move all, or part of the USER space to task-specific space.
   // TODO-28-MULTITASK this is non-trivial since somethings are clearly across all tasks (e.g. CP and NP)
   userAreaInit() {
-    for (let a = 0; a < this._USER; a += l.CELLL) {
-      this.Ustore(a, this.Mfetch(COLDD + a));
+    for (let a = 0; a < this._USER; a++) {
+      this.Ustore(a, this.Mfetch(this.UZERO + a));
     }
   }
 
@@ -2401,7 +2410,7 @@ class Forth {
     this.PARSE();   // b u (counted string, adjusts >IN)
     const u = Math.min(this.SPpop(), nameMaxLength); // length of string
     const b = this.SPpop(); // start of string
-    const np = this.m.align(this.npFetch() - u - l.CELLL); // Enough space in Name Directory to copy string optionally with one zero after
+    const np = this.m.align(this.npFetch() - u - this.CELLL); // Enough space in Name Directory to copy string optionally with one zero after
     this.m.pushCell(this.m.align(np + u + 1), 0); // Write a zero in the last cell where the last letter of word will be written
     this.m.copyWithin(np + 1, b, b + u);
     this.Mstore8(np, u);  // 1 byte count
@@ -2474,14 +2483,15 @@ class Forth {
   }
 
   JStoTIB(s) {
-    console.assert(s.length < (RTS - 10)); // Check for overlong lines
+    const TIBoff = this.Ufetch(TIBoffset);
+    console.assert((TIBoff + s.length) < (this.Ufetch(RP0offset) - 10)); // Check for overlong lines
     this.Ustore(INoffset, 0); // Start at beginning of TIB
-    this.Ustore(nTIBoffset,  this.m.encodeString(this.Ufetch(TIBoffset), s)); // copy string to TIB, and store length in #TIB
+    this.Ustore(nTIBoffset,  this.m.encodeString(TIBoff, s)); // copy string to TIB, and store length in #TIB
   }
   // equivalent to Forth EVAL with few things wrapped around it - so not exact same TODO align it
   async EVAL(inp) {
     if (this.testing & 0x01) {
-      console.log(this.m.debug(this.SP, SPP), ' >>', inp);
+      console.log(this.m.debug(this.SP, this.SPP), ' >>', inp);
     }
     this.JStoTIB(inp);
     while (this.Ufetch(INoffset) < this.Ufetch(nTIBoffset)) {
@@ -2493,7 +2503,8 @@ class Forth {
         // This is currently OK since its calling JS routines that may call Forth, there is no Forth-in-Forth
         await this.run(this.Ufetch(EVALoffset));
       }
-      console.assert(this.SP <= SPP && this.RP <= RPP); // Side effect of making SP and SPP available to debugger.
+      // TODO-28-MULTITASK RP0 will mvoe
+      console.assert(this.SP <= this.SPP && this.RP <= this.Ufetch(RP0offset)); // Side effect of making SP and SPP available to debugger.
     }
   }
 
