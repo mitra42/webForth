@@ -70,6 +70,7 @@ const jsFunctionAttributes = [
   { n: 'tokenDoList', token: true },
   { n: 'tokenUser', token: true },
   { n: 'tokenVar', token: true },
+  { n: 'tokenCreate', token: true },
   'ALIGNED',
   { n: 'find' }, // Fast version of find - see Forth definition later
   { n: 'OVERT', replaced: true },
@@ -79,7 +80,7 @@ const jsFunctionAttributes = [
   'debugNA', 'testing3', 'break', 'debugPrintTIB', 'TEST',
   'MS', 'BYE', { n: 'EXIT', jsNeeds: true }, 'EXECUTE',
   { n: '?RX', f: 'QRX' }, {  n: 'TX!', f: 'TXbang' }, { n: '!IO', f: 'bangIO' },
-  { n: 'doLIT', jsNeeds: true }, 'next', { n: '?branch', f: 'qBranch' }, 'branch',
+  { n: 'doLIT', jsNeeds: true }, { n: 'DOES>', f: 'DOES' }, 'next', { n: '?branch', f: 'qBranch' }, 'branch',
   { n: '!', f: 'store' }, { n: '@', f: 'fetch' }, { n: 'C@', f: 'cFetch' }, { n: 'C!', f: 'cStore' },
   { n: 'RP@', f: 'RPat' }, { n: 'RP!', f: 'RPbang' }, { n: 'R>', f: 'Rfrom'  }, { n: 'R@', f: 'Rat'  }, { n: '>R', f: 'toR'  },
   { n: 'SP@', f: 'SPat' }, { n: 'SP!', f: 'SPbang' },
@@ -231,8 +232,7 @@ BL 32 1 TEST
   , ; IMMEDIATE ( compile literal itself )
 
 ( This definition of CREATE is redefined pg97 to use new, rather than JS versions of TOKEN $,n OVERT and COMPILE)
-: CREATE TOKEN $,n OVERT tokenVar , ; 
-
+: CREATE TOKEN $,n OVERT tokenVar , 0 , ; ( Note the extra field for DOES> to patch )
 ( TODO-TEST test of above group non-obvious as writing to dictionary. )
 
 ( === Control structures - were on Zen pg91 but needed earlier Zen pg 91-92 but moved early )
@@ -1299,7 +1299,8 @@ TOKEN foo DUP ?UNIQUE - 0 1 TEST
 : USER ( u -- ; <string> ) TOKEN $,n OVERT tokenUser , ;
 
 ( Create a new word that doesnt allocate any space, but will push address of that space. )
-: CREATE ( -- ; <string> ) TOKEN $,n OVERT tokenVar , ; ( redefines definition moved up so that it will use new TOKEN etc)
+: CREATE ( -- ; <string> ) TOKEN $,n OVERT tokenVar , 0 , ; ( redefines definition moved up so that it will use new TOKEN etc)
+: foo CREATE 123 , DOES> @ ; FOO BAR BAR 123 1 TEST
 
 : VARIABLE ( -- ; <string> ) CREATE 0 , ;
 
@@ -2113,6 +2114,10 @@ class Forth {
   }
 
   // na -- ; Builds bytes around a newly entered name. Same function as $,n on Zen pg94 used by all defining words (this.CODE ':')
+  // expects in Name dictionary: <count><string><opt padding>
+  // prepends:   <aligned ddress of next cell of code><address of na of last deftn in vocab>...
+  // Side effects are important: specfically.
+  // LAST <= na
   dollarCommaN() {
     if (this.Mfetch8(this.SPfetch())) {         // DUP C@ IF  ; test for no word
       this.qUnique();
@@ -2180,7 +2185,15 @@ class Forth {
   tokenUser(payload) { this.SPpush(this.Mfetch(payload) + this.UP); }
 
   // Put the address of the payload onto Stack - used for CREATE which is used by VARIABLE
-  tokenVar(payload) { this.SPpush(payload); }
+  tokenVar(payload) {
+    this.SPpush(payload + this.CELLL);
+    const does = this.Mfetch(payload);
+    if (does) {
+      this.debugPush();
+      this.RPpush(this.IP);
+      this.IP = does;
+    }
+  }
 
   // === INNER INTERPRETER YES THIS IS IT ! ==================== eForthAndZen#36
   // This is quite different from eForth as its token-threaded rather than direct threaded
@@ -2292,6 +2305,15 @@ class Forth {
   // push the value in the next code word
   // The XT of this is stored in this.doLIT
   doLIT() { this.SPpush(this.IPnext()); }
+
+  // See DOES> and CREATE, this patches the field after the token compiled by the create to point to the code following the DOES>
+  DOES() {
+    this.Mstore(
+      this.Mfetch(this.Ufetch(LASToffset) - 2 * this.CELLL) + this.CELLL, // field after tokenVar compile by CREATE
+      this.IP, // The address after the doDOES
+    );
+    this.EXIT(); // Exit the CREATion
+  }
 
   // Address Literals (aka branches and jumps) eForthAndZen#38
 
@@ -2545,7 +2567,7 @@ class Forth {
   // : : TOKEN $,n [ ' doLIST ] LITERAL ] ; see Zen pg96
   colon() {
     this.TOKEN();  // a; (counted string in named space)
-    this.cpAlign(); // Before dollarCommaN so code field in Name dictioanry correct
+    this.cpAlign(); // Before dollarCommaN so code field in Name dictionary correct
     this.dollarCommaN();
     this.DW(tokenDoList); // Must be after creating the name and links etc
     this.closeBracket();
