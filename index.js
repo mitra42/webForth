@@ -1,17 +1,15 @@
 /*
- * WIP to build a Node API along the lines in https://github.com/mitra42/webForth/issues/23
- * See TODO-23-NODEAPI
  *
  * const Forth = require('webforth');   // The class or obj with functions
  * foo = new Forth()                    // Instantiate a new, but incomplete instance
  * foo.compileForthInForth()            // Load the parts of Forth written in Forth
  * .then(() => foo.interpret("1 2 DUP .S")); // Run some Forth words in the instance
  * .then(() => forth.console());        // Go interactive
+ * new Forth({ CELLL: 3, memClass: 8_32, EM: 0x4000);  // parameterizable
  *
  * And some ideas ... not yet implemented
- * new({ CELLL: 3, xxxMemSize: 1000000});  // parameterized "xxxMemSize"
- * .then(() => foo.load('foo.f'))       // TODO Load file into the class
- * .then(() => foo.load('https://....')) // TODO Load remote file it into the instance
+ * .then(() => foo.load('foo.f'))       // TODO-34-LOAD Load file into the class
+ * .then(() => foo.load('https://....')) // TODO-34-LOAD remote file it into the instance
  * boo = forth.rot([1,2,3]);  // Returns [2,3,1] - will depend what can do with JS API
  */
 
@@ -1485,7 +1483,7 @@ let stdinBuffer = null; // Local to ?RX do not access directly - but there can b
   to all of them.
  */
 // Mem8 assumes bigEndian
-// TODO could easily built a version of Mem8 that just used a raw Buffer or possibly Array Buffer (underlying buffer at Uint8Array.buffer )
+// TODO-27-MEMORY could easily built a version of Mem8 that just used a raw Buffer or possibly Array Buffer (underlying buffer at Uint8Array.buffer )
 class Mem8 extends Uint8Array {
   constructor(...args) {
     if (args[0] instanceof ArrayBuffer) { // Its a call to subarray,
@@ -1764,12 +1762,11 @@ class Forth {
     // Memory may be aligned to a boundary depending on underlying mem store (which may or may not match CELLL), this assumption should be confined to ALIGNED
     // Now the memory map itself, starting at the top of memory.
     // ERRATA In Zen the definitions on Zen pg26 dont come close to matching the addresses given as the example below. In particular UPP and RPP(RP0) overlap !
-    //TODO-11-CELLL move EM to parameters
     EM = EM || (0x2000 * this.CELLL); // top of memory default to 4K cells
     const US = 64 * this.CELLL;  // user area size in cells i.e. 64 variables - standard usage below is using about 37
     const UPP = EM - US; // start of user area // TODO-28-MULTI UP should be a variable, and used in most places UPP is
     const RP0 = UPP - (8 * this.CELLL);  // top of return stack RP0 - there is an 8 cell buffer which is probably just for safety.
-    const RTS = 0x80 * this.CELLL; // return stack/TIB size // eFORTH-DIFF was 64 which is tiny for any kind of string handling TODO review this
+    const RTS = 0x80 * this.CELLL; // return stack/TIB size // eFORTH-DIFF was 64 which is tiny for any kind of string handling
     this.TIB0 = RP0 - RTS; // Terminal input buffer - shares space with Return stack //TODO-28-MULTITASK will move
     this.SPP = this.TIB0 - (8 * this.CELLL); // start of data stack - grows down, points at top of stack - 8 word buffer for safety
     const SPS = 0x80 * this.CELLL; // Size of data stack 256 bytes for now
@@ -1784,8 +1781,8 @@ class Forth {
     console.log('Space for',NAMEE-CODEE, 'bytes for code and names');
 
     // Get a instance of a class to store in
-    this.m = new MemClasses[memClass || `8_${this.CELLLbits}`]({ length: EM, celll: this.CELLL }); // TODO-11-CELL parameterise
-    this.jsFunctions = [];  // Maps tokens to executable functions - only accessed through TODO
+    this.m = new MemClasses[memClass || `8_${this.CELLbits}`]({ length: EM, celll: this.CELLL });
+    this.jsFunctions = [];  // Maps tokens to executable functions
 
     // === Standard pointers used - Zen pg22
     // TODO-28-MULTI think about how these may need to be Task specific
@@ -1800,7 +1797,7 @@ class Forth {
     this.Ustore(NPoffset, NAMEE); // Pointer to where writing name stack
     this.Ustore(RP0offset, RP0);
     this.buildDictionary();
-    // compiling forthInForth is done outside this as it is async TODO-VM API may change.
+    // compiling forthInForth is done outside this as it is async. TODO-23-NODEAPI may change
   }
   // Extract some memory writing functions
 
@@ -1840,7 +1837,7 @@ class Forth {
       } else {
         const xt = this.buildCode(n, tok, attribs);
         //console.assert(xt === this.JSToXT(n));
-        if (attribs.jsNeeds) { this.js2xt[n] = xt; } //TODO-VM colon table then replace this
+        if (attribs.jsNeeds) { this.js2xt[n] = xt; }
       }
     });
 
@@ -2222,7 +2219,9 @@ class Forth {
     await new Promise(resolve => setTimeout(resolve, this.SPpop()));
   }
 
-  BYE() { console.log('TODO-bye'); } // TODO-30-BYE think thru how to exit
+  BYE() { // Should exit all the way out
+    this.IP = 0;
+  }
 
   // Unwind the effect of tokenDoList restoring IP to the next definition out.
   // The XT of this is stored in this.js2xt.EXIT
@@ -2542,7 +2541,7 @@ class Forth {
 
   // : ; doLIT EXIT , OVERT [ ;
   semicolon() { // Zen pg95
-    this.DW(this.js2xt.EXIT); //TODO-VM use a simplified interpreter then replace the setting of this.js2xt.EXIT
+    this.DW(this.js2xt.EXIT);
     this.OVERT();
     this.openBracket();
   }
@@ -2564,7 +2563,7 @@ class Forth {
   console() {
     return this.run(this.JSToXT('WARM'));
   }
-  // TODO-29 define DOES> for CREATE-DOES> and tokenDoes - this is not part of eForth, THEN defined Vocabulary as CREATE-DOES word
+  // TODO-29-DOES define DOES> for CREATE-DOES> and tokenDoes - this is not part of eForth, THEN defined Vocabulary as CREATE-DOES word
   //tokenDoes = Forth.tokenFunction(payload => { this.RPpush(this.IP); this.IP = (this.Mfetch8(payload++)<<8)+this.Mfetch8(payload++); this.SPpush(payload++); ); // Almost same as tokenDoList
 }
 /*
