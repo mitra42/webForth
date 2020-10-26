@@ -1,7 +1,7 @@
 import Forth from '../index.js';
 // Normally this would be: import Forth from 'webforth';
 
-const CELLL = 3;
+const CELLL = 2;
 const MEM = 8;
 const EM = 0x2000 * CELLL; // default is 0x2000 * CELLL
 const foo = new Forth({CELLL, EM, memClass: `${MEM}_${CELLL*8}`});

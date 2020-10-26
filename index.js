@@ -85,7 +85,7 @@ const jsFunctionAttributes = [
   { n: 'SP@', f: 'SPat' }, { n: 'SP!', f: 'SPbang' },
   'DROP', 'DUP', 'SWAP', 'OVER',
   { n: '0<', f: 'less0' }, 'AND', 'OR', 'XOR', { n: 'UM+', f: 'UMplus' },
-  'userAreaInit',
+  'userAreaInit', 'userAreaSave',
   { n: 'PARSE', replaced: true }, { n: 'TOKEN', replaced: true }, { n: 'NUMBER?', f: 'NUMBERQ', replaced: true },
   { n: '$COMPILE', replaced: true, jsNeeds: true }, { n: '$INTERPRET', replaced: true, jsNeeds: true },
   { n: '[', f: 'openBracket', immediate: true, replaced: true }, { n: ']', f: 'closeBracket', replaced: true },
@@ -1464,16 +1464,18 @@ CREATE 'BOOT  ' hi , ( application vector )
 : COLD ( -- )
   BEGIN
     userAreaInit  ( initialize user area, often U0 UP =US CMOVE )
-    ( initRegisters ; this is needed somewhere - to initialize RP, SP and IP, but clearly must be done by here )
+    ( initRegisters ; this is needed somewhere - to initialize RP, and IP, but clearly must be done before here )
     PRESET        ( Initialize TIB and SP )
-    'BOOT @EXECUTE ( Vectored Boot routine, defaults to HI
+    CONSOLE
+    'BOOT @EXECUTE ( Vectored Boot routine, defaults to hi)
     FORTH          ( Make FORTH context vocabulary - searches)
     CONTEXT @ DUP CURRENT 2! ( Definitions in FORTH as well )
-    ( OVERT         ( And link most recent definition into dictionary  - unclear why this is useful )
+    OVERT         ( And Reset FORTH definition to last definition from the userAreaInit  )
     QUIT          ( Invoke Forth "operating system" )
   AGAIN ;         ( Safeguard the Forth interpreter )
 
 : WARM CONSOLE 'BOOT @EXECUTE QUIT ;
+userAreaSave ( Save current User variables for COLD boot )
 `;
 
 let stdinBuffer = null; // Local to ?RX do not access directly - but there can be only one so global
@@ -1520,17 +1522,17 @@ class Mem8 extends Uint8Array {
 class Mem8_16 extends Mem8 {
   pushCell(a, v) { return this.push16(a, v); }
   fetchCell(a) { return (this[a++] << 8) | this[a]; }
-  debug(start,end) { return new Uint16Array(this.buffer, start,(end-start)>>1).toString(); }
+  debug(start,end) { return (end < start) ? "UNDERFLOW" : new Uint16Array(this.buffer, start,(end-start)>>1).toString(); }
 }
 class Mem8_24 extends Mem8 {
   pushCell(a, v) { return this.push24(a, v); }
   fetchCell(a) { return (((this[a++] << 8) | this[a++]) << 8) | this[a]; }
-  debug(start,end) { return new Uint8Array(this.buffer, start,end-start).toString(); }
+  debug(start,end) { return (end < start) ? "UNDERFLOW" : new Uint8Array(this.buffer, start,end-start).toString(); }
 }
 class Mem8_32 extends Mem8 {
   pushCell(a, v) { return this.push32(a, v); }
   fetchCell(a) { return  (((((this[a++] << 8) | this[a++]) << 8) | this[a++]) << 8) | this[a]; }
-  debug(start,end) { return new Uint32Array(this.buffer, start,(end-start)>>2).toString(); }
+  debug(start,end) { return (end < start) ? "UNDERFLOW" : new Uint32Array(this.buffer, start,(end-start)>>2).toString(); }
 }
 
 class Mem16 extends Uint16Array {
@@ -1609,7 +1611,7 @@ class Mem16 extends Uint16Array {
 class Mem16_16 extends Mem16 {
   pushCell(a, v) { return this.push16(a, v); }
   fetchCell(a) { return this.fetch16(a); }
-  debug(start,end) { return new Uint16Array(this.buffer, start,(end-start)>>1).toString(); }
+  debug(start,end) { return (end < start) ? "UNDERFLOW" : new Uint16Array(this.buffer, start,(end-start)>>1).toString(); }
 }
 class Mem16_32 extends Mem16 {
   pushCell(byteAddr, v) {
@@ -1624,7 +1626,7 @@ class Mem16_32 extends Mem16 {
       ? (this[cellAddr++] | (this[cellAddr] << 16))
       : ((this[cellAddr++] << 16) | this[cellAddr]);
   }
-  debug(start,end) { return new Uint32Array(this.buffer, start,(end-start)>>2).toString(); }
+  debug(start,end) { return (end < start) ? "UNDERFLOW" : new Uint32Array(this.buffer, start,(end-start)>>2).toString(); }
 }
 class Mem32 extends Uint32Array {
   // The actual pushCell and fetchCell should take care of endian issues and support littleEndian or bigEndian
@@ -1717,7 +1719,7 @@ class Mem32_16 extends Mem32 {
   // Alignment is to the smaller of cellsize or memory size, in this case 16 bit
   align(byteAddr) { return (((byteAddr - 1) >> 1) + 1) << 1; }
   assertAlign(byteAddr) { console.assert(!(byteAddr & 0x01));}
-  debug(start,end) { return new Uint16Array(this.buffer, start,(end-start)>>1).toString(); }
+  debug(start,end) { return (end < start) ? "UNDERFLOW" : new Uint16Array(this.buffer, start,(end-start)>>1).toString(); }
 }
 class Mem32_32 extends Mem32 {
   pushCell(a, v) { return this.push32(a, v); }
@@ -1725,7 +1727,7 @@ class Mem32_32 extends Mem32 {
   // Alignment is to the smaller of cellsize or memory size in this case 32
   align(byteAddr) { return (((byteAddr - 1) >> 2) + 1) << 2; }
   assertAlign(byteAddr) { console.assert(!(byteAddr & 0x03)); }
-  debug(start,end) { return new Uint32Array(this.buffer, start,(end-start)>>2).toString(); }
+  debug(start,end) { return (end < start) ? "UNDERFLOW" : new Uint32Array(this.buffer, start,(end-start)>>2).toString(); }
 }
 
 const MemClasses = {
@@ -1752,7 +1754,7 @@ class Forth {
     // === Support for Debugging ============
 
     this.debugStack = []; // Maintains a position, like a stack trace, don't manipulate directly use functions below
-    this.debugName = undefined; // Set in threadtoken()
+    this.debugName = "?"; // Set in threadtoken()
     this.testing = 0x0; // 0x01 display words passed to interpreters; 0x02 each word in tokenthread - typically set by 'testing3'
     this.testingDepth = 2;
     this.padTestLength = 0; // Display pad length
@@ -1815,7 +1817,7 @@ class Forth {
     this.OVERT(); // Uses the initialization done by this.Ustore(CURRENToffset) above.
 
     // copy constants over
-    ['CELLL', 'CELLbits', 'CELLMASK'].forEach(k => this.buildConstant(k, this[k]));
+    ['CELLL', 'CELLbits', 'CELLMASK', 'TIB0'].forEach(k => this.buildConstant(k, this[k]));
     Object.entries(l).forEach(kv => this.buildConstant(kv[0], kv[1]));
 
     this.js2xt = {};
@@ -1873,7 +1875,8 @@ class Forth {
     console.assert(typeof init !== 'undefined');
     this.Ustore(this._USER, init);         // Initialize the variable for live compilation
     const offsetInBytes = this._USER * this.CELLL;
-    this.Mstore(this.UZERO + offsetInBytes, init); // Store in initialization area for COLD reboot
+    //UZERO is now initialized at userAreaSave
+    //this.Mstore(this.UZERO + offsetInBytes, init); // Store in initialization area for COLD reboot
     if (name) {                       // Put into dictionary
       this.CODE(name);
       this.DW(tokenUser, offsetInBytes);
@@ -1918,7 +1921,7 @@ class Forth {
     this.testing |= 3; }
   // Put break in a definition.
   break() {
-    console.log('break in a FORTH word'); } // Put a breakpoint in your IDE at this line
+    console.log('\nbreak in a FORTH word'); } // Put a breakpoint in your IDE at this line
   // debugPrintTIB will print the current TIB.
   debugPrintTIB() {
     console.log('TIB: ', this.m.decodeString(this.Ufetch(TIBoffset) + this.Ufetch(INoffset),
@@ -2376,7 +2379,15 @@ class Forth {
   // TODO-28-MULTITASK this is non-trivial since somethings are clearly across all tasks (e.g. CP and NP)
   userAreaInit() {
     for (let a = 0; a < this._USER; a++) {
-      this.Ustore(a, this.Mfetch(this.UZERO + a));
+      //console.log(a, this.Ufetch(a), this.Mfetch(this.UZERO + a * this.CELLL));
+      this.Ustore(a, this.Mfetch(this.UZERO + a * this.CELLL));
+    }
+  }
+  // The opposite of userAreaInit - save values for restoration at COLD
+  // Note it saves the value of LAST which is also in "FORTH", the "OVERT" in COLD restores that
+  userAreaSave() {
+    for (let a = 0; a < this._USER; a++) {
+      this.Mstore(this.UZERO + a * this.CELLL, this.Ufetch(a));
     }
   }
 
