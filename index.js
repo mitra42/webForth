@@ -927,8 +927,6 @@ FORTH 0 TEST
 ( TODO convert test now dont have testFind ; BL WORD TOKEN CONTEXT @ FORTHfind', testFind.map(k => k ; (Compare with results from old version of find )
 ( TODO convert this test - now dont have testFind - BL WORD TOKEN NAME?', testFind ; // Name searches all vocabs )
 
-( ====== TODO COMPARE VERSIONS ZEN STAAPL V5 BELOW HERE )
-
 ( === Text input from terminal Zen pg 78: ^H TAP kTAP accept EXPECT QUERY )
 ( EFORTH-ZEN-ERRATA CTRL used here but not defined. )
 
@@ -948,9 +946,10 @@ FORTH 0 TEST
   OVER C!     ( store at current location )
   1 + ;       ( increment current pointer )
 
+( Diff - Staapl doesnt check for 10 )
 : kTAP ( bot eot cur key -- bot eot cur )
   ( Process a key stroke, CR or backspace.)
-  DUP 13 = OVER 10 = OR 0= ( is key a return?)
+  DUP 13 = OVER 10 = OR 0= ( is key a return or line feed?)
   IF [ CTRL H ] LITERAL ( is key a backspace? )
     XOR IF BL TAP   ( none of above, replace by space )
     ELSE ^H         ( backup current pointer )
@@ -960,6 +959,7 @@ FORTH 0 TEST
   DROP              ( discard bot and eot )
   NIP DUP ;         ( duplicate cur )
 
+( Errata Zen doesnt match the signature) 
 : accept ( b u -- b u )
   ( Accept characters to input buffer. Return with actual count.)
   OVER + OVER       ( b b+u b;  EFORTH-ZEN-ERRATA fixed in v5 and STAAPL)
@@ -973,8 +973,7 @@ FORTH 0 TEST
     THEN
   REPEAT            ( b b+u b'; repeat until buffer full )
   DROP              ( b b+u ; drop current pointer
-  OVER -
-  ;          ( b u; leave actual count)
+  OVER - ;          ( b u; leave actual count)
 
 ' accept 'EXPECT ! ( TODO needs to also be in UZERO area for COLD )
 
@@ -996,6 +995,8 @@ FORTH 0 TEST
 ( TODO-TEST TODO-IO input handling needs EXPECT etc )
 
 ( === Error Handling Zen pg80-82 CATCH THROW NULL$ ABORT abort" ?STACK )
+
+( ====== TODO COMPARE VERSIONS ZEN STAAPL V5 BELOW HERE )
 
 : CATCH ( ca -- err#/0 )
   ( Execute word at ca and set up an error frame for it.)
