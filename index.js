@@ -704,7 +704,7 @@ BL PARSE 1234 PAD PACK$ NUMBER? DROP 1234 1 TEST
   0           ( Initial delay )
   BEGIN
     MS        ( Introduce a delay, drops CPU from 100% to insignificant)
-    1000      ( Ramp to a max delay of 1S )
+    200       ( wait 0.5S if no keys w )
     ?KEY      ( delay c T | delay F; Check for key )
   UNTIL
   NIP ;       ( Drop delay )
@@ -934,8 +934,11 @@ FORTH 0 TEST
   ( Backup the cursor by one character.)
   >R OVER     ( bot eot bot --)
   R@ < DUP    ( bot<cur ? )
-  IF [ CTRL H ] LITERAL ( yes, echo backspace )
-    'ECHO @EXECUTE
+  IF
+    ( This should probably be vectored , on JS it needs BS BL BS to erase a char and position cursor )
+    [ CTRL H ] LITERAL 'ECHO @EXECUTE
+    BL 'ECHO @EXECUTE
+    [ CTRL H ] LITERAL 'ECHO @EXECUTE
   THEN        ( bot eot cur 0|-1 -- )
   R> + ;      ( decrement cur, but not passing bot )
 
@@ -950,8 +953,9 @@ FORTH 0 TEST
 : kTAP ( bot eot cur key -- bot eot cur )
   ( Process a key stroke, CR or backspace.)
   DUP 13 = OVER 10 = OR 0= ( is key a return or line feed?)
-  IF [ CTRL H ] LITERAL ( is key a backspace? )
-    XOR IF BL TAP   ( none of above, replace by space )
+  IF
+    [ CTRL H ] LITERAL = OVER 127 = OR ( is key a backspace or DEL ? )
+    IF BL TAP   ( none of above, replace by space )
     ELSE ^H         ( backup current pointer )
     THEN
     EXIT            ( done this part )
@@ -2293,8 +2297,8 @@ class Forth {
   // Setup I/O to the terminal
   bangIO() {
     if (process.stdin.isTTY) {
-      //process.stdout.write('RAW'); //TODO-31-RAW maybe comment out
-      //process.stdin.setRawMode();
+      process.stdout.write('RAW'); //TODO-31-RAW maybe comment out
+      process.stdin.setRawMode(true);
     }
     process.stdin.setEncoding('utf8');
     process.stdout.setEncoding('utf8');
