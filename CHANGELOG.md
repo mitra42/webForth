@@ -1,4 +1,4 @@
-* 2020-10-27: v0.0.4 
+* 2020-10-27: v0.0.5
   * Remove forth.js, add multitask example, 
   * CELLL and memClass and EM configurability
   * Add BYE and COLD and CREATE...DOES>

@@ -1300,7 +1300,7 @@ TOKEN foo DUP ?UNIQUE - 0 1 TEST
 
 ( Create a new word that doesnt allocate any space, but will push address of that space. )
 : CREATE ( -- ; <string> ) TOKEN $,n OVERT tokenVar , 0 , ; ( redefines definition moved up so that it will use new TOKEN etc)
-: foo CREATE 123 , DOES> @ ; FOO BAR BAR 123 1 TEST
+: foo CREATE 123 , DOES> @ ; foo BAR BAR 123 1 TEST
 
 : VARIABLE ( -- ; <string> ) CREATE 0 , ;
 
@@ -1447,7 +1447,7 @@ BL WORD DUP NAME? SWAP FORTH>NAME = -1 1 TEST
 ( ERRATA Zen uses CONSTANT but doesnt define it )
 ( === Signon Message Zen pg105 VER hi )
 
-4 CONSTANT VER ( Return the version number of this implementation.)
+5 CONSTANT VER ( Return the version number of this implementation.)
 
 ( ERRATA v5 'hi' doesnt restore BASE )
 : hi ( -- )
