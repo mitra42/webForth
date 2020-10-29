@@ -20,7 +20,7 @@ const Forth = require('webforth');
 ```
 Or alternatively if running node v13, or `node --experimental-modules`
 ```
-import Forth from 'webforth';
+import { Forth } from 'webforth';
 ```
 Then ...
 ```
@@ -47,7 +47,7 @@ In particular we'll be adding ability to load forth files into an instance.
 Note, it should be possible to run multiple instances, but this isn't tested fully yet.
 e.g. 
 ```
-import Forth from webforth;
+import { Forth } from webforth;
 const foo1 = new Forth();
 const foo2 = new Forth();
 foo2.compileForthInForth().then(() => foo2.console());

@@ -62,7 +62,14 @@
 */
 //eslint-env node
 
-// This is a key table mapping the functions that go in the dictionary to the function names in the instance.
+/*
+  This table maps the functions that go in the dictionary to the function names in the instance.
+  'foo':          Create a forth word foo linked to Forth.prototype.foo
+   {  n: 'foo'    Name of forth word
+      f: bar      Links to Forth.prototype.bar (defaults to same as 'n'
+      token: true Create a token word that can be used as first cell of a definition - order must match constants below
+      replaced: true  This word will be replaced by a Forth definition, so check for its being compiled into other definitions.
+ */
 // it is used to build the dictionary in each instance.
 const jsFunctionAttributes = [
   { n: 'tokenVocabulary', token: true }, // Token used for Vocabularies must be first 0
@@ -70,7 +77,6 @@ const jsFunctionAttributes = [
   { n: 'tokenDoList', token: true },
   { n: 'tokenUser', token: true },
   { n: 'tokenVar', token: true },
-  { n: 'tokenCreate', token: true },
   'ALIGNED',
   { n: 'find' }, // Fast version of find - see Forth definition later
   { n: 'OVERT', replaced: true },
@@ -94,7 +100,7 @@ const jsFunctionAttributes = [
 ];
 
 // Define the tokens used in the first cell of each word.
-// Order must match the order of
+// Order must match the order of functions defined above with token: true
 const tokenVocabulary = 0;
 const tokenNextVal = 1;
 const tokenDoList = 2;
@@ -114,7 +120,9 @@ console.assert(nameMaxLength === l['=BYTEMASK']); // If this isn't true then che
 l.BL = 32;
 
 // === Data table used to build users.
-// later the FORTH word 'USER' works but doesn't setup initialization, nor does it auto-increment to next available user slot.
+// later the FORTH word 'USER' is defined but unlike this function it doesn't setup initialization, nor does it auto-increment to next available user slot.
+// These definitions can refer to v: 'foo' to be initialized to a Forth word (which must be in jsFunctionAttributes)
+// or the contents of a property of the forth instance (e.g. Forth.prototype.TIB0
 const jsUsers = []; // Note 4 cells skipped for multitasking but that is in init of _USER to 4*CELLL
 function USER(n, v) { jsUsers.push([n, v]); return (jsUsers.length - 1); }
 USER(undefined, 0); // Used for multitasking
@@ -127,8 +135,8 @@ USER("'?KEY", '?RX');    // Execution vector of ?KEY. Default to ?rx.
 USER("'EMIT", 'TX!');  // Execution vector of EMIT. Default to TX!
 USER("'EXPECT", 0);    // Execution vector of EXPECT. Default to 'accept' - initialized when accept defined TODO-23-COLD needs to be in UZERO
 USER("'TAP", 0);       // Execution vector of TAP. Default to kTAP. TODO-23-COLD needs to be in UZERO
-USER("'ECHO", 'TX!');  // Execution vector of ECHO. Default to tx!.
-USER("'PROMPT", 0);    // Execution vector of PROMPT.  Default to '.ok'. TODO-23-COLD needs to be in UZERO
+USER("'ECHO", 'TX!');  // Execution vector of ECHO. Default to tx! but changed to ' EMIT later.
+const PROMPToffset = USER("'PROMPT", 0);    // Execution vector of PROMPT.  Default to '.ok'. TODO-23-COLD needs to be in UZERO
 const BASEoffset = USER('BASE', 10);
 USER('temp', 0);       // A temporary storage location used in parse and find. EFORTH-ZEN-ERRATA its uses as 'temp', listing says 'tmp'
 USER('SPAN', 0);       // Hold character count received by EXPECT (strangely it is stored, but not accessed)
@@ -1749,7 +1757,7 @@ const MemClasses = {
 // noinspection JSBitwiseOperatorUsage
 class Forth {
   // Build and return an initialized Forth memory obj
-  constructor({ CELLL = 2, memClass = undefined, EM = undefined }) {
+  constructor({ CELLL = 2, memClass = undefined, EM = undefined, overrides = {}}) {
     // ERRATA Zen doesnt define CELLL (and presumes is 2 in multiple places)
     this.CELLL = CELLL;  // 2,3 or 4. Needs to be big enough for an address
     this.CELLbits = CELLL * 8; // Number of bits in a cell - used for loops and shifts
@@ -1804,6 +1812,11 @@ class Forth {
     this.Ustore(CPoffset, CODEE); // Pointer to where compiling into dic
     this.Ustore(NPoffset, NAMEE); // Pointer to where writing name stack
     this.Ustore(RP0offset, RP0);
+    // Allow Overrides of funtions by caller - used for example to vector console I/O
+    // Order is significant, as buildDictionary will define a jsFunction that points to the function as defined then.
+    ["TXbangC", "TXbangS"].forEach(k => {
+      if (typeof overrides[k] === "function") {
+        this[k] = overrides[k]; } });
     this.buildDictionary();
     // compiling forthInForth is done outside this as it is async. TODO-23-NODEAPI may change
   }
@@ -1849,9 +1862,9 @@ class Forth {
       }
     });
 
-    // Bracket building users with a check
+    // Build user variables
+    // Bracket with a sanity check - also initializes TIB0 from this.TIB0
     console.assert(this.Ufetch(NPoffset) > 0);
-    // build USER variables - also initializes TIB0 from this.TIB0
     jsUsers.forEach(nv => this.buildUser(nv[0], nv[1]));
     console.assert(this.Ufetch(NPoffset) > 0);
   }
@@ -1876,8 +1889,9 @@ class Forth {
   buildUser(name, init) {
     init = typeof init === 'string'
       ? (typeof this[init] !== 'undefined' ? this[init] : this.JSToXT(init)) // Either field of this, or function
-      : typeof init === 'undefined' ? this.Ufetch(this._USER) // Already storing during build (e.g. NP)
-      : init;
+      : typeof init === 'undefined'
+        ? this.Ufetch(this._USER) // Already storing during build (e.g. NP)
+        : init;
     console.assert(typeof init !== 'undefined');
     this.Ustore(this._USER, init);         // Initialize the variable for live compilation
     const offsetInBytes = this._USER * this.CELLL;
@@ -2231,7 +2245,8 @@ class Forth {
       if (maybePromise) {
         await maybePromise;
       } else if (!waitFrequency--) {
-        await new Promise(resolve => setImmediate(resolve)); //ASYNC: to allow IO to run
+        //TODO-33-UI window.setTimeout instead of setImmediate may not work in Node
+        await new Promise(resolve => window.setTimeout(resolve, 0)); //ASYNC: to allow IO to run
         waitFrequency = 100; // How many cycles to allow a thread swap
       }
     }
@@ -2291,17 +2306,21 @@ class Forth {
   }
 
   // Low level TX!, output one character to stdout, inefficient, but not likely to be bottleneck.
-  TXbang() {
-    process.stdout.write(Uint8Array.from([this.SPpop()])); }
+  //TXbangC(c) { process.stdout.write(Uint8Array.from([c])); }
+  TXbangS(s) { process.stdout.write(s); }
+  TXbangC(c) { this.TXbangS(String.fromCharCode(c)); }
+  TXbang() { this.TXbangC(this.SPpop()); }
 
   // Setup I/O to the terminal
-  bangIO() {
+  bangIO_node() {
     if (process.stdin.isTTY) {
-      process.stdout.write('RAW'); //TODO-31-RAW maybe comment out
+      // process.stdout.write('RAW');
       process.stdin.setRawMode(true);
     }
     process.stdin.setEncoding('utf8');
     process.stdout.setEncoding('utf8');
+  }
+  bangIO() {
   }
 
   // === Literals and Branches - using next value in dictionary === eForthAndZen#37
@@ -2525,12 +2544,7 @@ class Forth {
     this.Ustore(INoffset, 0); // Start at beginning of TIB
     this.Ustore(nTIBoffset,  this.m.encodeString(TIBoff, s)); // copy string to TIB, and store length in #TIB
   }
-  // equivalent to Forth EVAL with few things wrapped around it - so not exact same TODO align it
-  async EVAL(inp) {
-    if (this.testing & 0x01) {
-      console.log(this.m.debug(this.SP, this.SPP), ' >>', inp);
-    }
-    this.JStoTIB(inp);
+  async EVAL() { // Same signature as Forth EVAL, reads tokens from TIB and interprets
     while (this.Ufetch(INoffset) < this.Ufetch(nTIBoffset)) {
       this.TOKEN(); // a ; pointing to word in Name Buffer (NB)
       // There may be case where this.TOKEN returns empty string at end of line or similar
@@ -2540,8 +2554,12 @@ class Forth {
         // This is currently OK since its calling JS routines that may call Forth, there is no Forth-in-Forth
         await this.run(this.Ufetch(EVALoffset));
       }
-      // TODO-28-MULTITASK RP0 will mvoe
+      // TODO-28-MULTITASK RP0 will move
       console.assert(this.SP <= this.SPP && this.RP <= this.Ufetch(RP0offset)); // Side effect of making SP and SPP available to debugger.
+    }
+    const prompt = this.Ufetch(PROMPToffset);
+    if (prompt) {
+      await this.run(this.Ufetch(PROMPToffset));
     }
   }
 
@@ -2550,7 +2568,12 @@ class Forth {
     const inputs = inp.split('\n');
     // eslint-disable-next-line no-restricted-syntax,guard-for-in
     for (const i in inputs) {
-      await this.EVAL(inputs[i]);
+      const inp = inputs[i];
+      if (this.testing & 0x01) {
+        console.log(this.m.debug(this.SP, this.SPP), ' >>', inp);
+      }
+      this.JStoTIB(inp);
+      await this.EVAL(inp);
     }
   }
 
@@ -2614,4 +2637,4 @@ foo.compileForthInForth()
   .then(() => foo.console())
   .then(() => console.log('console exited'));
 */
-module.exports = exports = Forth;
+export { Forth };

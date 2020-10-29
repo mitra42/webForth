@@ -1,4 +1,4 @@
-import Forth from '../index.js';
+import { Forth } from '../index.js';
 // Normally this would be: import Forth from 'webforth';
 
 const CELLL = 2;

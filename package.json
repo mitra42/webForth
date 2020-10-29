@@ -27,5 +27,6 @@
     "type": "git",
     "url": "git://github.com/mitra42/webforth.git"
   },
+  "type": "module",
   "version": "0.0.5"
 }
