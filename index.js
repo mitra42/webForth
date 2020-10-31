@@ -1759,7 +1759,7 @@ const MemClasses = {
 // noinspection JSBitwiseOperatorUsage
 class Forth {
   // Build and return an initialized Forth memory obj
-  constructor({ CELLL = 2, memClass = undefined, EM = undefined, overrides = {}}) {
+  constructor({ CELLL = 2, MEM = 8, memClass = undefined, EM = undefined, overrides = {}}) {
     // ERRATA Zen doesnt define CELLL (and presumes is 2 in multiple places)
     this.CELLL = CELLL;  // 2,3 or 4. Needs to be big enough for an address
     this.CELLbits = CELLL * 8; // Number of bits in a cell - used for loops and shifts
@@ -1799,7 +1799,7 @@ class Forth {
     console.log('Space for',NAMEE-CODEE, 'bytes for code and names');
 
     // Get a instance of a class to store in
-    this.m = new MemClasses[memClass || `8_${this.CELLbits}`]({ length: EM, celll: this.CELLL });
+    this.m = new (memClass || MemClasses[`${MEM}_${this.CELLbits}`])({ length: EM, celll: this.CELLL });
     this.jsFunctions = [];  // Maps tokens to executable functions
 
     // === Standard pointers used - Zen pg22
@@ -2641,4 +2641,4 @@ const ForthNodeOverrides = {
   },
 
 };
-export { Forth, ForthNodeOverrides };
+export { Forth, ForthNodeOverrides, Mem8_16, Mem8_24, Mem8_32, Mem16_16, Mem16_32, Mem32_16, Mem32_32 };

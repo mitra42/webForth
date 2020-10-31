@@ -97,7 +97,7 @@ async function ForthLoad({overrides={}} = {}) {
       //console.log("module is", Forth);
       Forth = module.Forth; // Make available globally to this file
       const f = new Forth({
-        CELLL, EM, memClass: `${MEM}_${CELLL * 8}`, // Define memory
+        CELLL, EM, MEM, memClass: module.Mem8_16, // Define memory
         overrides,
       });         // Setup I/O (just output currently)
       await f.compileForthInForth();
