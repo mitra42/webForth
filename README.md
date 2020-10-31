@@ -11,20 +11,21 @@ I hear you ask why, which is hardly surprising.
 ```
 npm install webforth
 ```
-Installs webforth, note there are intentionally no dependencies in the minimal version.
+Installs webforth, note there are intentionally no dependencies 
+in the minimal node or browser versions.
 
 ## Running
 
 ```
-const Forth = require('webforth');
+const {Forth, ForthNodeOverrides} = require('webforth');
 ```
 Or alternatively if running node v13, or `node --experimental-modules`
 ```
-import { Forth } from 'webforth';
+import {Forth, ForthNodeOverrides} from 'webforth';
 ```
 Then ...
 ```
-const foo = new Forth();
+const foo = new Forth({overrides: ForthNodeOverrides);
 foo.compileForthInForth()
   .then(() => foo.interpret('1 2 3 ROT .S')) // Pass forth to interpret
   .then(() => foo.console()) // Interactive console
@@ -47,12 +48,23 @@ In particular we'll be adding ability to load forth files into an instance.
 Note, it should be possible to run multiple instances, but this isn't tested fully yet.
 e.g. 
 ```
-import { Forth } from webforth;
-const foo1 = new Forth();
-const foo2 = new Forth();
+import {Forth, ForthNodeOverrides} from webforth;
+const foo1 = new Forth({overrides: ForthNodeOverrides});
+const foo2 = new Forth({overrides: ForthNodeOverrides});
 foo2.compileForthInForth().then(() => foo2.console());
 foo1.compileForthInForth().then(() => foo1.interpret('1 2 .S'));
 ```
+## Running in a browser
+Start a simple http server such as that included in Node
+```
+cd webforth
+http-server &
+```
+Open `http://localhost:8080` in a browser
+
+It should compile Forth (you can verify in the console) and present a console and entry box
+in which you can type any Forth.
+
 ## Contributing
 
 Yes please ! 

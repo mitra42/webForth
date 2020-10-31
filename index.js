@@ -1461,7 +1461,7 @@ BL WORD DUP NAME? SWAP FORTH>NAME = -1 1 TEST
 ( ERRATA Zen uses CONSTANT but doesnt define it )
 ( === Signon Message Zen pg105 VER hi )
 
-5 CONSTANT VER ( Return the version number of this implementation.)
+6 CONSTANT VER ( Return the version number of this implementation.)
 
 ( ERRATA v5 'hi' doesnt restore BASE )
 : hi ( -- )

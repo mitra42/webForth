@@ -1,3 +1,7 @@
+* 2020-10-31: v0.0.6
+  * Add index.html and index_web.js for simple POC UI 
+  * Refactor node specific IO out of Forth and add ForthNodeOverrides to simplify API
+  * Fix node Raw echoing issue
 * 2020-10-27: v0.0.5
   * Remove forth.js, add multitask example, 
   * CELLL and memClass and EM configurability
