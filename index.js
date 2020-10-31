@@ -1158,7 +1158,9 @@ BL PARSE 123 PAD PACK$ $INTERPRET 123 1 TEST
 : HAND ( -- )
   ( Select I/O vectors for terminal interface.)
   [ ' .OK  ] LITERAL  ( say 'ok' if all is well)
-  [ ' EMIT ] LITERAL  ( echo characters ) ( ERRATA zen, Staapl uses EMIT which is 'EMIT @', V5's use of EMIT is better because respects changes to 'EMIT
+  ( ERRATA zen, Staapl uses 'EMIT @, current version of emit, V5's use of EMIT is better because respects changes to 'EMIT)
+  ( Web overrides to Drop as echoing is handled at UI level)
+  [ ' EMIT ] LITERAL  ( echo characters ) 
   [ ' kTAP ] LITERAL  ( ignore control characters )
   XIO ;
 
@@ -1814,7 +1816,7 @@ class Forth {
     this.Ustore(RP0offset, RP0);
     // Allow Overrides of funtions by caller - used for example to vector console I/O
     // Order is significant, as buildDictionary will define a jsFunction that points to the function as defined then.
-    ["TXbangC", "TXbangS"].forEach(k => {
+    ["TXbangC", "TXbangS", "bangIO", "qrx"].forEach(k => {
       if (typeof overrides[k] === "function") {
         this[k] = overrides[k]; } });
     this.buildDictionary();
@@ -2245,8 +2247,8 @@ class Forth {
       if (maybePromise) {
         await maybePromise;
       } else if (!waitFrequency--) {
-        //TODO-33-UI window.setTimeout instead of setImmediate may not work in Node
-        await new Promise(resolve => window.setTimeout(resolve, 0)); //ASYNC: to allow IO to run
+        //setTimeout(resolve, 0) is same as setImmmediate(resolve) but latter is not available in browsers
+        await new Promise(resolve => setTimeout(resolve, 0)); //ASYNC: to allow IO to run
         waitFrequency = 100; // How many cycles to allow a thread swap
       }
     }
@@ -2289,39 +2291,21 @@ class Forth {
 
   // Call chain is ?RX < '?KEY  < ?KEY < KEY < accept < 'EXPECT < QUERY < que < QUIT
   QRX() {
-    // If there is no data in the buffer, check the stdin and reload the buffer.
-    if (!(stdinBuffer && stdinBuffer.length)) {
-      const s = process.stdin.read(); // Synchronous
-      if (s) stdinBuffer = Buffer.from(s, 'utf8');
-    }
-    // If there is any data (old or new) in the buffer, return the first character and True
-    if (stdinBuffer && stdinBuffer.length) {
-      this.SPpush(stdinBuffer[0]);
-      stdinBuffer = stdinBuffer.slice(1);
+    const [f, c] = this.qrx();
+    if (f) {
+      this.SPpush(c);
       this.SPpush(forthTrue);
     } else {
-      // If there is nothing (old or new) return False
       this.SPpush(0);
     }
   }
 
   // Low level TX!, output one character to stdout, inefficient, but not likely to be bottleneck.
-  //TXbangC(c) { process.stdout.write(Uint8Array.from([c])); }
-  TXbangS(s) { process.stdout.write(s); }
   TXbangC(c) { this.TXbangS(String.fromCharCode(c)); }
   TXbang() { this.TXbangC(this.SPpop()); }
+  qrx() { return [false]; } // Overridden by node
 
-  // Setup I/O to the terminal
-  bangIO_node() {
-    if (process.stdin.isTTY) {
-      // process.stdout.write('RAW');
-      process.stdin.setRawMode(true);
-    }
-    process.stdin.setEncoding('utf8');
-    process.stdout.setEncoding('utf8');
-  }
-  bangIO() {
-  }
+  bangIO() { } // Default to nothing to do, but Node overrides
 
   // === Literals and Branches - using next value in dictionary === eForthAndZen#37
 
@@ -2627,14 +2611,34 @@ class Forth {
   // TODO-29-DOES define DOES> for CREATE-DOES> and tokenDoes - this is not part of eForth, THEN defined Vocabulary as CREATE-DOES word
   //tokenDoes = Forth.tokenFunction(payload => { this.RPpush(this.IP); this.IP = (this.Mfetch8(payload++)<<8)+this.Mfetch8(payload++); this.SPpush(payload++); ); // Almost same as tokenDoList
 }
-/*
-const foo = new Forth();
-foo.compileForthInForth()
-  .then(() => console.log('===forthInForth compiled'))
-  //.then(() => foo.cleanupBootstrap())
-  //.then(() => console.log('===forthInForth cleaned up'))
-  //.then(() => foo.interpret("WARM"));
-  .then(() => foo.console())
-  .then(() => console.log('console exited'));
-*/
-export { Forth };
+const ForthNodeOverrides = {
+  TXbangS: s => process.stdout.write(s),
+  // Setup I/O to the terminal
+  bangIO: () => {
+    if (process.stdin.isTTY) {
+      // process.stdout.write('RAW');
+      process.stdin.setRawMode(true);
+    }
+    process.stdin.setEncoding('utf8');
+    process.stdout.setEncoding('utf8');
+  },
+  // Call chain is ?RX < '?KEY  < ?KEY < KEY < accept < 'EXPECT < QUERY < que < QUIT
+  qrx: () => {
+    // If there is no data in the buffer, check the stdin and reload the buffer.
+    if (!(stdinBuffer && stdinBuffer.length)) {
+      const s = process.stdin.read(); // Synchronous
+      if (s) stdinBuffer = Buffer.from(s, 'utf8');
+    }
+    // If there is any data (old or new) in the buffer, return the first character and True
+    if (stdinBuffer && stdinBuffer.length) {
+      const c = stdinBuffer[0];
+      stdinBuffer = stdinBuffer.slice(1);
+      return [true, c];
+    } else {
+      // If there is nothing (old or new) return False
+      return [false];
+    }
+  },
+
+};
+export { Forth, ForthNodeOverrides };

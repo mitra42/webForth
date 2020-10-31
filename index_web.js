@@ -6,19 +6,28 @@ https://developer.mozilla.org/en-US/docs/Web/JavaScript/Guide/Modules
  */
 let Forth; // Will hold class when loaded
 let forth; // Will hold instance
+
 class ForthConsole extends HTMLDivElement {
   constructor() {
     super();
     this.attachShadow({mode: 'open'});
+    // Create an output area
     this.output = document.createElement('forth-output');
     this.shadowRoot.append(this.output);
-    //this.output.app("FOO BAZ"); // Doesbt work - some kind of race condition
+    // Create an input area, but only attach once Forth is loaded.
     this.input = document.createElement('forth-input');
-    this.shadowRoot.append(this.input);
-    const overrides = {TXbangS: (s) => this. output.TXbangS_web(s)};
-    ForthLoad({overrides}); // returns a promise that is ignored
+    // Define hooks for IO to these areas
+    const overrides = {TXbangS: (s) => this.output.TXbangS_web(s)};
+    // Load Forth can also define CELL, EM, memClass //TODO-33-UI export class from forth.js and pass here as a class not a name
+    const CELLL = 2;
+    const MEM = 8;
+    ForthLoad({CELLL, MEM, memClass: `${MEM}_${CELLL*8}`, overrides})
+      .then(() => this.shadowRoot.append(this.input)) ; // Only add input area when Forth defined
+      // returns a promise that is ignored
   }
 }
+
+// Defines a basic pre-formated text area so can display forth output including CR etc
 class ForthOutput extends HTMLElement {
   constructor() {
     super();
@@ -26,46 +35,48 @@ class ForthOutput extends HTMLElement {
     this.pre = document.createElement('pre');
     this.shadowRoot.append(this.pre);
   }
-  app(s) {
-    //TODO-33-UI add styles
-    //TODO-33-UI handle CR
+  // Append string to area, this function is passed to the Forth instance on construction.
+  TXbangS_web(s) {
     this.pre.textContent += s;
   }
-  /*
-  TXbangC_web(c) {
-    this.TXbangS_web(String.fromCharCode(c));
-  }
-  */
-  TXbangS_web(s) {
-    this.app(s);
-  }
 }
-class ForthInput extends HTMLElement { // TODO-UI should be enabled only once Forth loaded
+// A simple (adaptable) utility to make it easier to write nested elements in JS
+function EL(tag, attributes = {}, children) {
+  const el = document.createElement(tag);
+  Object.entries(attributes)
+    .forEach(kv => {
+      if (['textContent','onsubmit'].includes(kv[0])) {
+        el[kv[0]] = kv[1]
+      } else {
+        el.setAttribute(kv[0], kv[1])
+      }
+    });
+  if (children) el.append(...children);
+  return el;
+}
+
+class ForthInput extends HTMLElement {
   constructor() {
     super();
     this.attachShadow({mode: 'open'});
-    const style = document.createElement('style');
-    style.textContent = 'input { width: 100%}';
-    this.shadowRoot.append(style);
-    this.form = document.createElement('form')
-    this.form.onsubmit = ev => this.submit(ev);
-    this.inputbox = document.createElement('input')
-    Object.entries({ type: 'text', spellcheck: false})
-      .forEach(kv => this.inputbox.setAttribute(kv[0], kv[1]))
-    this.form.append(this.inputbox);
-    this.shadowRoot.append(this.form);
+    this.inputbox = EL('input', { type: 'text', spellcheck: false}, )
+    this.shadowRoot.append(
+      // Style it as 100% of width of parent, by default will be boxed
+      EL('style', { textContent: 'input { width: 100%}'}),
+      // Define a form with a single Input element
+      EL('form', {onsubmit: ev => this.submit(ev) }, [this.inputbox])
+    );
   }
   submit(event) {
-    event.preventDefault(); // Stop it triggering reload
-    const inp = this.inputbox.value
-    console.log("SUBMITTED", inp);
-    if (forth) {
-      //TODO - echo it
-      this.inputbox.value = "";
-      forth.TXbangS(inp);
-      forth.interpret(inp); // Async but dont wait
-    } else {
+    event.preventDefault();           // Stop it triggering reload
+    const inp = this.inputbox.value;  // Fetch the value entered
+    console.log(">>", inp);           // Debugging output on console
+    if (!forth) {                      // Should only be enabled once forth is defined, but check
       console.log("Premature input TODO", inp);
+    } else {
+      this.inputbox.value = "";       // Clear result
+      forth.TXbangS(inp);             // But echo - via forth, should go to Console
+      forth.interpret(inp);           // Async interpretation of text, but dont wait for it
     }
   }
 }
