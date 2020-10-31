@@ -1527,7 +1527,8 @@ class Mem8 extends Uint8Array {
   // Write a Javascript string into the memory, note that string length is in characters,
   // while it returns the amount of bytes written, which could be different given UTF8 encoding
   encodeString(a, s) {
-    return new TextEncoder().encodeInto(s, this.subarray(a)).written;
+    const te = new TextEncoder()
+    return te.encodeInto(s, this.subarray(a)).written;
   }
   // Encode a string into an address and return the number of bytes written
   decodeString(a, end) {
