@@ -7,13 +7,29 @@ https://developer.mozilla.org/en-US/docs/Web/JavaScript/Guide/Modules
 let Forth; // Will hold class when loaded
 let forth; // Will hold instance
 
-class ForthConsole extends HTMLDivElement {
+// A simple (adaptable) utility to make it easier to write nested elements in JS
+function EL(tag, attributes = {}, children) {
+  const el = document.createElement(tag);
+  Object.entries(attributes)
+    .forEach(kv => {
+      if (['textContent','onsubmit'].includes(kv[0])) {
+        el[kv[0]] = kv[1]
+      } else {
+        el.setAttribute(kv[0], kv[1])
+      }
+    });
+  if (children) el.append(...children);
+  return el;
+}
+
+class ForthConsole extends HTMLElement {
   constructor() {
     super();
     this.attachShadow({mode: 'open'});
     // Create an output area
     this.output = document.createElement('forth-output');
-    this.shadowRoot.append(this.output);
+    this.div = EL("div", {}, [ this.output ]);
+    this.shadowRoot.append(this.div);
     // Create an input area, but only attach once Forth is loaded.
     this.input = document.createElement('forth-input');
     // Define hooks for IO to these areas
@@ -39,20 +55,6 @@ class ForthOutput extends HTMLElement {
   TXbangS_web(s) {
     this.pre.textContent += s;
   }
-}
-// A simple (adaptable) utility to make it easier to write nested elements in JS
-function EL(tag, attributes = {}, children) {
-  const el = document.createElement(tag);
-  Object.entries(attributes)
-    .forEach(kv => {
-      if (['textContent','onsubmit'].includes(kv[0])) {
-        el[kv[0]] = kv[1]
-      } else {
-        el.setAttribute(kv[0], kv[1])
-      }
-    });
-  if (children) el.append(...children);
-  return el;
 }
 
 class ForthInput extends HTMLElement {
@@ -82,7 +84,7 @@ class ForthInput extends HTMLElement {
 }
 
 //customElements.define('forth-output', ForthOutput);
-customElements.define('forth-console', ForthConsole, {extends: "div"});
+customElements.define('forth-console', ForthConsole);
 customElements.define('forth-output', ForthOutput);
 customElements.define('forth-input', ForthInput);
 

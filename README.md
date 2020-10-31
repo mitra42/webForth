@@ -60,10 +60,33 @@ Start a simple http server such as that included in Node
 cd webforth
 http-server &
 ```
-Open `http://localhost:8080` in a browser
+Open `http://localhost:8080` in a browser. 
+
+The HTML uses Web Components and TextEncoders so they should work in any modern browsers 
+(Firefox, Chrome, Opera, Edge, Android, but not IE or Safari on IOS or OSX). 
+There are no plans to support those browsers, 
+however I'll be happy to add PRs if someone else does.
 
 It should compile Forth (you can verify in the console) and present a console and entry box
-in which you can type any Forth.
+in which you can type any Forth. 
+
+Everything is happening locally i.e. this is forth running in your browser.
+
+## Debugging
+
+For the browser version open the Console. 
+The process of building the dictionary puts errors and progress there. 
+
+Feel free to open a new issue on [the git repo](https://github.com/mitra42/webforth/issues) 
+but the first thing I'm going to ask for is a copy of whatever appeared in the Console,
+or in Node.
+
+There are two useful Forth words you can insert in either a definition or the code to help debug.
+* `testing3`: sets an internal flag to increase (significantly) debugging output so we 
+    see stack condition before every forth word. 
+    Changing debugDepth can be useful to get more or less of it. (look for the variable)
+* `break`: Just calls a short routine that generates a console log, when working in my IDE 
+    I set a breakpoint here. 
 
 ## Contributing
 
