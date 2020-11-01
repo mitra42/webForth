@@ -1,7 +1,15 @@
 # Forth for Javascript - Design criteria
 Mitra Ardron <mitra@mitra.biz> 17 Sept 2020
 
+Welcome to my basic design document for WebForth.  
+
+Currently its not in a particularly useful order, in part because I haven't found an easy way to 
+provide a linear reading order without needing to look ahead.  
+Also at the end are some remnants of an earlier design doc that need updating. 
+
 ## Key Concepts
+
+TODO update this contents table
 
 * Based on eForth but not quite same
 * Javascript then Forth
@@ -13,11 +21,15 @@ Mitra Ardron <mitra@mitra.biz> 17 Sept 2020
 * Orthogonality and likely changes
 
 #### Based on eForth but not quite same
-This system is based on eForth, 
-I primarily used the version of eForth in "Zen and Forth", but this has a lot of bugs,
+This system is based on C.H. Ting's eForth, 
+I primarily used the version of eForth in "Zen and Forth", 
+but it has a not insignificant number of bugs,
 some of the bugs are fixed in the `v5` version, 
 and others in the version ported to `staapl`, 
 so I've picked and chosen and flagged the errors with "ERRATA" in the code. 
+
+I have tried, but failed to contact C.H.Ting (emails bounce) 
+so I don't have a constructive way to feed those bugs back to him.
 
 #### Javascript then Forth
 There are several ways to bootstrap Forth. 
@@ -35,14 +47,35 @@ As an alternative this system bootstraps in Javascript,
 ### Memory Handling
 The memory map follows the eForth model as defined on page 27 of eForth,
 Note this doesn't quite match the supplied code on page 26! 
-The code that defines these is well commented
+The code that defines these is well commented inline.
 
 #### Memory map to Javascript
-The primary memory, is a large byte buffer. 
-This may change and alternatives get tried such as Uint8Array or Uint16Array. 
-In future different parts of memory could be split, especially for multi-tasking, 
-but eForth doesn't lend itself easily to that. 
-See issue-15 and issue-11.
+The primary memory, is a large area of (at least conceptually) contiguous memory.
+
+There are two choices as to how that is used. 
+Whatever the choices, Forth addresses are always in Bytes.
+
+First choice is `CELLL` (cell length) which specifies how the size of the basic unit of data Forth processes.
+This is the size of each item on a stack, each field in the definition, each User variable etc. 
+This defaults to `2` bytes, i.e. 16 bits. 
+
+Secondly is `MEM` which specifies the width of memory slots.
+Addresses are translated on the fly from Forth's byte addresses, to the addresses in the MEM-width buffer.
+If CELLL and MEM are different, then cells have to be packed into memory slots, 
+for example if CELLL=2 and MEM = 32 then two 16 bit cells fit in each memory slot. 
+Usually an alignment is done, so that if CELLL is 2 then it always starts on an even border,
+but this depends on memory efficiency and is not done if MEM=8.
+The actual packing and unpacking are done by a class that can be passed to the Forth constructor.
+
+For example Mem16_32 is a 8 bit wide memory array for holding 32 bit cells which uses a `Uint16array`.
+
+There may be future experimentation to experiment with different ways of handling memory,
+for example handling read-only memory different from variable memory, 
+or managing a large virtual memory space on a smaller device.
+This would be mediated by the memory class.
+
+See [issue-15](https://www.github.com/mitra42/issue/15) 
+and [issue-11](https://www.github.com/mitra42/issue/11) 
 
 ### Colon, Code and other words
 ### I/O
@@ -61,24 +94,23 @@ There are three common ways to implement the interpreters.
 
 We are using Token threading 
 because we can't easily mix javascript code into the byte-array of Forth.
-The first word contains an index into a table of code. 
+The first word of each definition contains an index into a table of code. 
 This code table is used for both defining words (colon, constant etc) 
-and for any word implemented in pure javacript. 
+and for any word implemented in pure javacript (would be CODE words in most Forths).
 
-Code words are defined in javascript with `c.code(<name>, () => {javascript});`
+### Integrating Javascript into Forth 
 
+Code words are defined as methods on the Forth class,
+and then hooked to Forth names via the jsFunctionAttributes table at the top,
+That table is read during dictionary building.
 
-Which iterates through lists of pointers to other wo
+There is currently no way to extend Forth with more Javascript 
+See [Issue#39](https://github.com/mitra42/webForth/issues/39)
+
 ### Orthogonality and likely changes
 
 #### Sync/Async/Event Driven
 TODO write up Async
-
-#### Cell size
-TODO write up Cell Size 
-
-#### Memory handling
-TODO write up memory handling
 
 #### Compatibility
 This version is based on eForth which itself is based on bForth.
@@ -99,6 +131,43 @@ put e.g. `ANS : foo xxx ; FORTH` and know that foo used the ANS dialect.
 * Interaction with DOM
 * Event handling interaction with Forth
 
+
+### CREATE DOES>
+This is hairy to get your head around ... 
+
+Assume a trivial definition which defines words that push their square on the stack:
+`: square CREATE , DOES> @ DUP * ;`
+Creates in the dictionary. 
+```
+Dictionary: 100: | tokenDoList | CREATE | , | EXIT 
+Dictionary: 108: | @ | DUP | * | ; 
+Namespace: square->100
+```
+Then its used as `2 square sq2`.
+
+During the execution of `square`, `CREATE` sets up:
+```
+Dictionary: 116: | tokenvar | 0
+Namespace: sq2->116
+```
+And then `,` compiles the data so ...
+```
+Dictionary: 116: | tokenvar | 0 | 2
+```
+At this point its identical to something defined with `VARIABLE`.
+
+When the `DOES>` is called the function finds the most recent definition (using `LAST`), 
+and edits it point at its own code.
+```
+Dictionary: 116: | tokenvar | 108 | 2
+```
+Then lets assume sq2 is executed.
+```
+Dictionary: 110 | icolon | sq2 | ; 
+```
+`tokenvar` sees `118` in `IP` and reads `108` which points at the `DOES>` code (`@ DUP *`)
+It pushes the pointer to the data `120` onto the stack and acts like `tokenDoList` to run the code,
+which leaves 4 on the stack.
 
 ## Earlier version - pretty much everything below here was for a version now deleted
 Mitra Ardron <mitra@mitra.biz> 8 Aug 2020
@@ -157,40 +226,6 @@ colon-sys|definitionStart name|: initiateDoes|; DOES>
 next-sys|programCounter|initiateColon|runSemicolon DOES>
 do-sys|dicPointer (to initiate field)|DO|LOOP
 loop-sys|limit i|doDO|doLOOP I J
-
-### CREATE DOES>
-This is hairy to get your head around ... 
-
-Assume:
-`: square CREATE , DOES> @ DUP ;`
-Creates in the dictionary. 
-```
-Dictionary: 100 | icolon | CREATE | , | DOES> 
-Dictionary: 104 | @ | DUP | ; 
-Namespace: square->100
-```
-Then its used as `2 square sq2`.
-
-During the executation of `square`, `CREATE` sets up:
-```
-Dictionary: 107 | icreate | 900
-Namespace: sq2->107
-Data: 900: 2
-```
-When the `DOES>` is called the function sees `C: colon-sys(104)` and uses that 
-to edit the definition to:
-```
-Dictionary: 107 | idoes | 900 | 104
-```
-It also sees R: nest-sys(code-ptr) and returns control
-Then lets assume sq2 is used `: foo sq2 ;` which creates:
-```
-Dictionary: 110 | icolon | sq2 | ; 
-```
-`idoes(c,p)` sees `p=108` `PC=112`, it pushes the value at `108`, `900` to the stack.
-Pushes `112` to the Return stack (colon-sys) and sets PC=`104`.
-
-At this point `@ DUP` fetches the data from `900` and DUPs it. 
 
 ### Possible architecture
 
