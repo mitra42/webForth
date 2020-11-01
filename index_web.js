@@ -34,10 +34,10 @@ class ForthConsole extends HTMLElement {
     this.input = document.createElement('forth-input');
     // Define hooks for IO to these areas
     const overrides = {TXbangS: (s) => this.output.TXbangS_web(s)};
-    // Load Forth can also define CELL, EM, memClass //TODO-33-UI export class from forth.js and pass here as a class not a name
+    // Load Forth can also define CELL, EM, memClass
     const CELLL = 2;
     const MEM = 8;
-    ForthLoad({CELLL, MEM, memClass: `${MEM}_${CELLL*8}`, overrides})
+    ForthLoad({CELLL, MEM, overrides})
       .then(() => this.shadowRoot.append(this.input)) ; // Only add input area when Forth defined
       // returns a promise that is ignored
   }
