@@ -1526,12 +1526,10 @@ class Mem8 extends Uint8Array {
   // Write a Jabascript string into the memory, note that string length is in characters,
   // while it returns the amount of bytes written, which could be different given UTF8 encoding
   encodeString(a, s) {
-    //return this.m.write(s, a, 'utf8');
     return new TextEncoder().encodeInto(s, this.subarray(a)).written;
   }
   // Encode a string into an address and return the number of bytes written
   decodeString(a, end) {
-    // return this.m.slice(a, end).toString('utf8'); // Buffer
     return new TextDecoder().decode(this.subarray(a, end));
   }
 }
@@ -1746,6 +1744,8 @@ class Mem32_32 extends Mem32 {
   debug(start,end) { return (end < start) ? "UNDERFLOW" : new Uint32Array(this.buffer, start,(end-start)>>2).toString(); }
 }
 
+// Default memory class for different combinations of MEM and CELL
+// note 16_24 and 32_24 are intentionally unsupported
 const MemClasses = {
   '8_16': Mem8_16,
   '8_24': Mem8_24,
@@ -1781,7 +1781,7 @@ class Forth {
     // Now the memory map itself, starting at the top of memory.
     // ERRATA In Zen the definitions on Zen pg26 dont come close to matching the addresses given as the example below. In particular UPP and RPP(RP0) overlap !
     EM = EM || (0x2000 * this.CELLL); // top of memory default to 4K cells
-    const US = 64 * this.CELLL;  // user area size in cells i.e. 64 variables - standard usage below is using about 37
+    const US = 0x20 * this.CELLL;  // user area size in cells i.e. 64 variables - standard usage below is using about 37
     const UPP = EM - US; // start of user area // TODO-28-MULTI UP should be a variable, and used in most places UPP is
     const RP0 = UPP - (8 * this.CELLL);  // top of return stack RP0 - there is an 8 cell buffer which is probably just for safety.
     const RTS = 0x80 * this.CELLL; // return stack/TIB size // eFORTH-DIFF was 64 which is tiny for any kind of string handling
@@ -1897,8 +1897,7 @@ class Forth {
     console.assert(typeof init !== 'undefined');
     this.Ustore(this._USER, init);         // Initialize the variable for live compilation
     const offsetInBytes = this._USER * this.CELLL;
-    //UZERO is now initialized at userAreaSave
-    //this.Mstore(this.UZERO + offsetInBytes, init); // Store in initialization area for COLD reboot
+    //UZERO is initialized at userAreaSave
     if (name) {                       // Put into dictionary
       this.CODE(name);
       this.DW(tokenUser, offsetInBytes);
@@ -2584,7 +2583,7 @@ class Forth {
     this.closeBracket();
   }
 
-  // : ; doLIT EXIT , OVERT [ ;
+  // : ; doLIT EXIT , OVERT [ ; IMMEDIATE
   semicolon() { // Zen pg95
     this.DW(this.js2xt.EXIT);
     this.OVERT();
