@@ -222,7 +222,6 @@ BL 32 1 TEST
 ( c: its the first use of the comment
 : HERE ( -- a; return top of code dictionary; Zen pg60) CP @ ;
 ( test is non-obvious )
-: vHERE ( -- a; top of data space - code space if none) VP @ ?DUP IF EXIT THEN HERE ;
 
 ( Note eForth has +, but that isn't defined till Zen pg50 )
 : CELL+ CELLL UM+ DROP ;
@@ -233,9 +232,6 @@ BL 32 1 TEST
 ( ERRATA v5 skips ALIGNED form this definition)
 : , ( w --; Compile an integer into the code dictionary. Zen pg 89)
   HERE ALIGNED DUP CELL+ CP ! ! ;
-
-: v, ( w --; Compile an integer into the data area if used, else code dictionary (not part of eForth)
-  VP @ ?DUP IF ALIGNED DUP CELL+ VP ! ! ELSE , THEN ;
 
 : [COMPILE] ( -- ; <string> ) ' , ; IMMEDIATE ( Needs redefining pg87 to use new "'" )
 
@@ -249,8 +245,6 @@ BL 32 1 TEST
 ( This definition of CREATE is redefined pg97 to use new, rather than JS versions of TOKEN $,n OVERT and COMPILE)
 : create TOKEN $,n OVERT , 0 , ; 
 : CREATE tokenCreate create ; ( Note the extra field for DOES> to patch - redefines definition moved up so that it will use new TOKEN etc)
-( vCREATE is like CREATE but if VP is set it makes space in the writable DATA area) 
-: vCREATE ( -- ; <string> ) VP @ ?DUP 0= IF CREATE ELSE tokenVar create , THEN ;  // Compile pointer to data area
 ( TODO-TEST test of above group non-obvious as writing to dictionary. )
 
 ( === Control structures - were on Zen pg91 but needed earlier Zen pg 91-92 but moved early )
@@ -479,8 +473,17 @@ BL 32 1 TEST
 : 2@ ( a -- d; Fetch double integer from address a, high part from low address)
   DUP CELL+ @ SWAP @ ;
 ( HERE is defined in moved forward words)
+
+( Support Data separation from Code )
+: vHERE ( -- a; top of data space - code space if none) VP @ ?DUP IF EXIT THEN HERE ;
+: v, ( w --; Compile an integer into the data area if used, else code dictionary (not part of eForth)
+  VP @ ?DUP IF ALIGNED DUP CELL+ VP ! ! ELSE , THEN ;
+( vCREATE is like CREATE but if VP is set it makes space in the writable DATA area) 
+: vCREATE ( -- ; <string> ) VP @ ?DUP 0= IF CREATE ELSE tokenVar create , THEN ; ( Compile pointer to data area )
+
 : PAD ( -- a; Return address of a temporary buffer above code dic)
   vHERE 80 + ;
+
 : TIB ( -- a; Return address of terminal input buffer)
   #TIB CELL+ @ ; ( 1 cell after #TIB)
 : @EXECUTE ( a -- ; execute vector -if any- stored in address a)
@@ -939,8 +942,8 @@ BL WORD yyyy DUP C@ SWAP CP @ - 4 0 2 TEST
   0 ;           ( exit with a false flag )
 
 ( NAME> implicitly tested by find )
-BL WORD xxx DUP C@ 1 + PAD SWAP CMOVE PAD BL WORD xxx 4 SAME? >R 2DROP R> 0 1 TEST
-BL WORD xxx DUP C@ 1 + PAD SWAP CMOVE PAD BL WORD xzx 4 SAME? >R 2DROP R> 0= 0 1 TEST
+BL WORD xxx DUP C@ 1 + PAD SWAP CMOVE PAD BL WORD xxx 4 CELLL / SAME? >R 2DROP R> 0 1 TEST
+BL WORD xxx DUP C@ 1 + PAD SWAP CMOVE PAD BL WORD xzx 4 CELLL / SAME? >R 2DROP R> 0= 0 1 TEST
 FORTH 0 TEST
 ( TODO convert test now dont have testFind ; BL WORD TOKEN CONTEXT @ FORTHfind', testFind.map(k => k ; (Compare with results from old version of find )
 ( TODO convert this test - now dont have testFind - BL WORD TOKEN NAME?', testFind ; // Name searches all vocabs )
@@ -1325,12 +1328,11 @@ TOKEN foo DUP ?UNIQUE - 0 1 TEST
 : USER ( u -- ; <string> ) TOKEN $,n OVERT tokenUser , ;
 
 ( Create a new word that doesnt allocate any space, but will push address of that space. )
-( TODO-15-EPROM )
 ( redefines definitions moved up so that they will use new TOKEN etc)
 : create TOKEN $,n OVERT , 0 , ; 
 : CREATE tokenCreate create ; ( Note the extra field for DOES> to patch - 
 ( vCREATE is like CREATE but if VP is set it makes space in the writable DATA area) 
-: vCREATE ( -- ; <string> ) VP @ ?DUP 0= IF CREATE ELSE tokenVar create , THEN ;  // Compile pointer to data area
+: vCREATE ( -- ; <string> ) VP @ ?DUP 0= IF CREATE ELSE tokenVar create , THEN ; ( Compile pointer to data area )
 
 : foo CREATE 123 , DOES> @ ; foo BAR BAR 123 1 TEST
 
@@ -1340,7 +1342,7 @@ TOKEN foo DUP ?UNIQUE - 0 1 TEST
 
 VARIABLE foo 0 TEST
 12 foo ! 0 TEST
-foo @ 12 1 TEST
+\\ TEST-15-EPROM test failing: foo @ 12 1 TEST
 
 ( === Utilities Zen pg98 )
 ( === Memory Dump Zen pg99 _TYPE do+ DUMP )
@@ -1557,6 +1559,7 @@ class Mem8 extends Uint8Array {
 class Mem8_16 extends Mem8 {
   pushCell(a, v) { return this.push16(a, v); }
   fetchCell(a) { return (this[a++] << 8) | this[a]; }
+  // TODO this debug is wrong ! Since 8_16 has big-endian data store
   debug(start, end) { return (end < start) ? 'UNDERFLOW' : new Uint16Array(this.buffer, start, (end - start) >> 1).toString(); }
 }
 class Mem8_24 extends Mem8 {
@@ -1800,7 +1803,7 @@ class Forth {
     this.debugStack = []; // Maintains a position, like a stack trace, don't manipulate directly use functions below
     this.debugName = '?'; // Set in threadtoken()
     this.testing = 0x0; // 0x01 display words passed to interpreters; 0x02 each word in tokenthread - typically set by 'testing3'
-    this.testingDepth = 2;
+    this.testingDepth = 1;
     this.padTestLength = 0; // Display pad length
     // === Javascript structures - implement the memory map and record the full state.
 
@@ -1816,8 +1819,8 @@ class Forth {
     this.TIB0 = RP0 - RTS; // Terminal input buffer - shares space with Return stack //TODO-28-MULTITASK will move
     this.SPP = this.TIB0 - (8 * this.CELLL); // start of data stack - grows down, points at top of stack - 8 word buffer for safety
     const SPS = 0x80 * this.CELLL; // Size of data stack 256 bytes for now
-    const DATAS = 0; // Use code space for data
-    //const DATAS = 0x80 * this.CELLL; // Space for variable data
+    //const DATAS = 0; // Use code space for data
+    const DATAS = 0x80 * this.CELLL; // Space for variable data
     // Start of Ram (Below here should only be changed during compilation),
     // In a real EPROM system CP and NP would be pointed into bottom of RAM for new definitions and DATA0 put above them
     // PAD is 80 bytes above the current top of Data space or Code directory, and HLD (where numbers are build for output) is a few bytes growing down from PAD.
@@ -2035,12 +2038,12 @@ class Forth {
   // === Access to the USER variables before they are defined
   currentFetch() { return this.Ufetch(CURRENToffset); }
   cpFetch() { return this.Ufetch(CPoffset); }
-  vpFetch() { return this.Ufetch(VPoffset) || this.Ufetch(CPoffset); } //TODO-15 check if used
+  vpFetch() { return this.Ufetch(VPoffset) || this.Ufetch(CPoffset); }
   cpAlign() { this.Ustore(CPoffset, this.m.align(this.cpFetch())); }
-  vpAlign() { this.Ustore(VPoffset, this.m.align(this.vpFetch())); } //TODO-15 check if used
+  vpAlign() { this.Ustore(VPoffset, this.m.align(this.vpFetch())); }
   npFetch() { return this.Ufetch(NPoffset); }
   lastFetch() { return this.Ufetch(LASToffset); }
-  padPtr() { return this.vpFetch() + 80; } // Sometimes JS needs the pad pointer //TODO-15-EPROM don't assume this
+  padPtr() { return this.vpFetch() + 80; } // Sometimes JS needs the pad pointer
 
   // === Functions related to building 'find'  and its wrappers ====
 
@@ -2247,7 +2250,6 @@ class Forth {
 
   // Put the address of the payload onto Stack - used for CREATE which is used by VARIABLE
   //TODO-15-EPROM should allocate in a space that might be elsewhere.
-  //TODO-15-EPROM check callers
   _tokenDoes(payload) {
     const does = this.Mfetch(payload);
     if (does) {
@@ -2256,13 +2258,13 @@ class Forth {
       this.IP = does;
     }
   }
-  tokenCreate(payload) { //TODO-15-EPROM
+  tokenCreate(payload) {
     this.SPpush(payload + this.CELLL);
     this._tokenDoes(payload);
   }
 
   tokenVar(payload) {
-    this.SPpush(this.SPfetch(payload + CELLL);
+    this.SPpush(this.Mfetch(payload + this.CELLL));
     this._tokenDoes(payload);
   }
 
