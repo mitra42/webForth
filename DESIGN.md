@@ -74,8 +74,8 @@ for example handling read-only memory different from variable memory,
 or managing a large virtual memory space on a smaller device.
 This would be mediated by the memory class.
 
-See [issue-15](https://www.github.com/mitra42/issue/15) 
-and [issue-11](https://www.github.com/mitra42/issue/11) 
+See [issue-15](https://www.github.com/mitra42/issues/15) 
+and [issue-11](https://www.github.com/mitra42/issues/11) 
 
 ### Colon, Code and other words
 ### I/O
@@ -168,6 +168,13 @@ Dictionary: 110 | icolon | sq2 | ;
 `tokenvar` sees `118` in `IP` and reads `108` which points at the `DOES>` code (`@ DUP *`)
 It pushes the pointer to the data `120` onto the stack and acts like `tokenDoList` to run the code,
 which leaves 4 on the stack.
+
+## Epromability
+One challenge with eForth is that it puts data and code in the same space, 
+meaning that to Eprom it requires copying the Eprom to Ram, 
+and given that small chips have limited Ram that isn't smart.
+
+webForth will allow for their separation - see [issue#15](https://www.github.com/mitra42/webforth/issues/15)
 
 ## Earlier version - pretty much everything below here was for a version now deleted
 Mitra Ardron <mitra@mitra.biz> 8 Aug 2020

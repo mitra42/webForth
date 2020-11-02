@@ -77,6 +77,7 @@ const jsFunctionAttributes = [
   { n: 'tokenDoList', token: true },
   { n: 'tokenUser', token: true },
   { n: 'tokenVar', token: true },
+  { n: 'tokenCreate', token: true },
   'ALIGNED',
   { n: 'find' }, // Fast version of find - see Forth definition later
   { n: 'OVERT', replaced: true },
@@ -106,6 +107,7 @@ const tokenNextVal = 1;
 const tokenDoList = 2;
 const tokenUser = 3;
 const tokenVar = 4;
+const tokenCreate = 5;
 
 // === Memory Map - Zen pg26
 const l = {}; // Constants that will get compiled into the dictionary
@@ -165,6 +167,7 @@ USER(undefined, undefined); // Vocabulary link uses one cell after CURRENT (not 
 const CPoffset = USER('CP', undefined);  // eForth initializes to CTOP but we have to use this during compilation
 const NPoffset = USER('NP', undefined);  // normally set on Zen pg106 but we are using it live. Its the bottom of what compiled in name space.
 const LASToffset = USER('LAST', undefined); // normally set on Zen pg106 but using live
+const VPoffset = USER('VP', undefined);  // not part of eForth, pointer into Data space for EPROMability
 
 const forthInForth = `
 0 TEST
@@ -219,6 +222,7 @@ BL 32 1 TEST
 ( c: its the first use of the comment
 : HERE ( -- a; return top of code dictionary; Zen pg60) CP @ ;
 ( test is non-obvious )
+: vHERE ( -- a; top of data space - code space if none) VP @ ?DUP IF EXIT THEN HERE ;
 
 ( Note eForth has +, but that isn't defined till Zen pg50 )
 : CELL+ CELLL UM+ DROP ;
@@ -230,6 +234,9 @@ BL 32 1 TEST
 : , ( w --; Compile an integer into the code dictionary. Zen pg 89)
   HERE ALIGNED DUP CELL+ CP ! ! ;
 
+: v, ( w --; Compile an integer into the data area if used, else code dictionary (not part of eForth)
+  VP @ ?DUP IF ALIGNED DUP CELL+ VP ! ! ELSE , THEN ;
+
 : [COMPILE] ( -- ; <string> ) ' , ; IMMEDIATE ( Needs redefining pg87 to use new "'" )
 
 : COMPILE ( --; Compile the next address in colon list to code dictionary. Zen pg 90)
@@ -240,7 +247,10 @@ BL 32 1 TEST
   , ; IMMEDIATE ( compile literal itself )
 
 ( This definition of CREATE is redefined pg97 to use new, rather than JS versions of TOKEN $,n OVERT and COMPILE)
-: CREATE TOKEN $,n OVERT tokenVar , 0 , ; ( Note the extra field for DOES> to patch )
+: create TOKEN $,n OVERT , 0 , ; 
+: CREATE tokenCreate create ; ( Note the extra field for DOES> to patch - redefines definition moved up so that it will use new TOKEN etc)
+( vCREATE is like CREATE but if VP is set it makes space in the writable DATA area) 
+: vCREATE ( -- ; <string> ) VP @ ?DUP 0= IF CREATE ELSE tokenVar create , THEN ;  // Compile pointer to data area
 ( TODO-TEST test of above group non-obvious as writing to dictionary. )
 
 ( === Control structures - were on Zen pg91 but needed earlier Zen pg 91-92 but moved early )
@@ -470,7 +480,7 @@ BL 32 1 TEST
   DUP CELL+ @ SWAP @ ;
 ( HERE is defined in moved forward words)
 : PAD ( -- a; Return address of a temporary buffer above code dic)
-  HERE 80 + ;
+  vHERE 80 + ;
 : TIB ( -- a; Return address of terminal input buffer)
   #TIB CELL+ @ ; ( 1 cell after #TIB)
 : @EXECUTE ( a -- ; execute vector -if any- stored in address a)
@@ -1165,7 +1175,7 @@ BL PARSE 123 PAD PACK$ $INTERPRET 123 1 TEST
   XIO ;
 
 ( EFORTH-ZEN-ERRATA has 'RX?' should be '?RX'
-CREATE I/O  ' ?RX , ' TX! , ( Array to store default I/O vectors. )
+vCREATE I/O  ' ?RX v, ' TX! v, ( Array to store default I/O vectors. )
 
 : CONSOLE ( -- )
   ( Initiate terminal interface.)
@@ -1211,6 +1221,7 @@ CREATE I/O  ' ?RX , ' TX! , ( Array to store default I/O vectors. )
 : ' ( -- ca ) TOKEN NAME? IF EXIT THEN THROW ;
 
 : ALLOT ( n -- ) CP +! ; ( ERRATA Zen has +1 instead of +! fixed in V5 and Staapl)
+: vALLOT ( n -- ) VP @ IF VP +! ELSE ALLOT THEN ; ( EPROM ALLOT - not part of eForth)
 
 : [COMPILE] ( -- ; <string> ) ' , ; IMMEDIATE ( Needs redefining to use new "'" )
 
@@ -1279,6 +1290,7 @@ TOKEN foo DUP ?UNIQUE - 0 1 TEST
   THROW ;       ( generate an error condition )
   
 : OVERT ( -- ) ( Redefining code word in Forth)
+  ( TODO-15-EPROM can't write into Code space to update dict - see also code version)
   ( Link a successfully defined word into the current vocabulary. )
   LAST @        ( name field address of last word )
   CURRENT @  ! ; ( link it to current vocabulary )
@@ -1313,10 +1325,16 @@ TOKEN foo DUP ?UNIQUE - 0 1 TEST
 : USER ( u -- ; <string> ) TOKEN $,n OVERT tokenUser , ;
 
 ( Create a new word that doesnt allocate any space, but will push address of that space. )
-: CREATE ( -- ; <string> ) TOKEN $,n OVERT tokenVar , 0 , ; ( redefines definition moved up so that it will use new TOKEN etc)
+( TODO-15-EPROM )
+( redefines definitions moved up so that they will use new TOKEN etc)
+: create TOKEN $,n OVERT , 0 , ; 
+: CREATE tokenCreate create ; ( Note the extra field for DOES> to patch - 
+( vCREATE is like CREATE but if VP is set it makes space in the writable DATA area) 
+: vCREATE ( -- ; <string> ) VP @ ?DUP 0= IF CREATE ELSE tokenVar create , THEN ;  // Compile pointer to data area
+
 : foo CREATE 123 , DOES> @ ; foo BAR BAR 123 1 TEST
 
-: VARIABLE ( -- ; <string> ) CREATE 0 , ;
+: VARIABLE ( -- ; <string> ) vCREATE 0 v, ;
 
 : CONSTANT ( u -- ; <string> ) TOKEN $,n OVERT tokenNextVal , , ;
 
@@ -1385,6 +1403,7 @@ foo @ 12 1 TEST
   BASE @ DECIMAL DUP . BASE  ! ;
 : .FREE ( -- ; report free memory)
   CP 2@ - U. ;
+( TODO-15-EPROM may need .vFREE)
 : !CSP ( -- ; Save stack pointer for error checking )
   SP@ CSP ! ;
 : ?CSP ( -- ; Check stack pointer matches saved stack pointer )
@@ -1470,11 +1489,11 @@ BL WORD DUP NAME? SWAP FORTH>NAME = -1 1 TEST
   CR ; COMPILE-ONLY
 
 ( === Hardware Reset Zen pg106 COLD )
-: EMPTY ( -- )
+: EMPTY ( -- ) ( TODO-15-EPROM)
   ( Empty out any definitions)
   FORTH CONTEXT @ DUP CURRENT 2! ;
 
-CREATE 'BOOT  ' hi , ( application vector )
+vCREATE 'BOOT  ' hi v, ( application vector )
 
 ( ERRATA ZEN uses but doesnt define U0 and assumes US=37 )
 : COLD ( -- )
@@ -1485,9 +1504,10 @@ CREATE 'BOOT  ' hi , ( application vector )
     CONSOLE
     'BOOT @EXECUTE ( Vectored Boot routine, defaults to hi)
     FORTH          ( Make FORTH context vocabulary - searches)
-    CONTEXT @ DUP CURRENT 2! ( Definitions in FORTH as well )
+    CONTEXT @ DUP CURRENT 2! ( Definitions in FORTH as well ) ( TODO-15-EPROM)
     OVERT         ( And Reset FORTH definition to last definition from the userAreaInit  )
     QUIT          ( Invoke Forth "operating system" )
+    ( TODO-15-EPROM consider how to initialize variable area, esp FORTH I/O and 'BOOT )
   AGAIN ;         ( Safeguard the Forth interpreter )
 
 : WARM CONSOLE 'BOOT @EXECUTE QUIT ;
@@ -1796,14 +1816,21 @@ class Forth {
     this.TIB0 = RP0 - RTS; // Terminal input buffer - shares space with Return stack //TODO-28-MULTITASK will move
     this.SPP = this.TIB0 - (8 * this.CELLL); // start of data stack - grows down, points at top of stack - 8 word buffer for safety
     const SPS = 0x80 * this.CELLL; // Size of data stack 256 bytes for now
-    const NAMEE = this.SPP - SPS; // name dictionary
+    const DATAS = 0; // Use code space for data
+    //const DATAS = 0x80 * this.CELLL; // Space for variable data
+    // Start of Ram (Below here should only be changed during compilation),
+    // In a real EPROM system CP and NP would be pointed into bottom of RAM for new definitions and DATA0 put above them
+    // PAD is 80 bytes above the current top of Data space or Code directory, and HLD (where numbers are build for output) is a few bytes growing down from PAD.
+    const DATA0 = DATAS ? this.SPP-SPS-DATAS : 0; // 0 means use code space
+
+    const NAMEE = this.SPP-SPS-DATAS; // name dictionary
     // And then building from the bottom up. The gap in middle is code directory
     // cold start vector - its unclear if these bottom 0x100 are useful outside of the DOS context and for DOS it would need code at this address I think?
     // const COLDD = 0x100;
     this.UZERO = 0;
     // Above UZERO is a store of initial values for User variables
+    // PAD is 80 bytes above the current top of Data space or Code directory, and HLD (where numbers are build for output) is a few bytes growing down from PAD.
     const CODEE = this.UZERO + US; // code dictionary grows up from here towards NAME dictionary.
-    // PAD is 80 bytes above the current top of the Code directory, and HLD (where numbers are build for output) is a few bytes growing down from PAD.
     console.log('Space for', NAMEE - CODEE, 'bytes for code and names');
 
     // Get a instance of a class to store in
@@ -1821,6 +1848,7 @@ class Forth {
     // Setup pointers for first dictionary entries.
     this.Ustore(CPoffset, CODEE); // Pointer to where compiling into dic
     this.Ustore(NPoffset, NAMEE); // Pointer to where writing name stack
+    this.Ustore(VPoffset, DATA0); // Pointer to start of writing variables, might be 0 if using code space like eForth does
     this.Ustore(RP0offset, RP0);
     // Allow Overrides of functions by caller - used for example to vector console I/O
     // Order is significant, as buildDictionary will define a jsFunction that points to the function as defined then.
@@ -1836,6 +1864,7 @@ class Forth {
   // === Build dictionary, mostly from jsFunctionAttributes
   buildDictionary() {
     // Define the first word in the dictionary, I'm using 'FORTH' for this because we need this variable to define everything else.
+    // TODO-15-EPROM
     this.CODE('FORTH');
     this.DW(tokenVocabulary); // Uses assumption that tokenVocabulary is first in jsFunctionAttributes
     this.Ustore(CURRENToffset, this.cpFetch()); // Initialize Current. Context & Current+CELLL initialized in USER process Zen pg46
@@ -2006,10 +2035,12 @@ class Forth {
   // === Access to the USER variables before they are defined
   currentFetch() { return this.Ufetch(CURRENToffset); }
   cpFetch() { return this.Ufetch(CPoffset); }
+  vpFetch() { return this.Ufetch(VPoffset) || this.Ufetch(CPoffset); } //TODO-15 check if used
   cpAlign() { this.Ustore(CPoffset, this.m.align(this.cpFetch())); }
+  vpAlign() { this.Ustore(VPoffset, this.m.align(this.vpFetch())); } //TODO-15 check if used
   npFetch() { return this.Ufetch(NPoffset); }
   lastFetch() { return this.Ufetch(LASToffset); }
-  padPtr() { return this.cpFetch() + 80; } // Sometimes JS needs the pad pointer
+  padPtr() { return this.vpFetch() + 80; } // Sometimes JS needs the pad pointer //TODO-15-EPROM don't assume this
 
   // === Functions related to building 'find'  and its wrappers ====
 
@@ -2104,7 +2135,7 @@ class Forth {
 
   // -- a; Push a Javascript string to a temporary location as a counted string, and put its address on the stack
   JStoCounted(s) {
-    const tempBuf = this.cpFetch() + 52; // Above Code below HLD which builds numbers down from PAD which is cpFetch + 80
+    const tempBuf = this.vpFetch() + 52; // Above Data or Code below HLD which builds numbers down from PAD which is vpFetch + 80
     // copy string to TIB, and return length in bytes (which may not be same as s.length if UTF8;
     this.Mstore8(tempBuf, this.m.encodeString(tempBuf + 1, s));
     this.SPpush(tempBuf);
@@ -2162,6 +2193,7 @@ class Forth {
   }
 
   // Make the most recent definition available in the directory. This is part of closing every 'defining word'
+  // TODO-15-EPROM - see also forth version
   OVERT() {
     this.Mstore(this.currentFetch(), this.lastFetch()); // LAST @ CURRENT @ !
   }
@@ -2194,6 +2226,7 @@ class Forth {
   // Words that will use a Javascript function for its action are just JS functions with an entry in jsFunctionAttributes
 
   //TODO-29 define VOCABULARY as CREATE DOES> word then come back and replace this
+  // TODO-15-EPROM can't store a pointer to code space
   tokenVocabulary(payload) {
     // : doVOC R> CONTEXT ! ;
     this.Ustore(CONTEXToffset, payload);
@@ -2213,14 +2246,24 @@ class Forth {
   tokenUser(payload) { this.SPpush(this.Mfetch(payload) + this.UP); }
 
   // Put the address of the payload onto Stack - used for CREATE which is used by VARIABLE
-  tokenVar(payload) {
-    this.SPpush(payload + this.CELLL);
+  //TODO-15-EPROM should allocate in a space that might be elsewhere.
+  //TODO-15-EPROM check callers
+  _tokenDoes(payload) {
     const does = this.Mfetch(payload);
     if (does) {
       this.debugPush();
       this.RPpush(this.IP);
       this.IP = does;
     }
+  }
+  tokenCreate(payload) { //TODO-15-EPROM
+    this.SPpush(payload + this.CELLL);
+    this._tokenDoes(payload);
+  }
+
+  tokenVar(payload) {
+    this.SPpush(this.SPfetch(payload + CELLL);
+    this._tokenDoes(payload);
   }
 
   // === INNER INTERPRETER YES THIS IS IT ! ==================== eForthAndZen#36
@@ -2357,9 +2400,9 @@ class Forth {
 
   // Memory access eForthAndZen#39
   store() { this.Mstore(this.SPpop(), this.SPpop()); } //!  w a -- , Store
-  fetch() { this.SPpush(this.Mfetch(this.SPpop())); }//@ a -- w, fetch
-  cStore() { this.Mstore8(this.SPpop(), this.SPpop()); }//C! c a -- , Store character
-  cFetch() { this.SPpush(this.Mfetch8(this.SPpop())); }//C@ a -- c, Fetch character
+  fetch() { this.SPpush(this.Mfetch(this.SPpop())); } //@ a -- w, fetch
+  cStore() { this.Mstore8(this.SPpop(), this.SPpop()); } //C! c a -- , Store character
+  cFetch() { this.SPpush(this.Mfetch8(this.SPpop())); } //C@ a -- c, Fetch character
 
   // Return stack words eForthAndZen#40
   RPat() { this.SPpush(this.RP); } //RP@
@@ -2484,7 +2527,7 @@ class Forth {
   checkNotCompilingReplaceable(xt, na) {
     if (jsFunctionAttributes[this.Mfetch(xt)].replaced) {
       const inDefOf = this.countedToJS(this.lastFetch());
-      if (!['[COMPILE]', '(', 'CREATE'].includes(inDefOf)) { // We redefine ( so ok with redefinition
+      if (!['[COMPILE]', '(', 'create', 'CREATE', 'vCREATE'].includes(inDefOf)) { // Intentionally redefine ( so ok with redefinition
         console.log('Compiling', this.countedToJS(na), 'in', inDefOf, 'when code will be deleted');
         console.assert(false); // Break here, shouldn't be happening.
       }
