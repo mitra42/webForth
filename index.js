@@ -1505,9 +1505,10 @@ let stdinBuffer = null; // Local to ?RX do not access directly - but there can b
 class Mem8 extends Uint8Array {
   constructor(...args) {
     if (args[0] instanceof ArrayBuffer) { // Its a call to subarray,
+      // noinspection JSCheckFunctionSignatures
       super(...args);
     } else {
-      const { length, celll } = args[0]; // length in BYTES, and size of each CELL
+      const { length } = args[0]; // length in BYTES, and size of each CELL
       super(length);
     }
   } // Pointless constructor
@@ -1523,7 +1524,7 @@ class Mem8 extends Uint8Array {
   align(byteaddr) { return byteaddr; }
   assertAlign() { }
 
-  // Write a Jabascript string into the memory, note that string length is in characters,
+  // Write a Javascript string into the memory, note that string length is in characters,
   // while it returns the amount of bytes written, which could be different given UTF8 encoding
   encodeString(a, s) {
     return new TextEncoder().encodeInto(s, this.subarray(a)).written;
@@ -1536,26 +1537,28 @@ class Mem8 extends Uint8Array {
 class Mem8_16 extends Mem8 {
   pushCell(a, v) { return this.push16(a, v); }
   fetchCell(a) { return (this[a++] << 8) | this[a]; }
-  debug(start,end) { return (end < start) ? "UNDERFLOW" : new Uint16Array(this.buffer, start,(end-start)>>1).toString(); }
+  debug(start, end) { return (end < start) ? 'UNDERFLOW' : new Uint16Array(this.buffer, start, (end - start) >> 1).toString(); }
 }
 class Mem8_24 extends Mem8 {
   pushCell(a, v) { return this.push24(a, v); }
   fetchCell(a) { return (((this[a++] << 8) | this[a++]) << 8) | this[a]; }
-  debug(start,end) { return (end < start) ? "UNDERFLOW" : new Uint8Array(this.buffer, start,end-start).toString(); }
+  debug(start, end) { return (end < start) ? 'UNDERFLOW' : new Uint8Array(this.buffer, start, end - start).toString(); }
 }
 class Mem8_32 extends Mem8 {
   pushCell(a, v) { return this.push32(a, v); }
   fetchCell(a) { return  (((((this[a++] << 8) | this[a++]) << 8) | this[a++]) << 8) | this[a]; }
-  debug(start,end) { return (end < start) ? "UNDERFLOW" : new Uint32Array(this.buffer, start,(end-start)>>2).toString(); }
+  debug(start, end) { return (end < start) ? 'UNDERFLOW' : new Uint32Array(this.buffer, start, (end - start) >> 2).toString(); }
 }
 
+// noinspection JSBitwiseOperatorUsage,JSBitwiseOperatorUsage
 class Mem16 extends Uint16Array {
   // The actual pushCell and fetchCell should take care of endian issues and support littleEndian or bigEndian
   constructor(...args) {
     if (args[0] instanceof ArrayBuffer) { // Its a call to subarray,
+      // noinspection JSCheckFunctionSignatures
       super(...args);
     } else {
-      const { length, celll } = args[0]; // length in BYTES, and size of each CELL
+      const { length } = args[0]; // length in BYTES, and size of each CELL
       super(length);
       this.littleEndian = true;
     }
@@ -1589,7 +1592,7 @@ class Mem16 extends Uint16Array {
     const cellAddr = --byteAddr >> 1; // A points at cell (in both cases
     const offset = byteAddr & 0x01;
     const cell = this[cellAddr];
-    if (offset ^ this.littleEndian ) {
+    if (offset ^ this.littleEndian) {
       this[cellAddr] = (cell & 0xFF00) | v;
     } else {
       this[cellAddr] = (cell & 0x00FF) | (v << 8);
@@ -1625,7 +1628,7 @@ class Mem16 extends Uint16Array {
 class Mem16_16 extends Mem16 {
   pushCell(a, v) { return this.push16(a, v); }
   fetchCell(a) { return this.fetch16(a); }
-  debug(start,end) { return (end < start) ? "UNDERFLOW" : new Uint16Array(this.buffer, start,(end-start)>>1).toString(); }
+  debug(start, end) { return (end < start) ? 'UNDERFLOW' : new Uint16Array(this.buffer, start, (end - start) >> 1).toString(); }
 }
 class Mem16_32 extends Mem16 {
   pushCell(byteAddr, v) {
@@ -1640,15 +1643,18 @@ class Mem16_32 extends Mem16 {
       ? (this[cellAddr++] | (this[cellAddr] << 16))
       : ((this[cellAddr++] << 16) | this[cellAddr]);
   }
-  debug(start,end) { return (end < start) ? "UNDERFLOW" : new Uint32Array(this.buffer, start,(end-start)>>2).toString(); }
+  debug(start, end) { return (end < start) ? 'UNDERFLOW' : new Uint32Array(this.buffer, start, (end - start) >> 2).toString(); }
 }
+
+// noinspection JSBitwiseOperatorUsage,JSBitwiseOperatorUsage,JSBitwiseOperatorUsage
 class Mem32 extends Uint32Array {
   // The actual pushCell and fetchCell should take care of endian issues and support littleEndian or bigEndian
   constructor(...args) {
     if (args[0] instanceof ArrayBuffer) { // Its a call to subarray,
+      // noinspection JSCheckFunctionSignatures
       super(...args);
     } else {
-      const { length, celll } = args[0]; // length in BYTES, and size of each CELL
+      const { length } = args[0]; // length in BYTES, and size of each CELL
       super(length);
       this.littleEndian = true;
     }
@@ -1662,7 +1668,7 @@ class Mem32 extends Uint32Array {
   fetch8(byteAddr) {
     const offset = byteAddr & 0x03;
     const cell = this[byteAddr >> 2]; // Does not have to be aligned
-    const shift = 8 * (this.littleEndian ? offset : (3-offset));
+    const shift = 8 * (this.littleEndian ? offset : (3 - offset));
     return (cell >> shift) & 0xFF;
   }
 
@@ -1680,7 +1686,7 @@ class Mem32 extends Uint32Array {
     console.assert(!(v & 0xFFFFFF00)); // Check never try and store something > a byte
     const cellAddr = --byteAddr >> 2; // A points at cell (in both cases
     const offset = byteAddr & 0x03;
-    const shift = 8 * (this.littleEndian ? offset : (3-offset));
+    const shift = 8 * (this.littleEndian ? offset : (3 - offset));
     const cell = this[cellAddr];
     this[cellAddr] = (cell & (0xFFFFFFFF ^ (0xFF << shift))) | (v << shift);
     return byteAddr; // Has been decremented by 1
@@ -1693,13 +1699,13 @@ class Mem32 extends Uint32Array {
     const cellAddr = byteAddr >> 2; // A points at cell (in all cases
     const offset = (byteAddr & 0x03) >> 1; // Will be 0 or 1
     const cell = this[cellAddr];
-    if (offset ^ this.littleEndian ) {
+    if (offset ^ this.littleEndian) {
       this[cellAddr] = (cell & 0xFFFF0000) | v;
     } else {
       this[cellAddr] = (cell & 0x0000FFFF) | (v << 16);
     }
     return byteAddr; // Has been decremented by 1
- }
+  }
 
   push32(byteAddr, v) {
     let cellAddr = this.cellAddr(byteAddr);
@@ -1727,21 +1733,23 @@ class Mem32 extends Uint32Array {
   }
 }
 
+// noinspection JSBitwiseOperatorUsage
 class Mem32_16 extends Mem32 {
   pushCell(a, v) { return this.push16(a, v); }
   fetchCell(a) { return this.fetch16(a); }
-  // Alignment is to the smaller of cellsize or memory size, in this case 16 bit
+  // Alignment is to the smaller of cell length or memory size, in this case 16 bit
   align(byteAddr) { return (((byteAddr - 1) >> 1) + 1) << 1; }
-  assertAlign(byteAddr) { console.assert(!(byteAddr & 0x01));}
-  debug(start,end) { return (end < start) ? "UNDERFLOW" : new Uint16Array(this.buffer, start,(end-start)>>1).toString(); }
+  assertAlign(byteAddr) { console.assert(!(byteAddr & 0x01)); }
+  debug(start, end) { return (end < start) ? 'UNDERFLOW' : new Uint16Array(this.buffer, start, (end - start) >> 1).toString(); }
 }
+// noinspection JSBitwiseOperatorUsage
 class Mem32_32 extends Mem32 {
   pushCell(a, v) { return this.push32(a, v); }
   fetchCell(a) { return this.fetch32(a); }
-  // Alignment is to the smaller of cellsize or memory size in this case 32
+  // Alignment is to the smaller of cell length or memory size in this case 32
   align(byteAddr) { return (((byteAddr - 1) >> 2) + 1) << 2; }
   assertAlign(byteAddr) { console.assert(!(byteAddr & 0x03)); }
-  debug(start,end) { return (end < start) ? "UNDERFLOW" : new Uint32Array(this.buffer, start,(end-start)>>2).toString(); }
+  debug(start, end) { return (end < start) ? 'UNDERFLOW' : new Uint32Array(this.buffer, start, (end - start) >> 2).toString(); }
 }
 
 // Default memory class for different combinations of MEM and CELL
@@ -1759,7 +1767,7 @@ const MemClasses = {
 // noinspection JSBitwiseOperatorUsage
 class Forth {
   // Build and return an initialized Forth memory obj
-  constructor({ CELLL = 2, MEM = 8, memClass = undefined, EM = undefined, overrides = {}}) {
+  constructor({ CELLL = 2, MEM = 8, memClass = undefined, EM = undefined, overrides = {} }) {
     // ERRATA Zen doesnt define CELLL (and presumes is 2 in multiple places)
     this.CELLL = CELLL;  // 2,3 or 4. Needs to be big enough for an address
     this.CELLbits = CELLL * 8; // Number of bits in a cell - used for loops and shifts
@@ -1770,7 +1778,7 @@ class Forth {
     // === Support for Debugging ============
 
     this.debugStack = []; // Maintains a position, like a stack trace, don't manipulate directly use functions below
-    this.debugName = "?"; // Set in threadtoken()
+    this.debugName = '?'; // Set in threadtoken()
     this.testing = 0x0; // 0x01 display words passed to interpreters; 0x02 each word in tokenthread - typically set by 'testing3'
     this.testingDepth = 2;
     this.padTestLength = 0; // Display pad length
@@ -1796,7 +1804,7 @@ class Forth {
     // Above UZERO is a store of initial values for User variables
     const CODEE = this.UZERO + US; // code dictionary grows up from here towards NAME dictionary.
     // PAD is 80 bytes above the current top of the Code directory, and HLD (where numbers are build for output) is a few bytes growing down from PAD.
-    console.log('Space for',NAMEE-CODEE, 'bytes for code and names');
+    console.log('Space for', NAMEE - CODEE, 'bytes for code and names');
 
     // Get a instance of a class to store in
     this.m = new (memClass || MemClasses[`${MEM}_${this.CELLbits}`])({ length: EM, celll: this.CELLL });
@@ -1814,10 +1822,10 @@ class Forth {
     this.Ustore(CPoffset, CODEE); // Pointer to where compiling into dic
     this.Ustore(NPoffset, NAMEE); // Pointer to where writing name stack
     this.Ustore(RP0offset, RP0);
-    // Allow Overrides of funtions by caller - used for example to vector console I/O
+    // Allow Overrides of functions by caller - used for example to vector console I/O
     // Order is significant, as buildDictionary will define a jsFunction that points to the function as defined then.
-    ["TXbangC", "TXbangS", "bangIO", "qrx"].forEach(k => {
-      if (typeof overrides[k] === "function") {
+    ['TXbangC', 'TXbangS', 'bangIO', 'qrx'].forEach((k) => {
+      if (typeof overrides[k] === 'function') {
         this[k] = overrides[k]; } });
     this.buildDictionary();
     // compiling forthInForth is done outside this as it is async. TODO-23-NODEAPI may change
@@ -1827,7 +1835,6 @@ class Forth {
 
   // === Build dictionary, mostly from jsFunctionAttributes
   buildDictionary() {
-
     // Define the first word in the dictionary, I'm using 'FORTH' for this because we need this variable to define everything else.
     this.CODE('FORTH');
     this.DW(tokenVocabulary); // Uses assumption that tokenVocabulary is first in jsFunctionAttributes
@@ -1850,6 +1857,7 @@ class Forth {
         attribs = { n: attribs };
       }
       const n = attribs.n;
+      // noinspection JSUnresolvedVariable
       const f = this[attribs.f || n];
       const tok = this.jsFunctions.length; // Where function will be pushed
       // special case: token Functions that need constants
@@ -1913,6 +1921,7 @@ class Forth {
   cleanupBootstrap() {
     // Cleanup - remove routines that shouldnt be being used
     jsFunctionAttributes.forEach((attribs, i) => {
+      // noinspection JSUnresolvedVariable
       if (attribs.replaced) {
         this.jsFunctions[i] = null;
       }
@@ -1929,7 +1938,7 @@ class Forth {
       this.debugName = this.xt2name(xt); // Expensive so only done when testing
       if (this.testingDepth > this.debugStack.length) {
         //TODO-28-MULTITASK RPP(RP0) and SPP will move
-        console.log('R:', this.RP0 === this.RP ? '' : this.m.debug(this.RP, this.Ufetch(RP0offset)), this.debugStack, this.xt2name(xt), 'S:', this.SPP === this.SP ? '' : this.m.debug(this.SP, this.SPP),
+        console.log('R:', this.Ufetch(RP0offset) === this.RP ? '' : this.m.debug(this.RP, this.Ufetch(RP0offset)), this.debugStack, this.xt2name(xt), 'S:', this.SPP === this.SP ? '' : this.m.debug(this.SP, this.SPP),
           this.padTestLength ? ('pad: ' + (this.padTestLength > 0 ? this.m.decodeString(this.padPtr(), this.padPtr() + this.padTestLength) : this.m.decodeString(this.padPtr() + this.padTestLength, this.padPtr()))) : '');
       }
     }
@@ -1976,7 +1985,7 @@ class Forth {
   Mstore(a, v) { const a2 = a + this.CELLL; this.Mpush(a2, v); return a2; } // Returns address after the store
   // 8 bit equivalents
   Mfetch8(a) { return this.m.fetch8(a); } // Returns address after the store
-  Mpush8(a, v) { return this.m.push8(a); } // Returns address after the store
+  Mpush8(a, v) { return this.m.push8(a, v); } // Returns address after the store
   Mstore8(a, v) {
     const a2 = a + 1;
     this.m.push8(a2, v);
@@ -2134,8 +2143,8 @@ class Forth {
 
   // na -- ; Builds bytes around a newly entered name. Same function as $,n on Zen pg94 used by all defining words (this.CODE ':')
   // expects in Name dictionary: <count><string><opt padding>
-  // prepends:   <aligned ddress of next cell of code><address of na of last deftn in vocab>...
-  // Side effects are important: specfically.
+  // prepends:   <aligned address of next cell of code><address of na of last definition in vocabulary>...
+  // Side effects are important: specifically.
   // LAST <= na
   dollarCommaN() {
     if (this.Mfetch8(this.SPfetch())) {         // DUP C@ IF  ; test for no word
@@ -2163,8 +2172,8 @@ class Forth {
     // <NP-after>CPh CPl <_LINK> LINKh LINKl count name... <NP-BEFORE>
     this.cpAlign(); // If required by memory store, align to boundary.
     // Note this is going to give the name string an integral number of cells.
-    const len = (((name.length / this.CELLL) >>0) + 1) * this.CELLL;
-    let a = this.npFetch() - len;
+    const len = (((name.length / this.CELLL) >> 0) + 1) * this.CELLL;
+    const a = this.npFetch() - len;
     this.Ustore(NPoffset, a);
     this.SPpush(a); // so this.dollarCommaN can find it
     // This byte will be updated by this.IMMEDIATE() IMMEDIATE or COMPILE-ONLY
@@ -2246,7 +2255,7 @@ class Forth {
       if (maybePromise) {
         await maybePromise;
       } else if (!waitFrequency--) {
-        //setTimeout(resolve, 0) is same as setImmmediate(resolve) but latter is not available in browsers
+        //setTimeout(resolve, 0) is same as setImmediate(resolve) but latter is not available in browsers
         await new Promise(resolve => setTimeout(resolve, 0)); //ASYNC: to allow IO to run
         waitFrequency = 100; // How many cycles to allow a thread swap
       }
@@ -2300,7 +2309,8 @@ class Forth {
   }
 
   // Low level TX!, output one character to stdout, inefficient, but not likely to be bottleneck.
-  TXbangC(c) { this.TXbangS(String.fromCharCode(c)); }
+  TXbangC(c) { // noinspection JSUnresolvedFunction
+    this.TXbangS(String.fromCharCode(c)); }
   TXbang() { this.TXbangC(this.SPpop()); }
   qrx() { return [false]; } // Overridden by node
 
@@ -2318,7 +2328,7 @@ class Forth {
       this.Mfetch(this.Ufetch(LASToffset) - 2 * this.CELLL) + this.CELLL, // field after tokenVar compile by CREATE
       this.IP, // The address after the doDOES
     );
-    this.EXIT(); // Exit the CREATion
+    this.EXIT(); // Exit the CREATE part
   }
 
   // Address Literals (aka branches and jumps) eForthAndZen#38
@@ -2551,12 +2561,13 @@ class Forth {
     const inputs = inp.split('\n');
     // eslint-disable-next-line no-restricted-syntax,guard-for-in
     for (const i in inputs) {
-      const inp = inputs[i];
+      // noinspection JSUnfilteredForInLoop
+      const inputline = inputs[i];
       if (this.testing & 0x01) {
-        console.log(this.m.debug(this.SP, this.SPP), ' >>', inp);
+        console.log(this.m.debug(this.SP, this.SPP), ' >>', inputline);
       }
-      this.JStoTIB(inp);
-      await this.EVAL(inp);
+      this.JStoTIB(inputline);
+      await this.EVAL(inputline);
     }
   }
 
