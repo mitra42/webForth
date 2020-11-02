@@ -1789,7 +1789,7 @@ class Forth {
     // Now the memory map itself, starting at the top of memory.
     // ERRATA In Zen the definitions on Zen pg26 dont come close to matching the addresses given as the example below. In particular UPP and RPP(RP0) overlap !
     EM = EM || (0x2000 * this.CELLL); // top of memory default to 4K cells
-    const US = 0x20 * this.CELLL;  // user area size in cells i.e. 64 variables - standard usage below is using about 37
+    const US = 0x40 * this.CELLL;  // user area size in cells i.e. 64 variables - standard usage below is using about 37
     const UPP = EM - US; // start of user area // TODO-28-MULTI UP should be a variable, and used in most places UPP is
     const RP0 = UPP - (8 * this.CELLL);  // top of return stack RP0 - there is an 8 cell buffer which is probably just for safety.
     const RTS = 0x80 * this.CELLL; // return stack/TIB size // eFORTH-DIFF was 64 which is tiny for any kind of string handling
