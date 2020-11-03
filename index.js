@@ -176,42 +176,51 @@ const forthInForth = `
 : IMMEDIATE =IMED setHeaderBits ;
 
 : ( 41 PARSE 2DROP ; IMMEDIATE ( from Zen pg74, note dont have LITERAL so cant do [ CHAR ( ] LITERAL instead of 41 )
-  1 2 ( 3 ) 1 2 2 TEST
-( Now that ( is defined we can use comments below here )
+: \\ ( -- ; Ignore following text till the end of line.)
+   #TIB @ >IN ! ( store the length of TIB in >IN )
+   ; IMMEDIATE ( in effect ignore the rest of a line )
+( Now these are defined we can use both kinds of comments below here )
+
+1 2 ( 3 ) 1 2 2 TEST
+
+( Uncomment first for production, 2nd for testing )
+\\ : \\T #TIB @ >IN ! ;
+: \\T ; IMMEDIATE
+
 
 ( === Test as many of the words defined in code as possible)
 ( EXIT & EXECUTE tested with ' )
 ( doLIT implicitly tested by all literals )
 ( next, ?branch, branch implicitly tested by control structures )
 ( CELLL 2 1 TEST ( Assuming small cell, otherwise it should be 2 )
-123 HLD ! HLD @ 123 1 TEST ( Also tests user variables )
-222 HLD C! HLD C@ 222 1 TEST
+\\T 123 HLD ! HLD @ 123 1 TEST ( Also tests user variables )
+\\T 222 HLD C! HLD C@ 222 1 TEST
 ( R> >R R@ SP@ SP! tested after arithmetic operators )
-30 20 DROP 30 1 TEST
-30 20 DUP 30 20 20 3 TEST
-10 20 SWAP 20 10 2 TEST
-10 20 OVER 10 20 10 3 TEST
-123 0< -123 0< 0 -1 2 TEST
-16 BASE !
-5050 6060 AND 5050 6060 OR 5050 6060 XOR 4040 7070 3030 3 TEST
-0A BASE !
+\\T 30 20 DROP 30 1 TEST
+\\T 30 20 DUP 30 20 20 3 TEST
+\\T 10 20 SWAP 20 10 2 TEST
+\\T 10 20 OVER 10 20 10 3 TEST
+\\T 123 0< -123 0< 0 -1 2 TEST
+\\T 16 BASE !
+\\T 5050 6060 AND 5050 6060 OR 5050 6060 XOR 4040 7070 3030 3 TEST
+\\T 0A BASE !
 
-12 34 UM+ 46 0 2 TEST
+\\T 12 34 UM+ 46 0 2 TEST
 ( Next test is contrived to work with any CELLL size )
--1 -1 UM+ -2 1 2 TEST
+\\T -1 -1 UM+ -2 1 2 TEST
 ( IMMEDIATE implicitly tested )
-32 PARSE ABC SWAP DROP 3 1 TEST
+\\T 32 PARSE ABC SWAP DROP 3 1 TEST
 !IO 62 TX! 0 TEST ( Should output > )
-: FOO 10 EXIT 20 ; FOO 10 1 TEST
-' FOO EXECUTE 30 10 30 2 TEST
+\\T : FOO 10 EXIT 20 ; FOO 10 1 TEST
+\\T ' FOO EXECUTE 30 10 30 2 TEST
 
 
 ( === First section is words moved earlier than they appear in eForth as they are needed for other words )
 ( they are mostly still in the same order as in eForth )
 
-BL 32 1 TEST
+\\T BL 32 1 TEST
 : NIP SWAP DROP ;
-1 2 NIP 2 1 TEST
+\\T 1 2 NIP 2 1 TEST
 
 ( Note failure on this line, can be for three reasons )
 ( a: its the first execution of an immediate word inside a compilation )
@@ -278,9 +287,9 @@ BL 32 1 TEST
 : 2DUP OVER OVER ; ( w1 w2 -- w1 w2 w1 w2;)
 ( 2DROP & NIP moved earlier )
 
-1 ?DUP 0 ?DUP 1 1 0 3 TEST
-1 2 3 ROT 2 3 1 3 TEST
-1 2 2DUP 1 2 1 2 4 TEST
+\\T 1 ?DUP 0 ?DUP 1 1 0 3 TEST
+\\T 1 2 3 ROT 2 3 1 3 TEST
+\\T 1 2 2DUP 1 2 1 2 4 TEST
 
 ( === More Arithmetic operators Zen pg50 )
 : + UM+ DROP ; ( w1 w2 -- w1+w2)
@@ -293,14 +302,14 @@ BL 32 1 TEST
 : ABS DUP 0< IF NEGATE THEN ; ( n -- n; Absolute value of w)
 : 0= IF 0 ELSE -1 THEN ;
 
-1 2 + 3 1 TEST
--1 1 -1 3 D+ -2 5 2 TEST ( Test contrived to be CELLL independent )
-257 INVERT -258 1 TEST ( 257 is 0x101 65278 is 0xFEFE )
-53 NEGATE 53 + 0 1 TEST
-456 123 - 456 -123 - 333 579 2 TEST
--456 ABS 456 ABS - 0 1 TEST
-111 >R R@ RP@ R> SWAP RP@ SWAP - 111 111 CELLL 3 TEST
-1 2 SP@ CELL+ SP! 1 1 TEST
+\\T 1 2 + 3 1 TEST
+\\T -1 1 -1 3 D+ -2 5 2 TEST ( Test contrived to be CELLL independent )
+\\T 257 INVERT -258 1 TEST ( 257 is 0x101 65278 is 0xFEFE )
+\\T 53 NEGATE 53 + 0 1 TEST
+\\T 456 123 - 456 -123 - 333 579 2 TEST
+\\T -456 ABS 456 ABS - 0 1 TEST
+\\T 111 >R R@ RP@ R> SWAP RP@ SWAP - 111 111 CELLL 3 TEST
+\\T 1 2 SP@ CELL+ SP! 1 1 TEST
 
 ( === More comparison Zen pg51-52 )
 : = XOR IF 0 EXIT THEN -1 ; ( w w -- t)
@@ -310,12 +319,12 @@ BL 32 1 TEST
 : MIN 2DUP SWAP < IF SWAP THEN DROP ;
 : WITHIN OVER - >R - R> U< ;
 
-123 123 = 123 124 = -1 0 2 TEST
-123 100 U< 100 123 U< 123 -100 U< -100 123 U< 0 -1 -1 0 4 TEST
-123 100 < 100 123 < 123 -100 < -100 123 < 0 -1 0 -1 4 TEST
-100 200 MAX 300 100 MAX 200 300 2 TEST
-100 200 MIN 300 100 MIN 100 100 2 TEST
-200 100 300 WITHIN 300 100 200 WITHIN 100 -100 200 WITHIN -1 0 -1 3 TEST
+\\T 123 123 = 123 124 = -1 0 2 TEST
+\\T 123 100 U< 100 123 U< 123 -100 U< -100 123 U< 0 -1 -1 0 4 TEST
+\\T 123 100 < 100 123 < 123 -100 < -100 123 < 0 -1 0 -1 4 TEST
+\\T 100 200 MAX 300 100 MAX 200 300 2 TEST
+\\T 100 200 MIN 300 100 MIN 100 100 2 TEST
+\\T 200 100 300 WITHIN 300 100 200 WITHIN 100 -100 200 WITHIN -1 0 -1 3 TEST
 
 ( === More Math Words Zen pg53-55 UM/MOD M/MOD /MOD MOD / UM+ * M* )
 : UM/MOD ( udl udh u -- ur uq ) ( needs FOR-NEXT from 91)
@@ -393,15 +402,15 @@ BL 32 1 TEST
   ABS SWAP ABS UM*  ( multiply absolutes)
   R> IF DNEGATE THEN ;  ( negate if signs are different)
 
--1 1 2 UM/MOD 1 -1 2 TEST
--1 1 2 M/MOD 1 -1 2 TEST
-9 0 4 UM/MOD 1 2 2 TEST
-9 4 /MOD 1 2 2 TEST
-9 4 MOD 1 1 TEST
-9 4 / 2 1 TEST
-2 -1 UM* -2 1 2 TEST
-3 4 * 12 1 TEST
--2 -3 M* 6 0 2 TEST
+\\T -1 1 2 UM/MOD 1 -1 2 TEST
+\\T -1 1 2 M/MOD 1 -1 2 TEST
+\\T 9 0 4 UM/MOD 1 2 2 TEST
+\\T 9 4 /MOD 1 2 2 TEST
+\\T 9 4 MOD 1 1 TEST
+\\T 9 4 / 2 1 TEST
+\\T 2 -1 UM* -2 1 2 TEST
+\\T 3 4 * 12 1 TEST
+\\T -2 -3 M* 6 0 2 TEST
 
 ( === Scaling Words Zen pg56 */MOD */ )
 
@@ -414,8 +423,8 @@ BL 32 1 TEST
   ( Multiple by n1 by n2, then divide by n3. Return quotient only)
   */MOD NIP ; ( n1*n2/n3 and discard remainder)
 
-5 7 2 */MOD 1 17 2 TEST
-5 7 2 */ 17 1 TEST
+\\T 5 7 2 */MOD 1 17 2 TEST
+\\T 5 7 2 */ 17 1 TEST
 
 ( === Memory Alignment words Zen pg57 CELL+ CELL- CELLS ALIGNED )
 ( CELL+ & ALIGNED moved earlier ERRATA Zen & v5 use 2 which is wrong unless CELL is '2' )
@@ -428,8 +437,8 @@ BL 32 1 TEST
   ( Multiply n by cell size in bytes)
   CELLL * ;
 
-123 CELL- CELLL + 123 1 TEST
-123 CELLS CELLL / 123 1 TEST
+\\T 123 CELL- CELLL + 123 1 TEST
+\\T 123 CELLS CELLL / 123 1 TEST
 
 ( === Special Characters Zen pg58 BL >CHAR )
 
@@ -440,7 +449,7 @@ BL 32 1 TEST
   127 BL WITHIN ( if its a control character)
   IF DROP 95 THEN ; ( replace with an underscore)
 
-41 >CHAR 23 >CHAR BL >CHAR 41 95 32 3 TEST
+\\T 41 >CHAR 23 >CHAR BL >CHAR 41 95 32 3 TEST
 
 ( === Managing Data Stack Zen pg59 DEPTH PICK )
 
@@ -456,8 +465,8 @@ BL 32 1 TEST
   1 + CELLS     ( bytes below tos)
   SP@ + @ ;     ( fetch directly from stack)
 
-1 2 3 DEPTH 1 2 3 3 4 TEST
-11 22 33 1 PICK 11 22 33 22 4 TEST
+\\T 1 2 3 DEPTH 1 2 3 3 4 TEST
+\\T 11 22 33 1 PICK 11 22 33 22 4 TEST
 
 ( === Memory Access Zen pg60 +! 2! 2@ HERE PAD TIB @EXECUTE )
 ( Note 2! 2@ presume big-endian which is a Forth assumption (high word at low address)
@@ -478,10 +487,10 @@ BL 32 1 TEST
   ELSE break
   THEN ;
 
-HLD @ 2 HLD +! HLD @ SWAP - 2 1 TEST
-1 2 3 SP@ 4 5 ROT 2! 1 4 5 3 TEST
-1 2 3 SP@ 2@ 1 2 3 2 3 5 TEST
-TIB >R BL PARSE XXX SWAP R> - 3 16 2 TEST
+\\T HLD @ 2 HLD +! HLD @ SWAP - 2 1 TEST
+\\T 1 2 3 SP@ 4 5 ROT 2! 1 4 5 3 TEST
+\\T 1 2 3 SP@ 2@ 1 2 3 2 3 5 TEST
+\\T TIB >R BL PARSE XXX SWAP R> - 3 19 2 .S TEST
 
 ( === Memory Array and String Zen pg61-62: COUNT CMOVE FILL -TRAILING PACK$ )
 
@@ -531,7 +540,7 @@ TIB >R BL PARSE XXX SWAP R> - 3 16 2 TEST
   1 + SWAP CMOVE      ( ; store characters in cells - 0 padded to end of cell)
   R> ;        ( leave only word buffer address )
 
-  NP @ CELL+ CELL+ COUNT NIP 5 1 TEST
+\\T NP @ CELL+ CELL+ COUNT NIP 5 1 TEST
   ( TODO-11-CELLL - need these tests)
   ( TODO rework this  test('NP @ 4 + COUNT PAD SWAP CMOVE', [], {pad: 'PACK$'});
   ( TODO rework this  test('PAD 3 + 5 BL FILL', [], {pad: 'PAC     '});
@@ -549,7 +558,7 @@ TIB >R BL PARSE XXX SWAP R> - 3 16 2 TEST
   0 SWAP UM/MOD   ( divide n by base)
   SWAP DIGIT ;    ( convert remainder to a digit)
 
-123 10 EXTRACT 12 51 2 TEST
+\\T 123 10 EXTRACT 12 51 2 TEST
 
 ( === Number formatting Zen pg65 <# HOLD #S SIGN #> )
 
@@ -598,7 +607,7 @@ TIB >R BL PARSE XXX SWAP R> - 3 16 2 TEST
   FOR AFT DUP C@ EMIT 1 + THEN NEXT DROP ;
 : .$ ( a -- ) COUNT TYPE ; ( from Staapl, not in eForth)
 
-60 EMIT SPACE 2 SPACES 61 EMIT 0 TEST
+\\T 60 EMIT SPACE 2 SPACES 61 EMIT 0 TEST
 ( .$ is tested by ."| and others )
 
 ( === Number output Zen pg66 str HEX DECIMAL .R U.R U. . ? )
@@ -638,7 +647,7 @@ TIB >R BL PARSE XXX SWAP R> - 3 16 2 TEST
 : ? ( a -- ; Display the contents in a memory cell.)
   @ . ; ( very simple but useful command)
 
--123 5 .R 123 5 U.R 123 U. 123 . BASE ? 0 TEST
+\\T -123 5 .R 123 5 U.R 123 U. 123 . BASE ? 0 TEST
 
 ( === Numeric input Zen pg67-68 DIGIT? NUMBER? )
 ( ERRATA Zen NIP is used but not defined )
@@ -696,10 +705,10 @@ TIB >R BL PARSE XXX SWAP R> - 3 16 2 TEST
   2DROP             ( discard garbage )
   R> BASE ! ;       ( restore radix )
 
-50 10 DIGIT? 2 -1 2 TEST
-BL PARSE 1234 PAD PACK$ NUMBER? DROP 1234 1 TEST
+\\T 50 10 DIGIT? 2 -1 2 TEST
+\\T BL PARSE 1234 PAD PACK$ NUMBER? DROP 1234 1 TEST
 ' NUMBER? 'NUMBER !
-123 123 1 TEST
+\\T 123 123 1 TEST
 
 ( TODO Note the EFORTH-ZEN-ERRATA in the docs v. code for NUMBER? means we drop testing the flag will reconsider when see how used )
 ( === Serial I/O Zen pg69 ?KEY KEY EMIT NUF? )
@@ -814,17 +823,13 @@ BL PARSE 1234 PAD PACK$ NUMBER? DROP 1234 1 TEST
 
 : CHAR BL PARSE DROP C@ ; ( Parse a word and return its first character )
 : CTRL CHAR 31 AND ; ( Parse a word, return first character as a control )
-CHAR ) 41 1 TEST
-CTRL H 8 1 TEST
+\\T CHAR ) 41 1 TEST
+\\T CTRL H 8 1 TEST
 
 : .(  ( -- ) ( Output following string up to next )
   [ CHAR ) ] LITERAL PARSE
    ( parse the string until next )
   TYPE ; IMMEDIATE         ( type the string to terminal )
-
-: \\ ( -- ; Ignore following text till the end of line.)
-   #TIB @ >IN ! ( store the length of TIB in >IN )
-   ; IMMEDIATE ( in effect ignore the rest of a line )
 
 ( Note there is this.TOKEN which does same thing )
 : TOKEN ( -- a ; <string> ; Parse a word from input stream and copy it to name dictionary.)
@@ -837,11 +842,11 @@ CTRL H 8 1 TEST
   PARSE         ( parse out a string delimited by c )
   HERE PACK$ ;  ( copy the string into the word buffer )
 
-1 2 ( 3 ) 4 \\ commenting
-1 2 4 3 TEST
-: foo TOKEN C@ ; foo xxx 3 1 TEST
-BL WORD yyyy DUP C@ SWAP CP @ - 4 0 2 TEST
-: foo .( output at compile time) ; 0 TEST
+\\T 1 2 ( 3 ) 4 \\ commenting
+\\T 1 2 4 3 TEST
+\\T : foo TOKEN C@ ; foo xxx 3 1 TEST
+\\T BL WORD yyyy DUP C@ SWAP CP @ - 4 0 2 TEST
+\\T : foo .( output at compile time) ; 0 TEST
 
 ( === Dictionary Search Zen pg75-77 NAME> SAME? find NAME? )
 
@@ -929,9 +934,9 @@ BL WORD yyyy DUP C@ SWAP CP @ - 4 0 2 TEST
   0 ;           ( exit with a false flag )
 
 ( NAME> implicitly tested by find )
-BL WORD xxx DUP C@ 1 + PAD SWAP CMOVE PAD BL WORD xxx 4 SAME? >R 2DROP R> 0 1 TEST
-BL WORD xxx DUP C@ 1 + PAD SWAP CMOVE PAD BL WORD xzx 4 SAME? >R 2DROP R> 0= 0 1 TEST
-FORTH 0 TEST
+\\T BL WORD xxx DUP C@ 1 + PAD SWAP CMOVE PAD BL WORD xxx 4 SAME? >R 2DROP R> 0 1 TEST
+\\T BL WORD xxx DUP C@ 1 + PAD SWAP CMOVE PAD BL WORD xzx 4 SAME? >R 2DROP R> 0= 0 1 TEST
+\\T FORTH 0 TEST
 ( TODO convert test now dont have testFind ; BL WORD TOKEN CONTEXT @ FORTHfind', testFind.map(k => k ; (Compare with results from old version of find )
 ( TODO convert this test - now dont have testFind - BL WORD TOKEN NAME?', testFind ; // Name searches all vocabs )
 
@@ -1068,11 +1073,11 @@ CREATE NULL$ 0 , ( EFORTH-ZEN-ERRATA inserts a string "coyote" after this, no id
   $," ; IMMEDIATE ( compile print string )
 
 ( Test is tricky - the "3" in bar is thrown away during hte "THROW" while 5 is argument to THROW )
-: bar 3 5 THROW 4 ; : foo 1 [ ' bar ] LITERAL CATCH 2 ; foo 1 5 2 3 TEST
-: bar 3 ; : foo 1 [ ' bar ] LITERAL CATCH 2 ; foo 1 3 0 2 4 TEST
-: foo ." hello" ; foo 0 TEST
+\\T : bar 3 5 THROW 4 ; : foo 1 [ ' bar ] LITERAL CATCH 2 ; foo 1 5 2 3 TEST
+\\T : bar 3 ; : foo 1 [ ' bar ] LITERAL CATCH 2 ; foo 1 3 0 2 4 TEST
+\\T : foo ." hello" ; foo 0 TEST
 ( Note that abort restores the stack, so shouldn't have consumed something else will have random noise on stack )
-: bar ?DUP ABORT" test" 3 ; : foo [ ' bar ] LITERAL CATCH ; 1 foo C@ 0 foo 1 4 3 0 4 TEST
+\\T : bar ?DUP ABORT" test" 3 ; : foo [ ' bar ] LITERAL CATCH ; 1 foo C@ 0 foo 1 4 3 0 4 TEST
 ( $," and abort" are implicitly tested by ABORT")
 
 ( === Text Interpreter loop Zen pg83-84 $INTERPRET [ .OK ?STACK EVAL )
@@ -1115,9 +1120,9 @@ CREATE NULL$ 0 , ( EFORTH-ZEN-ERRATA inserts a string "coyote" after this, no id
 
 ( === TODO-TEST TODO-IO test EVAL, not that .OK wont work here since not yet using $INTERPRET )
 
-BL PARSE 123 PAD PACK$ $INTERPRET 123 1 TEST
-123 BL PARSE DUP PAD PACK$ $INTERPRET  123 123 2 TEST
-: foo 1 2DROP ?STACK ; : bar [ ' foo ] LITERAL CATCH ; bar C@ 9 1 TEST
+\\T BL PARSE 123 PAD PACK$ $INTERPRET 123 1 TEST
+\\T 123 BL PARSE DUP PAD PACK$ $INTERPRET  123 123 2 TEST
+\\T : foo 1 2DROP ?STACK ; : bar [ ' foo ] LITERAL CATCH ; bar C@ 9 1 TEST
 
 ( This switches to use new interpreter, its still using old js $COMPILE )
 
@@ -1127,7 +1132,7 @@ BL PARSE 123 PAD PACK$ $INTERPRET 123 1 TEST
   'EVAL !                   ( store $INTERPRET in 'EVAL )
   ; IMMEDIATE               ( must be done even while compiling )
 
-[ 1 2 3 ROT 2 3 1 3 TEST
+\\T [ 1 2 3 ROT 2 3 1 3 TEST
 
 ( TODO-ZEN-V5-STAAPL - COMPARE ABOVE HERE)
 
@@ -1217,10 +1222,10 @@ CREATE I/O  ' ?RX , ' TX! , ( Array to store default I/O vectors. )
 ( ERRATA Staapl & Zen do 'CURRENT @ !', v5 does 'NAME> ,' this is fundamentally different usage, ANS matches latter )
 : RECURSE ( -- ) LAST @ NAME> , ; IMMEDIATE
 
-1 ' DUP EXECUTE 1 1 2 TEST
-HERE 2 ALLOT HERE SWAP - 2 1 TEST
-: foo [COMPILE] ( ; foo 2 ) 0 TEST
-: foo ?DUP IF DUP 1 - RECURSE THEN ; 3 foo 3 2 1 3 TEST
+\\T 1 ' DUP EXECUTE 1 1 2 TEST
+\\T HERE 2 ALLOT HERE SWAP - 2 1 TEST
+\\T : foo [COMPILE] ( ; foo 2 ) 0 TEST
+\\T : foo ?DUP IF DUP 1 - RECURSE THEN ; 3 foo 3 2 1 3 TEST
 
 ( === Control Structures Zen pg91-92: FOR BEGIN NEXT UNTIL AGAIN IF AHEAD REPEAT THEN AFT ELSE WHILE )
 ( All moved earlier )
@@ -1233,7 +1238,7 @@ HERE 2 ALLOT HERE SWAP - 2 1 TEST
   COMPILE $"|     ( compile string runtime code)
   $," ; IMMEDIATE ( compile string itself )
 
-: foo $" hello" COUNT NIP ; foo 5 1 TEST
+\\T : foo $" hello" COUNT NIP ; foo 5 1 TEST
 
 ( === Name Dictionary Compiler Zen pg94-96: ?UNIQUE $,n $COMPILE OVERT ; ] call, : IMMEDIATE  (see this.dollarCommaN)
 
@@ -1244,7 +1249,7 @@ HERE 2 ALLOT HERE SWAP - 2 1 TEST
   OVER .$       ( with the offending name )
   THEN DROP ;     ( discard token address )
 
-TOKEN foo DUP ?UNIQUE - 0 1 TEST
+\\T TOKEN foo DUP ?UNIQUE - 0 1 TEST
 
 : $,n ( na -- ) ( See also this.dollarCommaN above)
   ( Build a new dictionary name using the string at na.)
@@ -1301,7 +1306,7 @@ TOKEN foo DUP ?UNIQUE - 0 1 TEST
   tokenDoList ,
   ] ;
 
-: foo 1 ; foo 1 1 TEST
+\\T : foo 1 ; foo 1 1 TEST
 
 
 ( TODO may need JS equivalent - see if used;  : CALL, ( ca -- ; ( DTC 8086 relative call ; [ =CALL ] LITERAL , HERE CELL+ - , ; )
@@ -1314,15 +1319,15 @@ TOKEN foo DUP ?UNIQUE - 0 1 TEST
 
 ( Create a new word that doesnt allocate any space, but will push address of that space. )
 : CREATE ( -- ; <string> ) TOKEN $,n OVERT tokenVar , 0 , ; ( redefines definition moved up so that it will use new TOKEN etc)
-: foo CREATE 123 , DOES> @ ; foo BAR BAR 123 1 TEST
+\\T : foo CREATE 123 , DOES> @ ; foo BAR BAR 123 1 TEST
 
 : VARIABLE ( -- ; <string> ) CREATE 0 , ;
 
 : CONSTANT ( u -- ; <string> ) TOKEN $,n OVERT tokenNextVal , , ;
 
-VARIABLE foo 0 TEST
-12 foo ! 0 TEST
-foo @ 12 1 TEST
+\\T VARIABLE foo 0 TEST
+\\T 12 foo ! 0 TEST
+\\T foo @ 12 1 TEST
 
 ( === Utilities Zen pg98 )
 ( === Memory Dump Zen pg99 _TYPE do+ DUMP )
@@ -1362,8 +1367,8 @@ foo @ 12 1 TEST
   THEN
   DROP R> BASE ! ;      ( restore radix )
 
-( TODO-TEST TODO-IO test DUMP (needs NUF? which needs ?RX )
-( LAST @ 48 DUMP 0 TEST )
+( DUMP needs NUF? which needs ?RX, so will fail test if those are not defined yet )
+\\T LAST @ 48 DUMP 0 TEST
 
 ( === Stack Dump Zen pg100 .S )
 
@@ -1377,7 +1382,7 @@ foo @ 12 1 TEST
   NEXT          ( repeat until done )
   ."  <sp" ;    ( print stack pointer )
 
-1 2 .S 1 2 2 TEST
+\\T 1 2 .S 1 2 2 TEST
 
 ( === Stack Checking Zen pg101 !CSP ?CSP )
 
@@ -1390,7 +1395,7 @@ foo @ 12 1 TEST
 : ?CSP ( -- ; Check stack pointer matches saved stack pointer )
   SP@ CSP @ XOR ABORT" stack depth" ;
 
-.BASE .FREE 1 !CSP ?CSP 1 1 TEST
+\\T .BASE .FREE 1 !CSP ?CSP 1 1 TEST
 
 ( === Dictionary Dump Zen pg102 .ID WORDS )
 
@@ -1415,7 +1420,7 @@ foo @ 12 1 TEST
     DROP
   THEN ;          ( end of vocab exit )
 
-( WORDS 0 TEST ; Commented out as expensive )
+\\T WORDS 0 TEST ( Commented out as expensive )
 
 ( === Search Token Name Zen pg103 >NAME )
 : FORTH>NAME ( ca -- na, F ) (
@@ -1430,9 +1435,9 @@ foo @ 12 1 TEST
     THEN NIP ?DUP
   UNTIL NIP NIP EXIT  ( found.  return name address )
   THEN DROP 0 ;       ( end of vocabulary, failure )
-BL WORD DUP NAME? SWAP >NAME = -1 1 TEST ( Test FAST JS version )
+\\T BL WORD DUP NAME? SWAP >NAME = -1 1 TEST ( Test FAST JS version )
 ( : >NAME FORTH>NAME ; ) ( Uncomment to use FORTH version of >NAME )
-BL WORD DUP NAME? SWAP FORTH>NAME = -1 1 TEST
+\\T BL WORD DUP NAME? SWAP FORTH>NAME = -1 1 TEST
 
 ( === The simplest Decompiler Zen pg104 SEE )
 : SEE ( -- ; <string> )
@@ -1456,7 +1461,7 @@ BL WORD DUP NAME? SWAP FORTH>NAME = -1 1 TEST
   THEN
   DROP ;
 
-( SEE FORTH>NAME 0 TEST ( Commented out as expensive TODO seems to crash out)
+\\T SEE FORTH>NAME 0 TEST ( Commented out as expensive TODO seems to crash out)
 
 ( ERRATA Zen uses CONSTANT but doesnt define it )
 ( === Signon Message Zen pg105 VER hi )
