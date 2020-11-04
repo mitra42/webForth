@@ -105,7 +105,7 @@ const tokenVocabulary = 0;
 const tokenNextVal = 1;
 const tokenDoList = 2;
 const tokenUser = 3;
-const tokenVar = 4;
+// const tokenVar = 4; - unused as constant, here for completeness
 
 // === Memory Map - Zen pg26
 const l = {}; // Constants that will get compiled into the dictionary
@@ -1837,7 +1837,6 @@ class Forth {
   }
   // Extract some memory writing functions
 
-
   // === Build dictionary, mostly from jsFunctionAttributes
   buildDictionary() {
     // Define the first word in the dictionary, I'm using 'FORTH' for this because we need this variable to define everything else.
@@ -1850,8 +1849,8 @@ class Forth {
     this.OVERT(); // Uses the initialization done by this.Ustore(CURRENToffset) above.
 
     // copy constants over
-    ['CELLL', 'CELLbits', 'CELLMASK', 'TIB0'].forEach(k => this.buildConstant(k, this[k]));
-    Object.entries(l).forEach(kv => this.buildConstant(kv[0], kv[1]));
+    ['CELLL', 'CELLbits', 'CELLMASK', 'TIB0'].forEach((k) => this.buildConstant(k, this[k]));
+    Object.entries(l).forEach((kv) => this.buildConstant(kv[0], kv[1]));
 
     this.js2xt = {};
 
@@ -1880,7 +1879,7 @@ class Forth {
     // Build user variables
     // Bracket with a sanity check - also initializes TIB0 from this.TIB0
     console.assert(this.Ufetch(NPoffset) > 0);
-    jsUsers.forEach(nv => this.buildUser(nv[0], nv[1]));
+    jsUsers.forEach((nv) => this.buildUser(nv[0], nv[1]));
     console.assert(this.Ufetch(NPoffset) > 0);
   }
 
@@ -2099,7 +2098,6 @@ class Forth {
 
   ToNAME() { this.SPpush(this.xt2na(this.SPpop())); }  // Fast version of >NAME see Forth definition below
 
-
   // TODO-29-VOCABULARY This just looks up a in the Context vocabulary, it makes no attempt to use multiple vocabularies
   // If required then fixing this to iterate over the context array should not break anything (this is what NAME? does)
   findName() { // a -- xt na | a F
@@ -2126,7 +2124,7 @@ class Forth {
 
   // Compile one or more words into the next consecutive code cells.
   DW(...words) {
-    words.forEach(word => this.Ustore(CPoffset, this.Mstore(this.cpFetch(), word)));
+    words.forEach((word) => this.Ustore(CPoffset, this.Mstore(this.cpFetch(), word)));
   }
 
   // a -- a; Check if a definition of the word at 'a' would be unique and display warning (but continue) if it would not be.
@@ -2261,13 +2259,13 @@ class Forth {
         await maybePromise;
       } else if (!waitFrequency--) {
         //setTimeout(resolve, 0) is same as setImmediate(resolve) but latter is not available in browsers
-        await new Promise(resolve => setTimeout(resolve, 0)); //ASYNC: to allow IO to run
+        await new Promise((resolve) => setTimeout(resolve, 0)); //ASYNC: to allow IO to run
         waitFrequency = 100; // How many cycles to allow a thread swap
       }
     }
   }
   async MS() { // ms --; delay for a period of time.
-    await new Promise(resolve => setTimeout(resolve, this.SPpop()));
+    await new Promise((resolve) => setTimeout(resolve, this.SPpop()));
   }
 
   BYE() { // Should exit all the way out
@@ -2434,7 +2432,6 @@ class Forth {
       this.Mstore(this.UZERO + a * this.CELLL, this.Ufetch(a));
     }
   }
-
 
   // === JS interpreter - could be discarded when done or built out
 
@@ -2627,7 +2624,7 @@ class Forth {
   //tokenDoes = Forth.tokenFunction(payload => { this.RPpush(this.IP); this.IP = (this.Mfetch8(payload++)<<8)+this.Mfetch8(payload++); this.SPpush(payload++); ); // Almost same as tokenDoList
 }
 const ForthNodeOverrides = {
-  TXbangS: s => process.stdout.write(s),
+  TXbangS: (s) => process.stdout.write(s),
   // Setup I/O to the terminal
   bangIO: () => {
     if (process.stdin.isTTY) {
