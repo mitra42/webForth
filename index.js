@@ -1542,17 +1542,35 @@ class Mem8 extends Uint8Array {
 class Mem8_16 extends Mem8 {
   pushCell(a, v) { return this.push16(a, v); }
   fetchCell(a) { return (this[a++] << 8) | this[a]; }
-  debug(start, end) { return (end < start) ? 'UNDERFLOW' : new Uint16Array(this.buffer, start, (end - start) >> 1).toString(); }
+  debug(start, end) {
+    if (end < start) return 'UNDERFLOW';
+    const res = [];
+    let i = start;
+    while (i < end) res.push(((this[i++] << 8) | this[i++]) >>0);
+    return res;
+  }
 }
 class Mem8_24 extends Mem8 {
   pushCell(a, v) { return this.push24(a, v); }
   fetchCell(a) { return (((this[a++] << 8) | this[a++]) << 8) | this[a]; }
-  debug(start, end) { return (end < start) ? 'UNDERFLOW' : new Uint8Array(this.buffer, start, end - start).toString(); }
+  debug(start, end) {
+    if (end < start) return 'UNDERFLOW';
+    const res = [];
+    const i = start;
+    while (i < end) res.push((this[i++]<<16 + this[i++]<<8 + this[i++])>>0);
+    return res;
+  }
 }
 class Mem8_32 extends Mem8 {
   pushCell(a, v) { return this.push32(a, v); }
   fetchCell(a) { return  (((((this[a++] << 8) | this[a++]) << 8) | this[a++]) << 8) | this[a]; }
-  debug(start, end) { return (end < start) ? 'UNDERFLOW' : new Uint32Array(this.buffer, start, (end - start) >> 2).toString(); }
+  debug(start, end) {
+    if (end < start) return 'UNDERFLOW';
+    const res = [];
+    let a = start;
+    while (a < end) res.push((((((this[a++] << 8) | this[a++]) << 8) | this[a++]) << 8) | this[a]);
+    return res;
+  }
 }
 
 // noinspection JSBitwiseOperatorUsage,JSBitwiseOperatorUsage
@@ -1785,7 +1803,7 @@ class Forth {
     this.debugStack = []; // Maintains a position, like a stack trace, don't manipulate directly use functions below
     this.debugName = '?'; // Set in threadtoken()
     this.testing = 0x0; // 0x01 display words passed to interpreters; 0x02 each word in tokenthread - typically set by 'testing3'
-    this.testingDepth = 2;
+    this.testingDepth = 10;
     this.padTestLength = 0; // Display pad length
     // === Javascript structures - implement the memory map and record the full state.
 
