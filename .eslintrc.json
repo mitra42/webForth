@@ -39,6 +39,7 @@
         "no-unused-vars": 1,
         "no-restricted-syntax": 1,
         "object-curly-newline": 0,
+        "object-property-newline": 0,
         "prefer-destructuring": 0,
         "prefer-template": 0,
         "spaced-comment": 0
