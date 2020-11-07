@@ -45,14 +45,35 @@ function EL(tag, attributes = {}, children) {
   return el;
 }
 
+const consoleStyle = `
+.grid-container {
+  display: grid;
+  grid-template-columns: auto auto;
+  grid-gap: 3px;
+  background-color: #2196F3;
+  padding: 3px;
+}
+forth-stack, forth-output, forth-input, .banner {
+  padding: 5px;
+  background-color: rgba(255, 255, 255, 0.8);
+}
+.banner { text-align: center; font-size: larger; grid-column-start: 1; grid-column-end: 3}
+forth-stack { text-align: right; grid-column-start: 2; grid-column-end: 3} 
+forth-output { text-align: left; grid-column-start: 1; grid-column-end: 2} 
+forth-input { text-align: left; grid-row-start: 3; grid-row-end: 4; grid-column-start: 1; grid-column-end: 3; } 
+`;
 class ForthConsole extends HTMLElement {
   constructor() {
     super();
     this.attachShadow({ mode: 'open' });
-    // Create an output area
-    this.output = document.createElement('forth-output');
-    this.div = EL('div', {}, [this.output]);
-    this.shadowRoot.append(this.div);
+    this.shadowRoot.append(
+      EL('style', { textContent: consoleStyle }),
+      this.grid = EL('div', {class: 'grid-container'}, [
+        EL('div',{ class: 'banner', textContent: 'webForth console' }),
+        // Create an output area
+        this.output = EL('forth-output'),
+      ]),
+    );
     this.stack = EL('forth-stack');
     // Create an input area, but only attach once Forth is loaded.
     this.input = EL('forth-input', { stack: this.stack });
@@ -62,7 +83,7 @@ class ForthConsole extends HTMLElement {
     const CELLL = 2;
     const MEM = 8;
     ForthLoad({ CELLL, MEM, overrides })
-      .then(() => this.shadowRoot.append(this.input, this.stack)); // Only add input area when Forth defined
+      .then(() => this.grid.append(this.input, this.stack)); // Only add input area when Forth defined
     // returns a promise that is ignored
   }
 }
@@ -88,7 +109,7 @@ class ForthInput extends HTMLElement {
     this.inputbox = EL('input', { type: 'text', spellcheck: false });
     this.shadowRoot.append(
       // Style it as 100% of width of parent, by default will be boxed
-      EL('style', { textContent: 'input { width: 100%}' }),
+      EL('style', { textContent: 'input { width: 98%; padding: 0.2em; }' }),
       // Define a form with a single Input element
       EL('form', { onsubmit: (ev) => this.submit(ev) }, [this.inputbox]),
     );
@@ -116,18 +137,10 @@ class ForthStack extends HTMLElement {
     super();
     this.attachShadow({ mode: 'open' });
     this.shadowRoot.append(
-      EL('style', { textContent: '.stacks { display: inline-grid; grid-template-columns: auto auto; padding-top: 20px;} .stack { border-color:red; border-width: 2px; margin-right: 20px; text-align: right;} ul {margin-top: 0px; list-style-type: none;} li {};' }),
-      EL('div', { class: 'stacks' }, [
-        EL('div', { class: 'stack' }, [
-          EL('span', { textContent: 'STACK' }),
-          this.sdiv = EL('div', {}, []),
-        ]),
-        /*
-        EL('div', { class: 'stack' }, [
-          EL('span', { textContent: 'RETURN_STACK' }),
-          this.rdiv = EL('div', {}, []),
-        ]),
-         */
+      EL('style', { textContent: '.stack ul {margin-top: 0px; list-style-type: none;}' }),
+      EL('div', { class: 'stack' }, [
+        EL('span', { textContent: 'STACK' }),
+        this.sdiv = EL('div', {}, []),
       ]),
     );
   }
@@ -136,11 +149,6 @@ class ForthStack extends HTMLElement {
     this.sdiv.append(
       this.sul = EL('ul', { },
         forth.debugStack().map((s) => EL('li', { textContent: s }))),
-    );
-    if (this.rul) this.rul.remove();
-    this.rdiv.append(
-      this.rul = EL('ul', { },
-        forth.debugReturnStack().map((s) => EL('li', { textContent: s }))),
     );
   }
 }
