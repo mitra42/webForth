@@ -35,7 +35,7 @@ function EL(tag, attributes = {}, children) {
   const el = document.createElement(tag);
   Object.entries(attributes)
     .forEach((kv) => {
-      if (['textContent', 'onsubmit'].includes(kv[0])) {
+      if (['textContent', 'onsubmit'].includes(kv[0]) || (typeof(kv[1]) === "object")) {
         el[kv[0]] = kv[1];
       } else {
         el.setAttribute(kv[0], kv[1]);
@@ -53,15 +53,16 @@ class ForthConsole extends HTMLElement {
     this.output = document.createElement('forth-output');
     this.div = EL('div', {}, [this.output]);
     this.shadowRoot.append(this.div);
+    this.stack = EL('forth-stack');
     // Create an input area, but only attach once Forth is loaded.
-    this.input = document.createElement('forth-input');
+    this.input = EL('forth-input', { stack: this.stack });
     // Define hooks for IO to these areas
     const overrides = { TXbangS: (s) => this.output.TXbangS_web(s) };
     // Load Forth can also define CELL, EM, memClass
     const CELLL = 2;
     const MEM = 8;
     ForthLoad({ CELLL, MEM, overrides })
-      .then(() => this.shadowRoot.append(this.input)); // Only add input area when Forth defined
+      .then(() => this.shadowRoot.append(this.input, this.stack)); // Only add input area when Forth defined
     // returns a promise that is ignored
   }
 }
@@ -102,14 +103,51 @@ class ForthInput extends HTMLElement {
       this.inputbox.value = '';       // Clear result
       forth.TXbangS(inp);             // But echo - via forth, should go to Console
       // noinspection JSIgnoredPromiseFromCall
-      forth.interpret(inp);           // Async interpretation of text, but dont wait for it
+      forth.interpret(inp)            // Async interpretation of text
+        // Attempt to debug a race condition - commented out as condition disappeared
+        //.then((res) => forth.debug1 = forth.m.debug(forth.SP,forth.SPP))
+      .then((res) => this.stack.render(res));     // Then reprint stack
     }
   }
 }
 
+class ForthStack extends HTMLElement {
+  constructor() {
+    super();
+    this.attachShadow({ mode: 'open' });
+    this.shadowRoot.append(
+      EL('style', { textContent: '.stacks { display: inline-grid; grid-template-columns: auto auto; padding-top: 20px;} .stack { border-color:red; border-width: 2px; margin-right: 20px; text-align: right;} ul {margin-top: 0px; list-style-type: none;} li {};' }),
+      EL('div', { class: 'stacks' }, [
+        EL('div', { class: 'stack' }, [
+          EL('span', { textContent: 'STACK' }),
+          this.sdiv = EL('div', {}, []),
+        ]),
+        /*
+        EL('div', { class: 'stack' }, [
+          EL('span', { textContent: 'RETURN_STACK' }),
+          this.rdiv = EL('div', {}, []),
+        ]),
+         */
+      ]),
+    );
+  }
+  render(res) {
+    if (this.sul) this.sul.remove();
+    this.sdiv.append(
+      this.sul = EL('ul', { },
+        forth.debugStack().map((s) => EL('li', { textContent: s }))),
+    );
+    if (this.rul) this.rul.remove();
+    this.rdiv.append(
+      this.rul = EL('ul', { },
+        forth.debugReturnStack().map((s) => EL('li', { textContent: s }))),
+    );
+  }
+}
 //customElements.define('forth-output', ForthOutput);
 customElements.define('forth-console', ForthConsole);
 customElements.define('forth-output', ForthOutput);
 customElements.define('forth-input', ForthInput);
+customElements.define('forth-stack', ForthStack);
 
 console.log('Imported');

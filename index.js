@@ -184,8 +184,8 @@ const forthInForth = `
 1 2 ( 3 ) 1 2 2 TEST
 
 ( Uncomment first for production, 2nd for testing )
-\\ : \\T #TIB @ >IN ! ;
-: \\T ; IMMEDIATE
+: \\T #TIB @ >IN ! ;
+\\ : \\T ; IMMEDIATE
 
 
 ( === Test as many of the words defined in code as possible)
@@ -1800,7 +1800,7 @@ class Forth {
     // Support parameters for TODO-27-MEMORY TODO-28-MULTI
     // === Support for Debugging ============
 
-    this.debugStack = []; // Maintains a position, like a stack trace, don't manipulate directly use functions below
+    this.debugExcecutionStack = []; // Maintains a position, like a stack trace, don't manipulate directly use functions below
     this.debugName = '?'; // Set in threadtoken()
     this.testing = 0x0; // 0x01 display words passed to interpreters; 0x02 each word in tokenthread - typically set by 'testing3'
     this.testingDepth = 10;
@@ -1951,16 +1951,23 @@ class Forth {
   }
 
   // === Support for Debugging ============
-  debugClear() { this.debugStack = []; }
-  debugPush() { this.debugStack.push(this.debugName); } // in tokenDoList
-  debugPop() { this.debugStack.pop(); } // in EXIT
+  debugClear() { this.debugExcecutionStack = []; }
+  debugPush() { this.debugExcecutionStack.push(this.debugName); } // in tokenDoList
+  debugPop() { this.debugExcecutionStack.pop(); } // in EXIT
 
+  // Return an array of stack entries
+  debugStack() {
+    return this.m.debug(this.SP, this.SPP);
+  }
+  debugReturnStack() {
+    return this.m.debug(this.RP, this.Ufetch(RP0offset));
+  }
   debugThread(xt) {
     if (this.testing & 0x02) {
       this.debugName = this.xt2name(xt); // Expensive so only done when testing
-      if (this.testingDepth > this.debugStack.length) {
+      if (this.testingDepth > this.debugExcecutionStack.length) {
         //TODO-28-MULTITASK RPP(RP0) and SPP will move
-        console.log('R:', this.Ufetch(RP0offset) === this.RP ? '' : this.m.debug(this.RP, this.Ufetch(RP0offset)), this.debugStack, this.xt2name(xt), 'S:', this.SPP === this.SP ? '' : this.m.debug(this.SP, this.SPP),
+        console.log('R:', this.Ufetch(RP0offset) === this.RP ? '' : this.debugReturnStack(), this.debugExcecutionStack, this.xt2name(xt), 'S:', this.SPP === this.SP ? '' : this.debugStack(),
           this.padTestLength ? ('pad: ' + (this.padTestLength > 0 ? this.m.decodeString(this.padPtr(), this.padPtr() + this.padTestLength) : this.m.decodeString(this.padPtr() + this.padTestLength, this.padPtr()))) : '');
       }
     }
