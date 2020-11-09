@@ -1,3 +1,6 @@
+* 2020-11-09: v0.0.8
+  * Add bottom text for help etc
+  * Better error handling in the console
 * 2020-11-08: v0.0.7
   * Console interface working, with stack display
   * Refactoring of memory classes
