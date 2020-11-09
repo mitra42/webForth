@@ -8,25 +8,27 @@ let Forth; // Will hold class when loaded
 let forth; // Will hold instance
 
 async function ForthLoad({ overrides = {} } = {}) {
+  const fLog = overrides.TXbangS || console.log
   const CELLL = 2;
   const MEM = 8;
   const EM = 0x2000 * CELLL; // default is 0x2000 * CELLL
   try {
     const module = await import('./index.js');
-    //console.log("module is", Forth);
     Forth = module.Forth; // Make available globally to this file
     const f = new Forth({
       CELLL, EM, MEM, memClass: module.Mem8_16, // Define memory
       overrides,
     });         // Setup I/O (just output currently)
+    fLog('\nCompiling Forth from Forth\n');
     // noinspection JSUnresolvedFunction
     await f.compileForthInForth();
-    console.log('===forthInForth compiled');
+    fLog('\nforth in forth compiled\n');
     // noinspection JSUnresolvedFunction
     await f.interpret("' .OK ' DROP ' kTAP XIO");
     forth = f; // Make available to other components when, and only when, forthInForth compiled.
   } catch (err) {
-    console.log('Failed to load Forth', err);
+    fLog('Failed to load Forth - see console for details');
+    console.log(err);
   }
 }
 
@@ -83,7 +85,8 @@ class ForthConsole extends HTMLElement {
     const CELLL = 2;
     const MEM = 8;
     ForthLoad({ CELLL, MEM, overrides })
-      .then(() => this.grid.append(this.input, this.stack)); // Only add input area when Forth defined
+      .then(() => this.grid.append(this.input, this.stack)) // Only add input area when Forth defined
+      .then(() => forth.interpret1('version'));
     // returns a promise that is ignored
   }
 }
@@ -124,7 +127,7 @@ class ForthInput extends HTMLElement {
       this.inputbox.value = '';       // Clear result
       forth.TXbangS(inp);             // But echo - via forth, should go to Console
       // noinspection JSIgnoredPromiseFromCall
-      forth.interpret(inp)            // Async interpretation of text
+      forth.interpret1(inp)            // Async interpretation of text
         // Attempt to debug a race condition - commented out as condition disappeared
         //.then((res) => forth.debug1 = forth.m.debug(forth.SP,forth.SPP))
       .then((res) => this.stack.render(res));     // Then reprint stack

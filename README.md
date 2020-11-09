@@ -8,11 +8,15 @@ I hear you ask why, which is hardly surprising.
 * All the Forth I've seen has been really antiquated, or over-complex, needs a fresh approach
 
 ## Installation
+The only prerequisite is [`node`](https://nodejs.org) and `npm` (or `yarn`). 
+
 ```
 npm install webforth
 ```
 Installs webforth, note there are intentionally no dependencies 
 in the minimal node or browser versions.
+
+If you only want to host the web version, then cloning the git repo should be sufficient.
 
 ## Running
 

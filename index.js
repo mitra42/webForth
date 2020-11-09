@@ -69,6 +69,7 @@
       f: bar      Links to Forth.prototype.bar (defaults to same as 'n'
       token: true Create a token word that can be used as first cell of a definition - order must match constants below
       replaced: true  This word will be replaced by a Forth definition, so check for its being compiled into other definitions.
+      jsNeeds: true The execution address of this word is needed by the JS o will be stored in jstoxt[n]
  */
 // it is used to build the dictionary in each instance.
 const jsFunctionAttributes = [
@@ -210,7 +211,7 @@ const forthInForth = `
 \\T -1 -1 UM+ -2 1 2 TEST
 ( IMMEDIATE implicitly tested )
 \\T 32 PARSE ABC SWAP DROP 3 1 TEST
-!IO 62 TX! 0 TEST ( Should output > )
+\\T !IO 62 TX! 0 TEST ( Should output > )
 \\T : FOO 10 EXIT 20 ; FOO 10 1 TEST
 \\T ' FOO EXECUTE 30 10 30 2 TEST
 
@@ -1181,6 +1182,17 @@ CREATE I/O  ' ?RX , ' TX! , ( Array to store default I/O vectors. )
   QUERY ( get a line of commands from )
   EVAL ; ( Evaluate it)
 
+: quitError ( f -- )
+  ( Handle a possible error returned by EVAL - common to QUIT and quit1 )
+      NULL$ OVER XOR      ( is error address=NULL$ ? )
+    ( V5, ZEN and Staapl differ, prefer Staapl I think)
+    IF                  ( its not NULL$ )
+      CR TIB #TIB @ TYPE ( Display line in TIB )
+      CR >IN @ [ CHAR ^ ] LITERAL CHARS ( ^ under offending word )
+      CR .$ ."  ? "     ( followed by error message and "?" )
+    THEN
+    PRESET ;             ( reset the data stack )
+
 : QUIT ( -- )
  ( Reset return stack pointer and start text interpreter. )
   RP0 @ RP!           ( initialize the return stack )
@@ -1193,16 +1205,18 @@ CREATE I/O  ' ?RX , ' TX! , ( Array to store default I/O vectors. )
     UNTIL ( a)          ( exit if an error occurred )
     ( 'PROMPT @ SWAP )  ( EFORTH-ZEN and EFORTH-V5 save current prompt address, Staapl doesnt)
     CONSOLE             ( Initialize for terminal interaction)
-    NULL$ OVER XOR      ( is error address=NULL$ ? )
-    ( V5, ZEN and Staapl differ, prefer Staapl I think)
-    IF                  ( its not NULL$ )
-      CR TIB #TIB @ TYPE ( Display line in TIB )
-      CR >IN @ [ CHAR ^ ] LITERAL CHARS ( ^ under offending word )
-      CR .$ ."  ? "     ( followed by error message and "?" )
-    THEN
-    PRESET              ( reset the data stack )
+    quitError           ( Report error and reset data stack) 
     ( V5 and ZEN also send "ERR" to file handler if prompt is not OK which is a little off )
   AGAIN ;               ( go back get another command line )
+
+: quit1 ( -- )
+  ( Evaluate a line that is already in TIB - could be compiling or interpreting, if error then report it)
+  [ ' EVAL ] LITERAL ( evaluate one line)
+  CATCH             ( execute commands with error handler)
+  ?DUP
+  IF ( Its an error )
+    quitError           ( Report error and reset data stack) 
+  THEN ;
 
 ( TODO-IO test PRESET HAND CONSOLE QUIT )
 
@@ -1336,7 +1350,7 @@ CREATE I/O  ' ?RX , ' TX! , ( Array to store default I/O vectors. )
 ( ERRATA Staapl - uses COUNT which is technically correct but poor typing )
 
 : _TYPE ( b u -- )
-  ( Unsigned multiply. Return double product.)
+  ( Send a counted string to output )
   FOR           ( repeat u+1 times )
     AFT         (  skip to THEN the first time )
     DUP C@      ( get one character from b )
@@ -1468,11 +1482,12 @@ CREATE I/O  ' ?RX , ' TX! , ( Array to store default I/O vectors. )
 
 7 CONSTANT VER ( Return the version number of this implementation.)
 
+: version CR ." webFORTH V" VER <# # # 46 HOLD # # 46 HOLD # #> TYPE ( display sign-on text and version )  CR ;
 ( ERRATA v5 'hi' doesnt restore BASE )
+
 : hi ( -- )
   !IO           ( initialize terminal I/O )
-  CR ." webFORTH V" VER <# # # 46 HOLD # # 46 HOLD # #> TYPE ( display sign-on text and version )
-  CR ; COMPILE-ONLY
+  version ; COMPILE-ONLY
 
 ( === Hardware Reset Zen pg106 COLD )
 : EMPTY ( -- )
@@ -1889,7 +1904,7 @@ class Forth {
       // regular code functions that just need a pointer.
       } else {
         const xt = this.buildCode(n, tok, attribs);
-        //console.assert(xt === this.JSToXT(n));
+        //console.assert(xt === this.JStoXT(n));
         if (attribs.jsNeeds) { this.js2xt[n] = xt; }
       }
     });
@@ -1920,7 +1935,7 @@ class Forth {
   }
   buildUser(name, init) {
     init = typeof init === 'string'
-      ? (typeof this[init] !== 'undefined' ? this[init] : this.JSToXT(init)) // Either field of this, or function
+      ? (typeof this[init] !== 'undefined' ? this[init] : this.JStoXT(init)) // Either field of this, or function
       : typeof init === 'undefined'
         ? this.Ufetch(this._USER) // Already storing during build (e.g. NP)
         : init;
@@ -2139,10 +2154,18 @@ class Forth {
   }
 
   // Search for a string and return either its XT or 0
-  JSToXT(s) {
+  JStoXT(s, save=false) {
+    let xt = this.js2xt[s];
+    if (xt) return xt; // Quick check for cached
     this.JStoCounted(s);
     this.findName(); // xt na | a F
-    return this.SPpop() ? this.SPpop() : undefined;
+    if (this.SPpop()) {
+      xt = this.SPpop();
+      if (save) this.js2xt[s] = xt;
+      return xt;
+    } else {
+      return undefined;
+    }
   }
 
   // === JS Functions to be able to define words ==== in Zen pg30 these are Macros.
@@ -2458,7 +2481,7 @@ class Forth {
     }
   }
 
-  // === JS interpreter - could be discarded when done or built out
+  // === Forth words written in JS as needed for the interpreter
 
   PARSE() { // returns b (address) and u (length)
     const delimiter = this.SPpop(); // delimiter
@@ -2558,12 +2581,6 @@ class Forth {
     }
   }
 
-  JStoTIB(s) {
-    const TIBoff = this.Ufetch(TIBoffset);
-    console.assert((TIBoff + s.length) < (this.Ufetch(RP0offset) - 10)); // Check for overlong lines
-    this.Ustore(INoffset, 0); // Start at beginning of TIB
-    this.Ustore(nTIBoffset,  this.m.encodeString(TIBoff, s)); // copy string to TIB, and store length in #TIB
-  }
   async EVAL() { // Same signature as Forth EVAL, reads tokens from TIB and interprets
     while (this.Ufetch(INoffset) < this.Ufetch(nTIBoffset)) {
       this.TOKEN(); // a ; pointing to word in Name Buffer (NB)
@@ -2583,6 +2600,14 @@ class Forth {
     }
   }
 
+  // ==== FORTH Interpreter - words that have no Forth equivalent ====
+  JStoTIB(s) {
+    const TIBoff = this.Ufetch(TIBoffset);
+    console.assert((TIBoff + s.length) < (this.Ufetch(RP0offset) - 10)); // Check for overlong lines
+    this.Ustore(INoffset, 0); // Start at beginning of TIB
+    this.Ustore(nTIBoffset,  this.m.encodeString(TIBoff, s)); // copy string to TIB, and store length in #TIB
+  }
+
   // Take a multiline string, and pass line by line to EVAL
   async interpret(inp) {
     const inputs = inp.split('\n');
@@ -2594,10 +2619,13 @@ class Forth {
         console.log(this.m.debug(this.SP, this.SPP), ' >>', inputline);
       }
       this.JStoTIB(inputline);
-      await this.EVAL(inputline);
+      await this.EVAL();
     }
   }
-
+  async interpret1(inp) {
+    this.JStoTIB(inp);
+    await this.run(this.JStoXT('quit1', true));
+  }
   // === A group of words required for the JS interpreter redefined later
 
   // : [  doLIT $INTERPRET 'EVAL ! ; IMMEDIATE
@@ -2643,7 +2671,7 @@ class Forth {
   }
 
   console() {
-    return this.run(this.JSToXT('WARM'));
+    return this.run(this.JStoXT('WARM'));
   }
   // TODO-29-DOES define DOES> for CREATE-DOES> and tokenDoes - this is not part of eForth, THEN defined Vocabulary as CREATE-DOES word
   //tokenDoes = Forth.tokenFunction(payload => { this.RPpush(this.IP); this.IP = (this.Mfetch8(payload++)<<8)+this.Mfetch8(payload++); this.SPpush(payload++); ); // Almost same as tokenDoList
