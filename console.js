@@ -55,6 +55,19 @@ const consoleStyle = `
   background-color: #2196F3;
   padding: 3px;
 }
+.grid-under {
+  display: grid;
+  gri-template-columns: auto auto auto;
+  grid-gap: 3px;
+  padding:  0px 3px 3px 3px;
+  background-color: #2196F3;
+  font-size: smaller;
+}
+.grid-under div {
+  padding: 1px;
+  background-color: rgba(255, 255, 255, 0.8);
+  text-align: center;
+}
 forth-stack, forth-output, forth-input, .banner {
   padding: 5px;
   background-color: rgba(255, 255, 255, 0.8);
@@ -70,10 +83,27 @@ class ForthConsole extends HTMLElement {
     this.attachShadow({ mode: 'open' });
     this.shadowRoot.append(
       EL('style', { textContent: consoleStyle }),
-      this.grid = EL('div', {class: 'grid-container'}, [
-        EL('div',{ class: 'banner', textContent: 'webForth console' }),
+      this.grid = EL('div', { class: 'grid-container' }, [
+        EL('div', { class: 'banner', textContent: 'webForth console' }),
         // Create an output area
         this.output = EL('forth-output'),
+      ]),
+      EL('div', { class: 'grid-under' }, [
+        EL('div',{style: 'grid-column-start: 1;grid-column-end: 2;'}, [
+          EL('a', {  href: 'https://github.com/mitra42/webForth' }, [
+            EL('span', { textContent: 'help' }),
+          ]),
+        ]),
+        EL('div',{ style: 'grid-column-start: 2;grid-column-end: 3;'}, [
+          EL('a', { href: 'https://mitra.biz' }, [
+            EL('span', { textContent: 'mitra ardron 2020' }),
+          ]),
+        ]),
+        EL('div',{ style: 'grid-column-start: 3;grid-column-end: 4;'}, [
+          EL('a', { href: 'https://github.com/mitra42/webForth' }, [
+            EL('span', { textContent: 'git repo' }),
+          ]),
+        ]),
       ]),
     );
     this.stack = EL('forth-stack');

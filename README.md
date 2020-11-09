@@ -59,19 +59,24 @@ foo2.compileForthInForth().then(() => foo2.console());
 foo1.compileForthInForth().then(() => foo1.interpret('1 2 .S'));
 ```
 ## Running in a browser
+
+You should be able to run this at https://mitra.biz/forth/console.html
+
+To make your own copy, clone the repo,
+
 Start a simple http server such as that included in Node
 ```
-cd webforth
+cd webforth # Or wherever you cloned it
 http-server &
 ```
-Open `http://localhost:8080` in a browser. 
+Open `http://localhost:8080/console.html` in a browser. 
 
-The HTML uses Web Components and TextEncoders so they should work in any modern browsers 
-(Firefox, Chrome, Opera, Edge, Android, but not IE or Safari on IOS or OSX). 
-There are no plans to support those browsers, 
+The HTML uses Web Components and TextEncoders so they should work in any modern browsers such as:
+Firefox, Chrome, Opera, Edge, Android. 
+It will not work in IE or Safari on IOS or OSX, and there are no plans to support those browsers, 
 however I'll be happy to add PRs if someone else does.
 
-It should compile Forth (you can verify in the console) and present a console and entry box
+It should compile Forth (you can verify in the web console) and present a console and entry box
 in which you can type any Forth. 
 
 Everything is happening locally i.e. this is forth running in your browser.
