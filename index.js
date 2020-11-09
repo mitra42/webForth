@@ -1216,6 +1216,7 @@ CREATE I/O  ' ?RX , ' TX! , ( Array to store default I/O vectors. )
   ?DUP
   IF ( Its an error )
     quitError           ( Report error and reset data stack) 
+    [COMPILE] [       ( Exit compiling e.g. if error in a definition )
   THEN ;
 
 ( TODO-IO test PRESET HAND CONSOLE QUIT )
@@ -1279,6 +1280,8 @@ CREATE I/O  ' ?RX , ' TX! , ( Array to store default I/O vectors. )
   THEN                        ( here if null input )
   $" name" THROW ;            ( this is an error return )
 
+( TODO-ZEN-V5-STAAPL - COMPARE ABOVE HERE )
+
 : $COMPILE ( a -- ) ( Redefining code word js $COMPILE in Forth)
   ( Compile next word to code dictionary as a token or literal.)
   NAME?         ( parse the next word out )
@@ -1294,8 +1297,9 @@ CREATE I/O  ' ?RX , ' TX! , ( Array to store default I/O vectors. )
   IF [COMPILE] LITERAL ( successful. compile a literal number )
     EXIT        ( done )
   THEN          ( not a number either )
-  COUNT TYPE SPACE ." Not found" ( TODO remove line when have better handling of THROW)
   THROW ;       ( generate an error condition )
+
+( TODO-ZEN-V5-STAAPL - COMPARE BELOW HERE )
   
 : OVERT ( -- ) ( Redefining code word in Forth)
   ( Link a successfully defined word into the current vocabulary. )
@@ -1990,6 +1994,9 @@ class Forth {
   // === Code words to support debugging on the console
   // Put debugNA in a definition to print a counted string on the console
   debugNA() { console.log('NAME=', this.countedToJS(this.SPfetch())); } // Print the NA on console
+  debugTIB() {
+    return this.m.decodeString(this.Ufetch(TIBoffset) + this.Ufetch(INoffset), this.Ufetch(TIBoffset) + this.Ufetch(nTIBoffset));
+  }
   // Put testing3 in a definition to start outputing stack trace on console.
   testing3() {
     this.testing |= 3; }
