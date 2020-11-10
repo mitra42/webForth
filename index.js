@@ -162,7 +162,7 @@ USER(undefined, 0);    // Always 0 to indicate no more valid Vocabularies
 const CURRENToffset = USER('CURRENT', undefined); // Point to the vocabulary to be extended. Default to FORTH.
 // this is set to result of currentFetch
 USER(undefined, undefined); // Vocabulary link uses one cell after CURRENT (not clear how this is used)
-// Note there is a (hidden) assumption that CP and NP are consecutive - used to check free space
+// Not e there is a (hidden) assumption that CP and NP are consecutive - used to check free space
 const CPoffset = USER('CP', undefined);  // eForth initializes to CTOP but we have to use this during compilation
 const NPoffset = USER('NP', undefined);  // normally set on Zen pg106 but we are using it live. Its the bottom of what compiled in name space.
 const LASToffset = USER('LAST', undefined); // normally set on Zen pg106 but using live
@@ -2052,8 +2052,8 @@ class Forth {
   Ufetch(userindex) {
     return this.Mfetch(this.UP + userindex * this.CELLL); }
   Ustore(userindex, w) {
-    return this.Mstore(this.UP + userindex * this.CELLL, w); }
-
+    this.Mstore(this.UP + userindex * this.CELLL, w); }
+    
   // === Access to the USER variables before they are defined
   currentFetch() { return this.Ufetch(CURRENToffset); }
   cpFetch() { return this.Ufetch(CPoffset); }
@@ -2381,6 +2381,7 @@ class Forth {
   doLIT() { this.SPpush(this.IPnext()); }
 
   // See DOES> and CREATE, this patches the field after the token compiled by the create to point to the code following the DOES>
+  // : DOES> R> LAST @ 2 CELLS - @ CELLL + ! ; // Untested Forth version, note side effect of the R> of doing an exit.
   DOES() {
     this.Mstore(
       this.Mfetch(this.Ufetch(LASToffset) - 2 * this.CELLL) + this.CELLL, // field after tokenVar compile by CREATE
