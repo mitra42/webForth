@@ -1,3 +1,9 @@
+* 2020-11-09: v0.0.9
+  * Add bottom text for help etc
+  * Better error handling in the console
+* 2020-11-08: v0.0.7
+  * Console interface working, with stack display
+  * Refactoring of memory classes
 * 2020-10-31: v0.0.6
   * Add index.html and index_web.js for simple POC UI 
   * Refactor node specific IO out of Forth and add ForthNodeOverrides to simplify API
