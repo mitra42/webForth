@@ -130,7 +130,7 @@ USER(undefined, 0); // Used for multitasking
 USER(undefined, 0); // Used for multitasking
 USER(undefined, 0); // Used for multitasking
 USER(undefined, 0); // Used for multitasking
-USER('SP0', 'SPP');      // (--a) Pointer to bottom of the data stack.
+const SP0offset = USER('SP0', undefined);      // (--a) Pointer to bottom of the data stack.
 const RP0offset = USER('RP0', undefined);      // (--a) Pointer to bottom of the return stack.
 USER("'?KEY", '?RX');    // Execution vector of ?KEY. Default to ?rx.
 USER("'EMIT", 'TX!');  // Execution vector of EMIT. Default to TX!
@@ -1561,6 +1561,8 @@ class Mem8 extends Uint8Array {
 class Mem8_16 extends Mem8 {
   pushCell(a, v) { return this.push16(a, v); }
   fetchCell(a) { return (this[a++] << 8) | this[a]; }
+  cellFetchCell(cellAddr) { return (this.fetchCell(cellAddr << 1)); }
+  cellStoreCell(cellAddr, v) { this.pushCell((cellAddr+1) << 1, v); }
   debug(start, end) {
     if (end < start) return 'UNDERFLOW';
     const res = [];
@@ -1572,17 +1574,21 @@ class Mem8_16 extends Mem8 {
 class Mem8_24 extends Mem8 {
   pushCell(a, v) { return this.push24(a, v); }
   fetchCell(a) { return (((this[a++] << 8) | this[a++]) << 8) | this[a]; }
+  cellFetchCell(cellAddr) { return (this.fetchCell(cellAddr * 3)); }
+  cellStoreCell(cellAddr, v) { this.pushCell((cellAddr + 1) * 3, v); }
   debug(start, end) {
     if (end < start) return 'UNDERFLOW';
     const res = [];
-    const i = start;
-    while (i < end) res.push((this[i++]<<16 + this[i++]<<8 + this[i++])>>0);
+    let i = start;
+    while (i < end) res.push((this[i++] << 16 + this[i++] << 8 + this[i++]) >> 0);
     return res;
   }
 }
 class Mem8_32 extends Mem8 {
   pushCell(a, v) { return this.push32(a, v); }
   fetchCell(a) { return  (((((this[a++] << 8) | this[a++]) << 8) | this[a++]) << 8) | this[a]; }
+  cellFetchCell(cellAddr) { return (this.fetchCell(cellAddr << 2)); }
+  cellStoreCell(cellAddr, v) { this.pushCell((cellAddr + 1) << 2, v); }
   debug(start, end) {
     if (end < start) return 'UNDERFLOW';
     const res = [];
@@ -1606,7 +1612,7 @@ class Mem16 extends Uint16Array {
     }
   } // Pointless constructor
 
-  cellAddr(byteAddr) {
+  memAddr(byteAddr) {
     this.assertAlign(byteAddr);
     return byteAddr >> 1;
   }
@@ -1626,7 +1632,7 @@ class Mem16 extends Uint16Array {
   }
 
   fetch16(byteAddr) {
-    return this[this.cellAddr(byteAddr)];
+    return this[this.memAddr(byteAddr)];
   }
 
   push8(byteAddr, v) { // a is 1 after address we want to store in, which could be start of next cell
@@ -1642,10 +1648,12 @@ class Mem16 extends Uint16Array {
     return byteAddr; // Has been decremented by 1
   }
 
+  memPush16(memAddr, v) {
+    this[--memAddr] = v;
+    return memAddr << 1;
+  }
   push16(byteAddr, v) {
-    let cellAddr = this.cellAddr(byteAddr);
-    this[--cellAddr] = v;
-    return cellAddr << 1;
+    return this.memPush16(byteAddr >> 1, v); //TODO-MEM could refactor this into callers
   }
 
   // Encode a string into an address and return the number of bytes written
@@ -1670,6 +1678,8 @@ class Mem16 extends Uint16Array {
 class Mem16_16 extends Mem16 {
   pushCell(a, v) { return this.push16(a, v); }
   fetchCell(a) { return this.fetch16(a); }
+  cellFetchCell(cellAddr) { return this[cellAddr]; }
+  cellStoreCell(cellAddr, v) { this[cellAddr] = v; }
   debug(start, end) { return (end < start) ? 'UNDERFLOW' : new Uint16Array(this.buffer, start, (end - start) >> 1).toString(); }
 }
 class Mem16_32 extends Mem16 {
@@ -1680,11 +1690,13 @@ class Mem16_32 extends Mem16 {
   }
 
   fetchCell(byteAddr) {
-    let cellAddr = this.cellAddr(byteAddr);
+    let memAddr = this.memAddr(byteAddr);
     return this.littleEndian
-      ? (this[cellAddr++] | (this[cellAddr] << 16))
-      : ((this[cellAddr++] << 16) | this[cellAddr]);
+      ? (this[memAddr++] | (this[memAddr] << 16))
+      : ((this[memAddr++] << 16) | this[memAddr]);
   }
+  cellFetchCell(cellAddr) { return this.fetchCell(cellAddr << 2); } //TODO-MEM inefficient refactor
+  cellStoreCell(cellAddr, v) { this.pushCell((cellAddr+1) << 2, v); }
   debug(start, end) { return (end < start) ? 'UNDERFLOW' : new Uint32Array(this.buffer, start, (end - start) >> 2).toString(); }
 }
 
@@ -1702,7 +1714,7 @@ class Mem32 extends Uint32Array {
     }
   } // Pointless constructor
 
-  cellAddr(byteAddr) {
+  memAddr(byteAddr) {
     this.assertAlign(byteAddr);
     return byteAddr >> 2;
   }
@@ -1721,7 +1733,7 @@ class Mem32 extends Uint32Array {
     return (offset ^ this.littleEndian) ? (cell & 0xFFFF) : cell >>> 16;
   }
   fetch32(byteAddr) {
-    return this[this.cellAddr(byteAddr)];
+    return this[this.memAddr(byteAddr)];
   }
 
   push8(byteAddr, v) { // a is 1 after address we want to store in, which could be start of next cell
@@ -1750,7 +1762,7 @@ class Mem32 extends Uint32Array {
   }
 
   push32(byteAddr, v) {
-    let cellAddr = this.cellAddr(byteAddr);
+    let cellAddr = this.memAddr(byteAddr);
     this[--cellAddr] = v;
     return cellAddr << 2;
   }
@@ -1779,6 +1791,8 @@ class Mem32 extends Uint32Array {
 class Mem32_16 extends Mem32 {
   pushCell(a, v) { return this.push16(a, v); }
   fetchCell(a) { return this.fetch16(a); }
+  cellFetchCell(cellAddr) { return this.fetchCell(cellAddr << 1); }
+  cellStoreCell(cellAddr, v) { this.pushCell((cellAddr + 1) << 1, v); }
   // Alignment is to the smaller of cell length or memory size, in this case 16 bit
   align(byteAddr) { return (((byteAddr - 1) >> 1) + 1) << 1; }
   assertAlign(byteAddr) { console.assert(!(byteAddr & 0x01)); }
@@ -1789,6 +1803,8 @@ class Mem32_32 extends Mem32 {
   pushCell(a, v) { return this.push32(a, v); }
   fetchCell(a) { return this.fetch32(a); }
   // Alignment is to the smaller of cell length or memory size in this case 32
+  cellFetchCell(cellAddr) { return this[cellAddr]; }
+  cellStoreCell(cellAddr, v) { this[cellAddr] = v; }
   align(byteAddr) { return (((byteAddr - 1) >> 2) + 1) << 2; }
   assertAlign(byteAddr) { console.assert(!(byteAddr & 0x03)); }
   debug(start, end) { return (end < start) ? 'UNDERFLOW' : new Uint32Array(this.buffer, start, (end - start) >> 2).toString(); }
@@ -1836,9 +1852,9 @@ class Forth {
     const RP0 = UPP - (8 * this.CELLL);  // top of return stack RP0 - there is an 8 cell buffer which is probably just for safety.
     const RTS = 0x80 * this.CELLL; // return stack/TIB size // eFORTH-DIFF was 64 which is tiny for any kind of string handling
     this.TIB0 = RP0 - RTS; // Terminal input buffer - shares space with Return stack //TODO-28-MULTITASK will move
-    this.SPP = this.TIB0 - (8 * this.CELLL); // start of data stack - grows down, points at top of stack - 8 word buffer for safety
+    this.cellSPP = ((this.TIB0 - (8 * this.CELLL)) / this.CELLL)>>0; // start of data stack - grows down, points at top of stack - 8 word buffer for safety
     const SPS = 0x80 * this.CELLL; // Size of data stack 256 bytes for now
-    const NAMEE = this.SPP - SPS; // name dictionary
+    const NAMEE = (this.cellSPP * this.CELLL) - SPS; // name dictionary
     // And then building from the bottom up. The gap in middle is code directory
     // cold start vector - its unclear if these bottom 0x100 are useful outside of the DOS context and for DOS it would need code at this address I think?
     // const COLDD = 0x100;
@@ -1855,7 +1871,7 @@ class Forth {
     // === Standard pointers used - Zen pg22
     // TODO-28-MULTI think about how these may need to be Task specific
     this.IP = 0;    // Interpreter Pointer
-    this.SP = this.SPP;  // Data Stack Pointer
+    this.cellSP = this.cellSPP;  // Data Stack Pointer but in MEM units rather than bytes
     this.RP = RP0;  // Return Stack Pointer (aka BP in 8086)
     this.UP = UPP;  // User Area Pointer // TODO-28-MULTI will move this around
     this._USER = 0; // Incremented by this.CELLL as define USER's
@@ -1863,7 +1879,9 @@ class Forth {
     // Setup pointers for first dictionary entries.
     this.Ustore(CPoffset, CODEE); // Pointer to where compiling into dic
     this.Ustore(NPoffset, NAMEE); // Pointer to where writing name stack
+    //console.assert(this.npFetch() > 0); // Quick test that above worked - should be commented out
     this.Ustore(RP0offset, RP0);
+    this.Ustore(SP0offset, this.cellSPP * this.CELLL);
     // Allow Overrides of functions by caller - used for example to vector console I/O
     // Order is significant, as buildDictionary will define a jsFunction that points to the function as defined then.
     ['TXbangC', 'TXbangS', 'bangIO', 'qrx'].forEach((k) => {
@@ -1975,8 +1993,11 @@ class Forth {
   debugPop() { this.debugExcecutionStack.pop(); } // in EXIT
 
   // Return an array of stack entries
+  debugCells(start, end) {
+    return this.m.debug(start * this.CELLL, end * this.CELLL);
+  }
   debugStack() {
-    return this.m.debug(this.SP, this.SPP);
+    return this.debugCells(this.cellSP, this.cellSPP);
   }
   debugReturnStack() {
     return this.m.debug(this.RP, this.Ufetch(RP0offset));
@@ -1986,7 +2007,7 @@ class Forth {
       this.debugName = this.xt2name(xt); // Expensive so only done when testing
       if (this.testingDepth > this.debugExcecutionStack.length) {
         //TODO-28-MULTITASK RPP(RP0) and SPP will move
-        console.log('R:', this.Ufetch(RP0offset) === this.RP ? '' : this.debugReturnStack(), this.debugExcecutionStack, this.xt2name(xt), 'S:', this.SPP === this.SP ? '' : this.debugStack(),
+        console.log('R:', this.Ufetch(RP0offset) === this.RP ? '' : this.debugReturnStack(), this.debugExcecutionStack, this.xt2name(xt), 'S:', this.cellSPP === this.cellSP ? '' : this.debugStack(),
           this.padTestLength ? ('pad: ' + (this.padTestLength > 0 ? this.m.decodeString(this.padPtr(), this.padPtr() + this.padTestLength) : this.m.decodeString(this.padPtr() + this.padTestLength, this.padPtr()))) : '');
       }
     }
@@ -2019,7 +2040,7 @@ class Forth {
       b.unshift(this.SPpop());
     }
     // Check stack depth matches
-    console.assert(((this.SPP - this.SP) / this.CELLL) === stackDepth);
+    console.assert((this.cellSPP - this.cellSP) === stackDepth);
     // Compare stacks
     for (let i = 0; i < stackDepth; i++) {
       console.assert(this.SPpop() === b.pop());
@@ -2042,9 +2063,9 @@ class Forth {
     this.m.push8(a2, v);
     return a2; } // Returns address after the store
   ALIGNED() { this.SPpush(this.m.align(this.SPpop())); }
-  SPfetch() { return this.Mfetch(this.SP); }
-  SPpop() { const v = this.Mfetch(this.SP); this.SP += this.CELLL; return v; }
-  SPpush(v) { this.SP = this.Mpush(this.SP, v); }
+  SPfetch() { return this.m.cellFetchCell(this.cellSP); }
+  SPpop() { return this.m.cellFetchCell(this.cellSP++); }
+  SPpush(v) { this.m.cellStoreCell(--this.cellSP, v); }
   RPfetch() { return this.Mfetch(this.RP); }
   RPpop() { const v = this.Mfetch(this.RP); this.RP += this.CELLL; return v; }
   RPpush(v) { this.RP = this.Mpush(this.RP, v); }
@@ -2053,7 +2074,7 @@ class Forth {
     return this.Mfetch(this.UP + userindex * this.CELLL); }
   Ustore(userindex, w) {
     this.Mstore(this.UP + userindex * this.CELLL, w); }
-    
+
   // === Access to the USER variables before they are defined
   currentFetch() { return this.Ufetch(CURRENToffset); }
   cpFetch() { return this.Ufetch(CPoffset); }
@@ -2428,11 +2449,11 @@ class Forth {
   toR() { this.RPpush(this.SPpop()); } // >R
 
   // Data stack initialization eForthAndZen#41
-  SPat() { this.SPpush(this.SP); } //SP@
-  SPbang() { this.SP = this.SPpop(); } //SP!
+  SPat() { this.SPpush(this.cellSP * this.CELLL); } //SP@
+  SPbang() { this.cellSP = this.SPpop() / this.CELLL; } //SP!
 
   // Classic Data stack words eForthAndZen#42
-  DROP() { this.SP += this.CELLL; }
+  DROP() { this.cellSP++; }
   DUP() { this.SPpush(this.SPfetch()); }
   SWAP() {
     const x = this.SPpop();
@@ -2600,7 +2621,7 @@ class Forth {
         await this.run(this.Ufetch(EVALoffset));
       }
       // TODO-28-MULTITASK RP0 will move
-      console.assert(this.SP <= this.SPP && this.RP <= this.Ufetch(RP0offset)); // Side effect of making SP and SPP available to debugger.
+      console.assert(this.cellSP <= this.cellSPP && this.RP <= this.Ufetch(RP0offset)); // Side effect of making SP and SPP available to debugger.
     }
     const prompt = this.Ufetch(PROMPToffset);
     if (prompt) {
@@ -2624,7 +2645,7 @@ class Forth {
       // noinspection JSUnfilteredForInLoop
       const inputline = inputs[i];
       if (this.testing & 0x01) {
-        console.log(this.m.debug(this.SP, this.SPP), ' >>', inputline);
+        console.log(this.debugCells(this.cellSP, this.cellSPP), ' >>', inputline);
       }
       this.JStoTIB(inputline);
       await this.EVAL();
