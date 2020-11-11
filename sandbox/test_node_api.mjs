@@ -2,7 +2,7 @@ import { Forth, ForthNodeOverrides} from '../index.js';
 // Normally this would be: import Forth from 'webforth';
 
 const CELLL = 2;
-const MEM = 16;
+const MEM = 8;
 const EM = 0x2000 * CELLL; // default is 0x2000 * CELLL
 const foo = new Forth({CELLL, EM, MEM, overrides: ForthNodeOverrides});
 foo.compileForthInForth()

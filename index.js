@@ -69,7 +69,7 @@
       f: bar      Links to Forth.prototype.bar (defaults to same as 'n'
       token: true Create a token word that can be used as first cell of a definition - order must match constants below
       replaced: true  This word will be replaced by a Forth definition, so check for its being compiled into other definitions.
-      jsNeeds: true The execution address of this word is needed by the JS o will be stored in jstoxt[n]
+      jsNeeds: true The execution address of this word is needed by the JS o will be stored in js2xt[n]
  */
 // it is used to build the dictionary in each instance.
 const jsFunctionAttributes = [
@@ -1540,10 +1540,10 @@ class Mem8 extends Uint8Array {
   fetch8(a) {
     return this[a];
   }
-  push8(a, v) { this[--a] = v; return a; } // Note implicit & 0xFF when storing to Uint8
-  push16(a, v) { this[--a] = v; return this.push8(a, v >>> 8); }
-  push24(a, v) { this[--a] = v; return this.push16(a, v >>> 8); }
-  push32(a, v) { this[--a] = v; return this.push24(a, v >>> 8); }
+  store8(a, v) { this[a] = v; } // Note implicit & 0xFF when storing to Uint8
+  store16(a, v) { this[a++] = v >>> 8; this[a] = v; } // Note implicit & 0xFF when storing to Uint8
+  store24(a, v) { this.store8(a++, v >>> 16); this.store16(a, v); }
+  store32(a, v) { this.store16(a, v >> 16); this.store16(a + 2, v); }
 
   align(byteaddr) { return byteaddr; }
   assertAlign() { }
@@ -1559,23 +1559,23 @@ class Mem8 extends Uint8Array {
   }
 }
 class Mem8_16 extends Mem8 {
-  pushCell(a, v) { return this.push16(a, v); }
+  storeCell(a, v) { this.store16(a, v); }
   fetchCell(a) { return (this[a++] << 8) | this[a]; }
   cellFetchCell(cellAddr) { return (this.fetchCell(cellAddr << 1)); }
-  cellStoreCell(cellAddr, v) { this.pushCell((cellAddr+1) << 1, v); }
+  cellStoreCell(cellAddr, v) { this.storeCell(cellAddr << 1, v); }
   debug(start, end) {
     if (end < start) return 'UNDERFLOW';
     const res = [];
     let i = start;
-    while (i < end) res.push(((this[i++] << 8) | this[i++]) >>0);
+    while (i < end) res.push(((this[i++] << 8) | this[i++]) >> 0);
     return res;
   }
 }
 class Mem8_24 extends Mem8 {
-  pushCell(a, v) { return this.push24(a, v); }
+  storeCell(a, v) { this.store24(a, v); }
   fetchCell(a) { return (((this[a++] << 8) | this[a++]) << 8) | this[a]; }
   cellFetchCell(cellAddr) { return (this.fetchCell(cellAddr * 3)); }
-  cellStoreCell(cellAddr, v) { this.pushCell((cellAddr + 1) * 3, v); }
+  cellStoreCell(cellAddr, v) { this.storeCell(cellAddr * 3, v); }
   debug(start, end) {
     if (end < start) return 'UNDERFLOW';
     const res = [];
@@ -1585,10 +1585,10 @@ class Mem8_24 extends Mem8 {
   }
 }
 class Mem8_32 extends Mem8 {
-  pushCell(a, v) { return this.push32(a, v); }
+  storeCell(a, v) { this.store32(a, v); }
   fetchCell(a) { return  (((((this[a++] << 8) | this[a++]) << 8) | this[a++]) << 8) | this[a]; }
   cellFetchCell(cellAddr) { return (this.fetchCell(cellAddr << 2)); }
-  cellStoreCell(cellAddr, v) { this.pushCell((cellAddr + 1) << 2, v); }
+  cellStoreCell(cellAddr, v) { this.storeCell(cellAddr << 2, v); }
   debug(start, end) {
     if (end < start) return 'UNDERFLOW';
     const res = [];
@@ -1600,7 +1600,7 @@ class Mem8_32 extends Mem8 {
 
 // noinspection JSBitwiseOperatorUsage,JSBitwiseOperatorUsage
 class Mem16 extends Uint16Array {
-  // The actual pushCell and fetchCell should take care of endian issues and support littleEndian or bigEndian
+  // The actual storeCell and fetchCell should take care of endian issues and support littleEndian or bigEndian
   constructor(...args) {
     if (args[0] instanceof ArrayBuffer) { // Its a call to subarray,
       // noinspection JSCheckFunctionSignatures
@@ -1611,11 +1611,6 @@ class Mem16 extends Uint16Array {
       this.littleEndian = true;
     }
   } // Pointless constructor
-
-  memAddr(byteAddr) {
-    this.assertAlign(byteAddr);
-    return byteAddr >> 1;
-  }
 
   align(byteAddr) {
     return (((byteAddr - 1) >> 1) + 1) << 1;
@@ -1631,13 +1626,9 @@ class Mem16 extends Uint16Array {
     return (offset ^ this.littleEndian) ? (cell & 0xFF) : cell >>> 8;
   }
 
-  fetch16(byteAddr) {
-    return this[this.memAddr(byteAddr)];
-  }
-
-  push8(byteAddr, v) { // a is 1 after address we want to store in, which could be start of next cell
+  store8(byteAddr, v) { // a is 1 after address we want to store in, which could be start of next cell
     console.assert(!(v & 0xFF00)); // Check never try and store something > a byte
-    const cellAddr = --byteAddr >> 1; // A points at cell (in both cases
+    const cellAddr = byteAddr >> 1; // A points at cell (in both cases
     const offset = byteAddr & 0x01;
     const cell = this[cellAddr];
     if (offset ^ this.littleEndian) {
@@ -1645,15 +1636,6 @@ class Mem16 extends Uint16Array {
     } else {
       this[cellAddr] = (cell & 0x00FF) | (v << 8);
     }
-    return byteAddr; // Has been decremented by 1
-  }
-
-  memPush16(memAddr, v) {
-    this[--memAddr] = v;
-    return memAddr << 1;
-  }
-  push16(byteAddr, v) {
-    return this.memPush16(byteAddr >> 1, v); //TODO-MEM could refactor this into callers
   }
 
   // Encode a string into an address and return the number of bytes written
@@ -1676,33 +1658,38 @@ class Mem16 extends Uint16Array {
 }
 
 class Mem16_16 extends Mem16 {
-  pushCell(a, v) { return this.push16(a, v); }
-  fetchCell(a) { return this.fetch16(a); }
+  storeCell(a, v) { this[a >> 1] = v; }
+  fetchCell(byteAddr) { return this[byteAddr >> 1]; }
   cellFetchCell(cellAddr) { return this[cellAddr]; }
   cellStoreCell(cellAddr, v) { this[cellAddr] = v; }
   debug(start, end) { return (end < start) ? 'UNDERFLOW' : new Uint16Array(this.buffer, start, (end - start) >> 1).toString(); }
 }
 class Mem16_32 extends Mem16 {
-  pushCell(byteAddr, v) {
-    return this.littleEndian
-      ? this.push16(this.push16(byteAddr, v >>> 16), v & 0xFFFF)
-      : this.push16(this.push16(byteAddr, v & 0xFFFF), v >>> 16);
+  memStoreCell(memAddr, v) {
+    if (this.littleEndian) {
+      this[memAddr++] = v & 0xFFFF;
+      this[memAddr] = v >> 16;
+    } else {
+      this[memAddr] = v >> 16;
+      this[memAddr++] = v & 0xFFFF;
+    }
   }
+  storeCell(byteAddr, v) { this.memStoreCell(byteAddr >> 1, v); }
+  cellStoreCell(cellAddr, v) { this.memStoreCell(cellAddr << 1, v); }
 
-  fetchCell(byteAddr) {
-    let memAddr = this.memAddr(byteAddr);
+  memFetchCell(memAddr) {
     return this.littleEndian
       ? (this[memAddr++] | (this[memAddr] << 16))
       : ((this[memAddr++] << 16) | this[memAddr]);
   }
-  cellFetchCell(cellAddr) { return this.fetchCell(cellAddr << 2); } //TODO-MEM inefficient refactor
-  cellStoreCell(cellAddr, v) { this.pushCell((cellAddr+1) << 2, v); }
+  fetchCell(byteAddr) { return this.memFetchCell(byteAddr >> 1); }
+  cellFetchCell(cellAddr) { return this.memFetchCell(cellAddr << 1); }
   debug(start, end) { return (end < start) ? 'UNDERFLOW' : new Uint32Array(this.buffer, start, (end - start) >> 2).toString(); }
 }
 
 // noinspection JSBitwiseOperatorUsage,JSBitwiseOperatorUsage,JSBitwiseOperatorUsage
 class Mem32 extends Uint32Array {
-  // The actual pushCell and fetchCell should take care of endian issues and support littleEndian or bigEndian
+  // The actual storeCell and fetchCell should take care of endian issues and support littleEndian or bigEndian
   constructor(...args) {
     if (args[0] instanceof ArrayBuffer) { // Its a call to subarray,
       // noinspection JSCheckFunctionSignatures
@@ -1714,11 +1701,6 @@ class Mem32 extends Uint32Array {
     }
   } // Pointless constructor
 
-  memAddr(byteAddr) {
-    this.assertAlign(byteAddr);
-    return byteAddr >> 2;
-  }
-
   fetch8(byteAddr) {
     const offset = byteAddr & 0x03;
     const cell = this[byteAddr >> 2]; // Does not have to be aligned
@@ -1726,45 +1708,13 @@ class Mem32 extends Uint32Array {
     return (cell >> shift) & 0xFF;
   }
 
-  fetch16(byteAddr) {
-    console.assert(!(byteAddr & 0x01)); // Has to be aligned 16 bit but not 32 bit
-    const offset = (byteAddr & 0x03) >> 1; // Will be 0 or 1
-    const cell = this[byteAddr >> 2];
-    return (offset ^ this.littleEndian) ? (cell & 0xFFFF) : cell >>> 16;
-  }
-  fetch32(byteAddr) {
-    return this[this.memAddr(byteAddr)];
-  }
-
-  push8(byteAddr, v) { // a is 1 after address we want to store in, which could be start of next cell
+  store8(byteAddr, v) { // a is 1 after address we want to store in, which could be start of next cell
     console.assert(!(v & 0xFFFFFF00)); // Check never try and store something > a byte
-    const cellAddr = --byteAddr >> 2; // A points at cell (in both cases
+    const cellAddr = byteAddr >> 2; // A points at cell (in both cases
     const offset = byteAddr & 0x03;
     const shift = 8 * (this.littleEndian ? offset : (3 - offset));
     const cell = this[cellAddr];
     this[cellAddr] = (cell & (0xFFFFFFFF ^ (0xFF << shift))) | (v << shift);
-    return byteAddr; // Has been decremented by 1
-  }
-
-  push16(byteAddr, v) { // a is 1 after address we want to store in, which could be start of next cell
-    v &= 0xFFFF;
-    console.assert(!(byteAddr & 0x01)); // Should be 16 bit aligned
-    byteAddr -= 2;
-    const cellAddr = byteAddr >> 2; // A points at cell (in all cases
-    const offset = (byteAddr & 0x03) >> 1; // Will be 0 or 1
-    const cell = this[cellAddr];
-    if (offset ^ this.littleEndian) {
-      this[cellAddr] = (cell & 0xFFFF0000) | v;
-    } else {
-      this[cellAddr] = (cell & 0x0000FFFF) | (v << 16);
-    }
-    return byteAddr; // Has been decremented by 1
-  }
-
-  push32(byteAddr, v) {
-    let cellAddr = this.memAddr(byteAddr);
-    this[--cellAddr] = v;
-    return cellAddr << 2;
   }
 
   // Encode a string into an address and return the number of bytes written
@@ -1789,10 +1739,28 @@ class Mem32 extends Uint32Array {
 
 // noinspection JSBitwiseOperatorUsage
 class Mem32_16 extends Mem32 {
-  pushCell(a, v) { return this.push16(a, v); }
-  fetchCell(a) { return this.fetch16(a); }
-  cellFetchCell(cellAddr) { return this.fetchCell(cellAddr << 1); }
-  cellStoreCell(cellAddr, v) { this.pushCell((cellAddr + 1) << 1, v); }
+  cellStoreCell(cellAddr, v) {
+    v &= 0xFFFF;
+    const memAddr = cellAddr >> 1; // A points at cell (in all cases
+    const offset = cellAddr & 0x01; // Will be 0 or 1
+    const cell = this[memAddr];
+    if (offset ^ this.littleEndian) {
+      this[memAddr] = (cell & 0xFFFF0000) | v;
+    } else {
+      this[memAddr] = (cell & 0x0000FFFF) | (v << 16);
+    }
+  }
+  storeCell(byteAddr, v) { this.cellStoreCell(byteAddr >> 1, v); }
+
+  cellFetchCell(cellAddr) {
+    const offset = cellAddr & 0x01; // Will be 0 or 1
+    const cell = this[cellAddr >> 1];
+    return (offset ^ this.littleEndian) ? (cell & 0xFFFF) : cell >>> 16;
+  }
+  fetchCell(byteAddr) {
+    console.assert(!(byteAddr & 0x01)); // Has to be aligned 16 bit but not 32 bit
+    return this.cellFetchCell(byteAddr >> 1);
+  }
   // Alignment is to the smaller of cell length or memory size, in this case 16 bit
   align(byteAddr) { return (((byteAddr - 1) >> 1) + 1) << 1; }
   assertAlign(byteAddr) { console.assert(!(byteAddr & 0x01)); }
@@ -1800,11 +1768,11 @@ class Mem32_16 extends Mem32 {
 }
 // noinspection JSBitwiseOperatorUsage
 class Mem32_32 extends Mem32 {
-  pushCell(a, v) { return this.push32(a, v); }
-  fetchCell(a) { return this.fetch32(a); }
+  storeCell(byteAddr, v) { this[byteAddr >> 2] = v; }
+  cellStoreCell(cellAddr, v) { this[cellAddr] = v; }
+  fetchCell(byteAddr) { return this[byteAddr >> 2]; }
   // Alignment is to the smaller of cell length or memory size in this case 32
   cellFetchCell(cellAddr) { return this[cellAddr]; }
-  cellStoreCell(cellAddr, v) { this[cellAddr] = v; }
   align(byteAddr) { return (((byteAddr - 1) >> 2) + 1) << 2; }
   assertAlign(byteAddr) { console.assert(!(byteAddr & 0x03)); }
   debug(start, end) { return (end < start) ? 'UNDERFLOW' : new Uint32Array(this.buffer, start, (end - start) >> 2).toString(); }
@@ -1822,7 +1790,7 @@ const MemClasses = {
   '32_32': Mem32_32,
 };
 
-// noinspection JSBitwiseOperatorUsage
+// noinspection JSBitwiseOperatorUsage,JSUnusedGlobalSymbols
 class Forth {
   // Build and return an initialized Forth memory obj
   constructor({ CELLL = 2, MEM = 8, memClass = undefined, EM = undefined, overrides = {} }) {
@@ -1852,7 +1820,7 @@ class Forth {
     const RP0 = UPP - (8 * this.CELLL);  // top of return stack RP0 - there is an 8 cell buffer which is probably just for safety.
     const RTS = 0x80 * this.CELLL; // return stack/TIB size // eFORTH-DIFF was 64 which is tiny for any kind of string handling
     this.TIB0 = RP0 - RTS; // Terminal input buffer - shares space with Return stack //TODO-28-MULTITASK will move
-    this.cellSPP = ((this.TIB0 - (8 * this.CELLL)) / this.CELLL)>>0; // start of data stack - grows down, points at top of stack - 8 word buffer for safety
+    this.cellSPP = ((this.TIB0 - (8 * this.CELLL)) / this.CELLL) >> 0; // start of data stack - grows down, points at top of stack - 8 word buffer for safety
     const SPS = 0x80 * this.CELLL; // Size of data stack 256 bytes for now
     const NAMEE = (this.cellSPP * this.CELLL) - SPS; // name dictionary
     // And then building from the bottom up. The gap in middle is code directory
@@ -2051,17 +2019,10 @@ class Forth {
   // === Functions to simplify storing and retrieving 16 bit values into 8 bit stacks etc.
   // These aren't part of eForth, but are here to simplify storing multi-byte words into 8 bit bytes in the Buffer.
   Mfetch(a) { return this.m.fetchCell(a); }
-  // Push below address a, return new pointer (where its stored)
-  Mpush(a, v) { return this.m.pushCell(a, v); }
-  // Push at address a, return new pointer above where its stored
-  Mstore(a, v) { const a2 = a + this.CELLL; this.Mpush(a2, v); return a2; } // Returns address after the store
+  Mstore(a, v) { this.m.storeCell(a, v); }  // Store at address a
   // 8 bit equivalents
-  Mfetch8(a) { return this.m.fetch8(a); } // Returns address after the store
-  Mpush8(a, v) { return this.m.push8(a, v); } // Returns address after the store
-  Mstore8(a, v) {
-    const a2 = a + 1;
-    this.m.push8(a2, v);
-    return a2; } // Returns address after the store
+  Mfetch8(a) { return this.m.fetch8(a); } // Returns byte at a
+  Mstore8(a, v) { this.m.store8(a, v); }
   ALIGNED() { this.SPpush(this.m.align(this.SPpop())); }
   SPfetch() { return this.m.cellFetchCell(this.cellSP); }
   SPpop() { return this.m.cellFetchCell(this.cellSP++); }
@@ -2182,7 +2143,7 @@ class Forth {
   }
 
   // Search for a string and return either its XT or 0
-  JStoXT(s, save=false) {
+  JStoXT(s, save = false) {
     let xt = this.js2xt[s];
     if (xt) return xt; // Quick check for cached
     this.JStoCounted(s);
@@ -2200,7 +2161,12 @@ class Forth {
 
   // Compile one or more words into the next consecutive code cells.
   DW(...words) {
-    words.forEach((word) => this.Ustore(CPoffset, this.Mstore(this.cpFetch(), word)));
+    let cp = this.cpFetch();
+    words.forEach((word) => {
+      this.Mstore(cp, word);
+      cp += this.CELLL;
+    });
+    this.Ustore(CPoffset, cp);
   }
 
   // a -- a; Check if a definition of the word at 'a' would be unique and display warning (but continue) if it would not be.
@@ -2232,9 +2198,12 @@ class Forth {
       this.Ustore(LASToffset, a);    // DUP LAST ! ; a=na  ; LAST=na
       // Link address points to previous NA (prev value of LAST)
       // Note that first time this is run, it gets a 0 (CURRENT is 0, @0 is 0) if that changes will need to test Current here.
-      a = this.Mpush(a, this.Mfetch(this.currentFetch())); // CURRENT @ @ OVER ! ; a = la = top of current dic
+      a -= this.CELLL; // CURRENT @ @ OVER ! ; a = la = top of current dic
+      this.Mstore(a, this.Mfetch(this.currentFetch())); // CURRENT @ @ OVER ! ; a = la = top of current dic
       // Push CP (code field to where will build in dictionary) into ca, below a and store that ca into NP
-      this.Ustore(NPoffset, this.Mpush(a, this.cpFetch())); // ca=CP ;
+      a -= this.CELLL;
+      this.Mstore(a, this.cpFetch()); // ca=CP ;
+      this.Ustore(NPoffset, a); // ca=CP ;
     } else {                    // THEN $" name" THROW ;
       console.log('name error'); // This is an error - in FORTH equivalent its a THROW
     }
@@ -2414,6 +2383,7 @@ class Forth {
   // Address Literals (aka branches and jumps) eForthAndZen#38
 
   // decrement count on Return stack, and branch if not decremented past zero (FOR..NEXT)
+  // noinspection JSUnusedGlobalSymbols
   next() {
     let x = this.RPpop();
     const destn = this.IPnext(); // Increments over it
@@ -2539,7 +2509,7 @@ class Forth {
     const u = Math.min(this.SPpop(), nameMaxLength); // length of string
     const b = this.SPpop(); // start of string
     const np = this.m.align(this.npFetch() - u - this.CELLL); // Enough space in Name Directory to copy string optionally with one zero after
-    this.m.pushCell(this.m.align(np + u + 1), 0); // Write a zero in the last cell where the last letter of word will be written
+    this.Mstore(this.m.align(np + u + 1 - this.CELLL), 0); // Write a zero in the last cell where the last letter of word will be written
     this.m.copyWithin(np + 1, b, b + u);
     this.Mstore8(np, u);  // 1 byte count
     this.SPpush(np); // Note that NP is not updated, the same buffer will be used for each word until hit ':'
@@ -2705,6 +2675,7 @@ class Forth {
   // TODO-29-DOES define DOES> for CREATE-DOES> and tokenDoes - this is not part of eForth, THEN defined Vocabulary as CREATE-DOES word
   //tokenDoes = Forth.tokenFunction(payload => { this.RPpush(this.IP); this.IP = (this.Mfetch8(payload++)<<8)+this.Mfetch8(payload++); this.SPpush(payload++); ); // Almost same as tokenDoList
 }
+// noinspection JSUnusedGlobalSymbols
 const ForthNodeOverrides = {
   TXbangS: (s) => process.stdout.write(s),
   // Setup I/O to the terminal
