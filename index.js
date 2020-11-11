@@ -1872,7 +1872,7 @@ class Forth {
     // TODO-28-MULTI think about how these may need to be Task specific
     this.IP = 0;    // Interpreter Pointer
     this.cellSP = this.cellSPP;  // Data Stack Pointer but in MEM units rather than bytes
-    this.RP = RP0;  // Return Stack Pointer (aka BP in 8086)
+    this.cellRP = RP0 / this.CELLL;  // Return Stack Pointer (aka BP in 8086)
     this.UP = UPP;  // User Area Pointer // TODO-28-MULTI will move this around
     this._USER = 0; // Incremented by this.CELLL as define USER's
     // create data structures
@@ -2000,14 +2000,14 @@ class Forth {
     return this.debugCells(this.cellSP, this.cellSPP);
   }
   debugReturnStack() {
-    return this.m.debug(this.RP, this.Ufetch(RP0offset));
+    return this.m.debugCells(this.cellRP, this.Ufetch(RP0offset) / this.CELLL);
   }
   debugThread(xt) {
     if (this.testing & 0x02) {
       this.debugName = this.xt2name(xt); // Expensive so only done when testing
       if (this.testingDepth > this.debugExcecutionStack.length) {
         //TODO-28-MULTITASK RPP(RP0) and SPP will move
-        console.log('R:', this.Ufetch(RP0offset) === this.RP ? '' : this.debugReturnStack(), this.debugExcecutionStack, this.xt2name(xt), 'S:', this.cellSPP === this.cellSP ? '' : this.debugStack(),
+        console.log('R:', (this.Ufetch(RP0offset) === (this.cellRP * this.CELLL)) ? '' : this.debugReturnStack(), this.debugExcecutionStack, this.xt2name(xt), 'S:', this.cellSPP === this.cellSP ? '' : this.debugStack(),
           this.padTestLength ? ('pad: ' + (this.padTestLength > 0 ? this.m.decodeString(this.padPtr(), this.padPtr() + this.padTestLength) : this.m.decodeString(this.padPtr() + this.padTestLength, this.padPtr()))) : '');
       }
     }
@@ -2066,9 +2066,9 @@ class Forth {
   SPfetch() { return this.m.cellFetchCell(this.cellSP); }
   SPpop() { return this.m.cellFetchCell(this.cellSP++); }
   SPpush(v) { this.m.cellStoreCell(--this.cellSP, v); }
-  RPfetch() { return this.Mfetch(this.RP); }
-  RPpop() { const v = this.Mfetch(this.RP); this.RP += this.CELLL; return v; }
-  RPpush(v) { this.RP = this.Mpush(this.RP, v); }
+  RPfetch() { return this.m.cellFetchCell(this.cellRP); }
+  RPpop() { return this.m.cellFetchCell(this.cellRP++); }
+  RPpush(v) { this.m.cellStoreCell(--this.cellRP, v); }
   IPnext() { const v = this.Mfetch(this.IP); this.IP += this.CELLL; return v; }
   Ufetch(userindex) {
     return this.Mfetch(this.UP + userindex * this.CELLL); }
@@ -2442,8 +2442,8 @@ class Forth {
   cFetch() { this.SPpush(this.Mfetch8(this.SPpop())); }//C@ a -- c, Fetch character
 
   // Return stack words eForthAndZen#40
-  RPat() { this.SPpush(this.RP); } //RP@
-  RPbang() { this.RP = this.SPpop(); } // RP!
+  RPat() { this.SPpush(this.cellRP * this.CELLL); } //RP@
+  RPbang() { this.cellRP = this.SPpop() / this.CELLL; } // RP!
   Rfrom() { this.SPpush(this.RPpop()); } // R>
   Rat() { this.SPpush(this.RPfetch()); } // R@
   toR() { this.RPpush(this.SPpop()); } // >R
@@ -2621,7 +2621,7 @@ class Forth {
         await this.run(this.Ufetch(EVALoffset));
       }
       // TODO-28-MULTITASK RP0 will move
-      console.assert(this.cellSP <= this.cellSPP && this.RP <= this.Ufetch(RP0offset)); // Side effect of making SP and SPP available to debugger.
+      console.assert(this.cellSP <= this.cellSPP && (this.cellRP * this.CELLL) <= this.Ufetch(RP0offset)); // Side effect of making SP and SPP available to debugger.
     }
     const prompt = this.Ufetch(PROMPToffset);
     if (prompt) {
