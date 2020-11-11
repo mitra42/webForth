@@ -9,5 +9,5 @@ foo.compileForthInForth()
   .then(() => console.log('===forthInForth compiled'))
   //.then(() => foo.cleanupBootstrap()).then(() => console.log('===forthInForth cleaned up'))
   //.then(() => foo.interpret("WARM"));
-  .then(() => foo.console()) // Interactive console
+  //.then(() => foo.console()) // Interactive console
   .then(() => console.log('\nconsole exited'));
