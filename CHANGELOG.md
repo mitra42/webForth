@@ -1,3 +1,5 @@
+* 2020-11-10: v0.0.10
+  * Significant memory refactoring to make it quicker - involves SP and RP being in cells rather than bytes
 * 2020-11-09: v0.0.9
   * Add bottom text for help etc
   * Better error handling in the console
