@@ -1505,7 +1505,7 @@ vCREATE I/O  ' ?RX v, ' TX! v, ( Array to store default I/O vectors. )
 ( ERRATA Zen uses CONSTANT but doesnt define it )
 ( === Signon Message Zen pg105 VER hi )
 
-9 CONSTANT VER ( Return the version number of this implementation.)
+10 CONSTANT VER ( Return the version number of this implementation.)
 
 : version CR ." webFORTH V" VER <# # # 46 HOLD # # 46 HOLD # #> TYPE ( display sign-on text and version )  CR ;
 ( ERRATA v5 'hi' doesnt restore BASE )
