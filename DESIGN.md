@@ -74,8 +74,8 @@ for example handling read-only memory different from variable memory,
 or managing a large virtual memory space on a smaller device.
 This would be mediated by the memory class.
 
-See [issue-15](https://www.github.com/mitra42/issue/15) 
-and [issue-11](https://www.github.com/mitra42/issue/11) 
+See [issue-15](https://www.github.com/mitra42/issues/15) 
+and [issue-11](https://www.github.com/mitra42/issues/11) 
 
 ### Colon, Code and other words
 ### I/O
