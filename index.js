@@ -2046,13 +2046,18 @@ class Forth {
     this.debugClear(); // Reset Debug Stack as can be mucked up by THROW and CATCH
   }
 
+  // TODO-ported below L.2049
   // === Functions to simplify storing and retrieving 16 bit values into 8 bit stacks etc.
   // These aren't part of eForth, but are here to simplify storing multi-byte words into 8 bit bytes in the Buffer.
   Mfetch(a) { return this.m.fetchCell(a); }
   Mstore(a, v) { this.m.storeCell(a, v); }  // Store at address a
+  // TODO-ported above
+
   // 8 bit equivalents
   Mfetch8(a) { return this.m.fetch8(a); } // Returns byte at a
   Mstore8(a, v) { this.m.store8(a, v); }
+
+  // TODO-ported below L.2061
   ALIGNED() { this.SPpush(this.m.align(this.SPpop())); }
   SPfetch() { return this.m.cellFetchCell(this.cellSP); }
   SPpop() { return this.m.cellFetchCell(this.cellSP++); }
@@ -2065,6 +2070,7 @@ class Forth {
     return this.Mfetch(this.UP + userindex * this.CELLL); }
   Ustore(userindex, w) {
     this.Mstore(this.UP + userindex * this.CELLL, w); }
+  // TODO-ported above
 
   // === Access to the USER variables before they are defined
   currentFetch() { return this.Ufetch(CURRENToffset); }
@@ -2089,6 +2095,7 @@ class Forth {
     return this.Mfetch(na - (2 * this.CELLL));
   }
 
+  // TODO-porting below to L.2098-
   // Inner function of find, traverses a linked list Name dictionary.
   // name   javascript string looking for
   // va     pointer holding address of first element in the list.
@@ -2269,6 +2276,7 @@ class Forth {
     this.Mstore8(lastNA, this.Mfetch8(lastNA) | b);
   }
 
+  // TODO-ported below L.2278-
   // === Define this tokens used for each kind of defining word
   // Zen pg31
   // Tokens are just JS functions with an entry in jsFunctions with token:true
@@ -2313,6 +2321,7 @@ class Forth {
     this.SPpush(this.Mfetch(payload + this.CELLL));
     this._tokenDoes(payload);
   }
+  // TODO-ported above
 
   // === INNER INTERPRETER YES THIS IS IT ! ==================== eForthAndZen#36
   // This is quite different from eForth as its token-threaded rather than direct threaded
