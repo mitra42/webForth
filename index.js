@@ -85,7 +85,6 @@ const jsFunctionAttributes = [
   // { n: '?UNIQUE', f: 'qUnique' }, // Not used yet
   { n: '$,n', f: 'dollarCommaN', replaced: true },
   { n: '>NAME', f: 'ToNAME' }, // Fast version of >NAME - see Forth definition later
-  'debugNA', 'testing3', 'break', 'debugPrintTIB', 'TEST',
   'MS', 'BYE', { n: 'EXIT', jsNeeds: true }, 'EXECUTE',
   { n: '?RX', f: 'QRX' }, {  n: 'TX!', f: 'TXbang' }, { n: '!IO', f: 'bangIO' },
   { n: 'doLIT', jsNeeds: true }, { n: 'DOES>', f: 'DOES' }, 'next', { n: '?branch', f: 'qBranch' }, 'branch',
@@ -99,6 +98,7 @@ const jsFunctionAttributes = [
   { n: '$COMPILE', replaced: true, jsNeeds: true }, { n: '$INTERPRET', replaced: true, jsNeeds: true },
   { n: '[', f: 'openBracket', immediate: true, replaced: true }, { n: ']', f: 'closeBracket', replaced: true },
   { n: ':', f: 'colon', replaced: true }, { n: ';', f: 'semicolon', immediate: true, replaced: true }, { n: "'", f: 'tick', replaced: true },
+  'debugNA', 'testing3', 'break', 'debugPrintTIB', 'TEST',
 ];
 
 // Define the tokens used in the first cell of each word.
@@ -122,6 +122,7 @@ const nameMaxLength = 31; // Max number of characters in a name, length needs to
 console.assert(nameMaxLength === l['=BYTEMASK']); // If this isn't true then check each of the usages below
 l.BL = 32;
 
+// TODO ported to Arduino below to L.125-
 // === Data table used to build users.
 // later the FORTH word 'USER' is defined but unlike this function it doesn't setup initialization, nor does it auto-increment to next available user slot.
 // These definitions can refer to v: 'foo' to be initialized to a Forth word (which must be in jsFunctionAttributes)
@@ -169,6 +170,7 @@ const CPoffset = USER('CP', undefined);  // eForth initializes to CTOP but we ha
 const NPoffset = USER('NP', undefined);  // normally set on Zen pg106 but we are using it live. Its the bottom of what compiled in name space.
 const LASToffset = USER('LAST', undefined); // normally set on Zen pg106 but using live
 const VPoffset = USER('VP', undefined);  // not part of eForth, pointer into Data space for EPROMability
+// TODO ported to Arduino above
 
 const forthInForth = `
 0 TEST
@@ -2058,14 +2060,10 @@ class Forth {
   // These aren't part of eForth, but are here to simplify storing multi-byte words into 8 bit bytes in the Buffer.
   Mfetch(a) { return this.m.fetchCell(a); }
   Mstore(a, v) { this.m.storeCell(a, v); }  // Store at address a
-  // TODO-ported above
-
   // 8 bit equivalents
   Mfetch8(a) { return this.m.fetch8(a); } // Returns byte at a
   Mstore8(a, v) { this.m.store8(a, v); }
-
-  // TODO-ported below L.2061
-  ALIGNED() { this.SPpush(this.m.align(this.SPpop())); }
+ALIGNED() { this.SPpush(this.m.align(this.SPpop())); }
   SPfetch() { return this.m.cellFetchCell(this.cellSP); }
   SPpop() { return this.m.cellFetchCell(this.cellSP++); }
   SPpush(v) { this.m.cellStoreCell(--this.cellSP, v); }
@@ -2077,7 +2075,6 @@ class Forth {
     return this.Mfetch(this.UP + userindex * this.CELLL); }
   Ustore(userindex, w) {
     this.Mstore(this.UP + userindex * this.CELLL, w); }
-  // TODO-ported above
 
   // === Access to the USER variables before they are defined
   currentFetch() { return this.Ufetch(CURRENToffset); }
@@ -2089,6 +2086,8 @@ class Forth {
   lastFetch() { return this.Ufetch(LASToffset); }
   padPtr() { return this.vpFetch() + 80; } // Sometimes JS needs the pad pointer
 
+  // TODO-ported above
+
   // === Functions related to building 'find'  and its wrappers ====
 
   // Convert a string made up of a count and that many bytes to a Javascript string.
@@ -2097,12 +2096,12 @@ class Forth {
   countedToJS(a) {
     return this.m.decodeString(a + 1, a + (this.Mfetch8(a) & l['=BYTEMASK']) + 1);
   }
+  // TODO-porting below to L.2096-
   // Convert a name address to the code dictionary definition.
   na2xt(na) {
     return this.Mfetch(na - (2 * this.CELLL));
   }
 
-  // TODO-porting below to L.2098-
   // Inner function of find, traverses a linked list Name dictionary.
   // name   javascript string looking for
   // va     pointer holding address of first element in the list.
@@ -2127,7 +2126,7 @@ class Forth {
     while (p = this.Mfetch(p)) {
       //console.log('_find: comparing:', this.countedToJS(p)) // comment out except when debugging find
       const c1 = this.Mfetch(p) & this.CELLMASK; // count
-      if (!cell1 || (cell1 === c1)) { // first cell matches (if cell1 not passed then does slow compare
+      if (cell1 === c1) { // first cell matches (if cell1 not passed then does slow compare
         if (this._sameq(p + this.CELLL, na + this.CELLL, cellCount)) {
           return p;
         }
@@ -2155,6 +2154,8 @@ class Forth {
     }
   }
 
+
+  // TODO-ported below L.2177-
   // Traverse dictionary to convert xt back to a na (for decompiler or debugging)
   xt2na(xt) {
     let p = this.currentFetch(); // vocabulary
@@ -2168,10 +2169,7 @@ class Forth {
     // Drop through not found
     return 0;
   }
-
-
-
-
+  // TODO-ported above L.2177-
 
   // Convert xt to a Javascript string of its name or 'undefined' (only used for debugging).
   xt2name(xt) {
@@ -2179,7 +2177,9 @@ class Forth {
     return na ? this.countedToJS(na) : 'undefined';
   }
 
+  // TODO-ported below L.2177-
   ToNAME() { this.SPpush(this.xt2na(this.SPpop())); }  // Fast version of >NAME see Forth definition below
+  // TODO-ported above L.2278-
 
   // TODO-29-VOCABULARY This just looks up a in the Context vocabulary, it makes no attempt to use multiple vocabularies
   // If required then fixing this to iterate over the context array should not break anything (this is what NAME? does)
@@ -2223,6 +2223,7 @@ class Forth {
     this.Ustore(CPoffset, cp);
   }
 
+  // TODO ported to Arduino below to L.2221-
   // a -- a; Check if a definition of the word at 'a' would be unique and display warning (but continue) if it would not be.
   // Same profile as ?UNIQUE but not turned into a code word as not used prior to
   qUnique() {
@@ -2268,6 +2269,7 @@ class Forth {
   OVERT() {
     this.Mstore(this.currentFetch(), this.lastFetch()); // LAST @ CURRENT @ !
   }
+  // TODO ported to Arduino above here
 
   //  Build a new definition - part of all defining words.
   CODE(name) {
@@ -2336,7 +2338,7 @@ class Forth {
     this.SPpush(this.Mfetch(payload + this.CELLL));
     this._tokenDoes(payload);
   }
-  // TODO-ported above
+  // TODO-ported above L.2278-
 
   // === INNER INTERPRETER YES THIS IS IT ! ==================== eForthAndZen#36
   // This is quite different from eForth as its token-threaded rather than direct threaded
@@ -2376,6 +2378,8 @@ class Forth {
       }
     }
   }
+
+  // TODO-ported below L.2382-
   async MS() { // ms --; delay for a period of time.
     await new Promise((resolve) => setTimeout(resolve, this.SPpop()));
   }
@@ -2390,12 +2394,14 @@ class Forth {
     this.debugPop(); // Pushed in tokenDoList
     this.IP = this.RPpop();
   }
+
   // EXECUTE runs the word on the stack,
   // TODO-ASYNC it works because it itself is a code word, included in colon words
   // and because there is nothing after the return from threadtoken which would get executed out of order
   // Note that it has a return which could be a promise, which the 'run' will await on.
   // This pattern may or may not work in other situations.
   EXECUTE() { this.threadtoken(this.SPpop()); }
+
 
   // === Basic low level key I/O and links to OS - Zen pg 35
   // This section will need editing for other systems.
@@ -2425,7 +2431,7 @@ class Forth {
 
   // Low level TX!, output one character to stdout, inefficient, but not likely to be bottleneck.
   TXbangC(c) { // noinspection JSUnresolvedFunction
-    this.TXbangS(String.fromCharCode(c)); }
+    this.TXbangS(String.fromCharCode(c)); } // TXbangS is passed in by node
   TXbang() { this.TXbangC(this.SPpop()); }
   qrx() { return [false]; } // Overridden by node
 
@@ -2467,8 +2473,11 @@ class Forth {
       this.IP = destn;
     }
   }
+
   // Unconditional jump to destn in dictionary
   branch() { this.IP = this.IPnext(); }
+
+  // TODO-ported above L.2382-
 
   // === Primitive words for memory, stack and return access.
 

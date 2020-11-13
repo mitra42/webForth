@@ -26,9 +26,10 @@
 //L.1794
 #define EM 0x2000 * CELLL
 
+#define LITTLEENDIAN true // Arduino is little endian
 
 
-// ==== In order, there is a gap (missing code) before each Line marker ==== 
+// ==== In order, there is a gap (mLissing code) before each Line marker ==== 
 //L.112
 #define COMP 0x40 // bit in first char of name field to indicate 'compile-only'  ERRATA Zen uses this but its not defined
 #define IMED 0x80 // bit in first char of name field to indicate 'immediate' ERRATA Zen uses this but its not defined
@@ -39,8 +40,9 @@ const CELLTYPE forthTrue = -1; // Not quite correct, should be masked BUT when p
 #define nameMaxLength 31
 #define BL 32
 
-//L.152
+//L.125-
 // User offsets - TODO should be defined by dictionary creation - note these are in CELLS not in Bytes as in webForth
+#define SP0offset 4
 #define RP0offset 5
 #define PROMPToffset 11
 #define BASEoffset 12
@@ -54,6 +56,7 @@ const CELLTYPE forthTrue = -1; // Not quite correct, should be masked BUT when p
 #define CPoffset 34
 #define NPoffset 35
 #define LASToffset 36
+#define VPoffset 37
 
 //L.17
 //L.1778
@@ -75,15 +78,20 @@ const CELLTYPE CELLMASK = forthTrue ^ ((0xFF ^ BYTEMASK) << (CELLbits - 8)); // 
 #define RAM0 NAMEE
 #define RAMSIZE (EM - RAM0) // TODO-RAM maybe want to build up from e.g. 0x8000 instead of down from EM
 
+#define RAMADDR(x) ((x - RAM0) >> CELLSHIFT)
+#define ROMADDR(x) (x >> CELLSHIFT)
+
 // Now some cell based pointers into RAM
-#define ramSPP ((SPP - RAM0) >> CELLSHIFT) // start of data stack - grows down, points at top of stack - 8 word buffer for safety
+#define ramSPP RAMADDR(SPP) // start of data stack - grows down, points at top of stack - 8 word buffer for safety
 #define RAMCELLS (RAMSIZE >> CELLSHIFT) // Approx 624 bytes  TODO-RAM
 #define ROMCELLS (NAMEE >> CELLSHIFT)
-#define ramRP0 ((RP0 - RAM0) >> CELLSHIFT)
-#define ramUP0 ((UPP - RAM0) >> CELLSHIFT)
+#define ramRP0 RAMADDR(RP0)
+#define ramUP0 RAMADDR(UPP)
+
 
 // Define the Rom area we will build the dictionary in
 extern const CELLTYPE rom[ROMCELLS]; // Forward reference
+extern const void (*f[30])(CELLTYPE); // Forward reference 
 
 // And then building from the bottom up. The gap in middle is code directory
 // cold start vector - its unclear if these bottom 0x100 are useful outside of the DOS context and for DOS it would need code at this address I think?
@@ -111,14 +119,44 @@ CELLTYPE cellRamStore(CELLTYPE cellAddr, CELLTYPE v) { ram[cellAddr] = v; };
 #ifdef WRITEROM
 CELLTYPE cellRomStore(CELLTYPE cellAddr, CELLTYPE v) { rom[cellAddr] = v; };
 #endif
-CELLTYPE Mfetch(CELLTYPE byteAddr) { return (byteAddr > RAM0) ? cellRamFetch((byteAddr - RAM0) >> CELLSHIFT) : cellRamFetch(byteAddr >> CELLSHIFT) ; }
+CELLTYPE Mfetch(CELLTYPE byteAddr) { return (byteAddr > RAM0) ? cellRamFetch(RAMADDR(byteAddr)) : cellRomFetch(ROMADDR(byteAddr)) ; }
 #ifdef WRITEROM
-CELLTYPE Mstore(CELLTYPE byteAddr, CELLTYPE v) { return (byteAddr > RAM0) ? cellRamStore(byteAddr - RAM0) >> CELLSHIFT, v) : cellRomStore(byteAddr >> CELLSHIFT, v) ; }
+CELLTYPE Mstore(CELLTYPE byteAddr, CELLTYPE v) { return (byteAddr > RAM0) ? cellRamStore(RAMADDR(byteAddr), v) : cellRomStore(ROMADDR(byteAddr), v) ; }
 #else
-CELLTYPE Mstore(CELLTYPE byteAddr, CELLTYPE v) { cellRamStore((byteAddr - RAM0) >> CELLSHIFT, v); }
+CELLTYPE Mstore(CELLTYPE byteAddr, CELLTYPE v) { cellRamStore(RAMADDR(byteAddr), v); }
 #endif
+// 8 bit equivalents
+byte Mfetch8(CELLTYPE byteAddr) { 
+  const bool offset = byteAddr & 0x01;
+  const CELLTYPE cell = Mfetch(byteAddr); // Does not have to be aligned
+#ifdef LITTLEENDIAN
+  return offset ? (cell >> 8) : (cell & 0xFF) ;
+#else
+  return offset ? (cell & 0xFF) : (cell >> 8);
+#endif
+}; // Returns byte at a 
 
-//L.2061-
+void Mstore8(CELLTYPE byteAddr, byte v) { 
+  const bool offset = byteAddr & 0x01;
+  const CELLTYPE cell = Mfetch(byteAddr);
+#ifdef LITTLEENDIAN
+    if (offset) {
+      Mstore(byteAddr, (cell & 0x00FF) | (v << 8));
+    } else {
+      Mstore(byteAddr, (cell & 0xFF00) | v);
+    }  
+#else
+    if (offset) {
+      Mstore(cellAddr, (cell & 0xFF00) | v);
+    } else {
+      Mstore(cellAddr, (cell & 0x00FF) | (v << 8));
+    }  
+#endif
+}
+
+// TODO-MEM this is really dependent on MEM not CELLL 
+CELLTYPE align(CELLTYPE byteAddr) { return (((byteAddr - 1) >> CELLSHIFT) + 1) << CELLSHIFT; }
+
 void ALIGNED(CELLTYPE unused) { SPpush(align(SPpop())); }
 CELLTYPE SPfetch() { return ram[ramSP]; }
 CELLTYPE SPpop() { return ram[ramSP++]; }
@@ -129,8 +167,23 @@ void RPpush(CELLTYPE v) { ram[--ramRP] = v; }
 CELLTYPE IPnext() { return rom[romIP++]; }
 CELLTYPE Ufetch(byte userindex) { return ram[ramUP + userindex]; } // userindex is a cell index, not a byte index
 void Ustore(byte userindex, CELLTYPE w) { ram[ramUP + userindex] = w; } // userindex is a cell index not a byte index
+// === Access to the USER variables before they are defined
+CELLTYPE currentFetch() { return Ufetch(CURRENToffset); }
+CELLTYPE cpFetch() { return Ufetch(CPoffset); }
+CELLTYPE vpFetch() { return Ufetch(VPoffset) || Ufetch(CPoffset); }
+CELLTYPE cpAlign() { Ustore(CPoffset, align(cpFetch())); }
+CELLTYPE vpAlign() { Ustore(VPoffset, align(vpFetch())); }
+CELLTYPE npFetch() { return Ufetch(NPoffset); }
+CELLTYPE lastFetch() { return Ufetch(LASToffset); }
+CELLTYPE padPtr() { return vpFetch() + 80; } // Sometimes JS needs the pad pointer
 
-//L.2098
+
+//L.2096-
+// Convert a name address to the code dictionary definition.
+CELLTYPE na2xt(CELLTYPE na) {
+    return Mfetch(na - (2 << CELLSHIFT));
+}
+
 // Inner function of find, traverses a linked list Name dictionary.
 // name   javascript string looking for
 // va     pointer holding address of first element in the list.
@@ -138,14 +191,119 @@ void Ustore(byte userindex, CELLTYPE w) { ram[ramUP + userindex] = w; } // useri
 // xt     if present we are looking for name pointing at this executable (for decompiler)
 // returns 0 or na
 // TODO-11-CELLL optimize to cells
-bool _sameq(na1, na2, cells) {
+bool _sameq(CELLTYPE na1, CELLTYPE na2, byte cells) {
   // Note this is similar to SAME? but takes a count (not count of cells, and returns boolean
-  for (let i = 0; i < chars; i++) {
-    if (this.Mfetch8(na1 + i) !== this.Mfetch8(na2 + i)) {
-      return false;
+  // Note this is similar to SAME? but takes a count (not count of cells, and returns boolean
+  for (byte i = 0; i < cells; i++) {
+      if ( Mfetch(na1 + (i<<CELLSHIFT)) != Mfetch(na2 + (i<<CELLSHIFT))) {
+        return false;
+      }
     }
+    return true;
+}
+CELLTYPE _find(CELLTYPE va, CELLTYPE na) { // return na that matches or 0
+  const byte cellCount = (Mfetch8(na) & BYTEMASK)  >> CELLSHIFT; // Count of cells after first one (formula is not as obvious as you think)
+  const CELLTYPE cell1 = Mfetch(na);  // Could be little or big-endian
+  CELLTYPE p = va;
+  while (p = Mfetch(p)) {
+    const CELLTYPE c1 = Mfetch(p) & CELLMASK; // count
+    if (cell1 == c1) { // first cell matches (if cell1 not passed then does slow compare
+      if (_sameq(p + CELLL, na + CELLL, cellCount)) {
+        return p;
+      }
+    }
+    p -= CELLL; // point at link address and loop for next word
   }
-  return true;
+  // Drop through not found
+  return 0;
+}
+
+// Search a single vocabulary for a string
+// This has same footprint as eForth's 'find' but we do not replace it since this is approx 8x faster
+void find() { // a va -- ca na | a 0
+  const CELLTYPE va = SPpop();
+  const CELLTYPE a = SPpop();
+  const CELLTYPE na = _find(va, a);  // return matching na or 0
+  if (na) {
+    SPpush(na2xt(na));
+    SPpush(na);
+  } else {
+    SPpush(a);
+    SPpush(0);
+  }
+}
+
+//L.2177-
+// Traverse dictionary to convert xt back to a na (for decompiler or debugging)
+CELLTYPE xt2na(CELLTYPE xt) {
+  CELLTYPE p = currentFetch(); // vocabulary
+  while (p = Mfetch(p)) {
+    //console.log('_find: comparing:', this.countedToJS(p)) // comment out except when debugging find
+    if (na2xt(p) == xt) {
+      return p;
+    }
+    p -= CELLL; // point at link address and loop for next word
+  }
+  // Drop through not found
+  return 0;
+}
+// TODO-ported above L.2177-
+
+//L.2177-
+void ToNAME() { SPpush(xt2na(SPpop())); }  // Fast version of >NAME see Forth definition below
+
+
+//L.2221-
+// a -- a; Check if a definition of the word at 'a' would be unique and display warning (but continue) if it would not be.
+// Same profile as ?UNIQUE but not turned into a code word as not used prior to
+void qUnique() {
+  SPpush(SPfetch());      // DUP
+  SPpush(currentFetch()); // a a va; dictionary to search
+  find();                 // a xt na | a a F
+  if (SPpop()) {
+    const CELLTYPE xt = SPpop();              // Discard xt
+    Serial.println('Duplicate definition of'); // Catch duplicates - report, but allow
+    /*TODO-ARDUINO
+      const char* name = countedToJS(SPfetch());
+      if (!['foo', 'bar'].includes(name)) {
+        Serial.println('Duplicate definition of', name); // Catch duplicates - report, but allow
+        //Serial.println(jsFunctionAttributes[Mfetch(xt)].replaced ? 'Expected' : '', 'Duplicate definition of', countedToJS(this.SPfetch())); // Catch duplicates - report, but allow
+      }
+    */
+  } else {
+    SPpop(); // DROP a
+  }
+}
+
+
+// na -- ; Builds bytes around a newly entered name. Same function as $,n on Zen pg94 used by all defining words (this.CODE ':')
+// expects in Name dictionary: <count><string><opt padding>
+// prepends:   <aligned address of next cell of code><address of na of last definition in vocabulary>...
+// Side effects are important: specifically.
+// LAST <= na
+void dollarCommaN() {
+  if (Mfetch8(SPfetch())) {         // DUP C@ IF  ; test for no word
+    qUnique();
+    CELLTYPE a = SPpop();
+    Ustore(LASToffset, a);    // DUP LAST ! ; a=na  ; LAST=na
+    // Link address points to previous NA (prev value of LAST)
+    // Note that first time this is run, it gets a 0 (CURRENT is 0, @0 is 0) if that changes will need to test Current here.
+    a -= CELLL; // CURRENT @ @ OVER ! ; a = la = top of current dic
+    Mstore(a, Mfetch(currentFetch())); // CURRENT @ @ OVER ! ; a = la = top of current dic
+    // Push CP (code field to where will build in dictionary) into ca, below a and store that ca into NP
+    a -= CELLL;
+    Mstore(a, cpFetch()); // ca=CP ;
+    Ustore(NPoffset, a); // ca=CP ;
+  } else {                    // THEN $" name" THROW ;
+    Serial.println('name error'); // This is an error - in FORTH equivalent its a THROW
+  }
+}
+
+
+// Make the most recent definition available in the directory. This is part of closing every 'defining word'
+// See also forth version
+void OVERT() {
+  Mstore(currentFetch(), lastFetch()); // LAST @ CURRENT @ !
 }
 
 //L.2278-
@@ -187,14 +345,114 @@ void tokenVar(CELLTYPE romAddr) {
   _tokenDoes(romAddr);
 }
 
-CELLTYPE align(CELLTYPE byteAddr) {
-  // TODO-MEM this is really dependent on MEM not CELLL 
-  return (((byteAddr - 1) >> CELLSHIFT) + 1) << CELLSHIFT; 
+// === INNER INTERPRETER YES THIS IS IT ! ==================== eForthAndZen#36
+// This is quite different from eForth as its token-threaded rather than direct threaded
+
+void threadtoken(CELLTYPE xt) {
+  // console.assert(xt >= CODEE && xt < NAMEE); // Uncomment to catch bizarre xt values earlier
+  // This next section is only done while testing, and outputs a trace, so set it on (with testing3) immediately before a likely error.
+  //this.debugThread(xt);
+  const CELLTYPE tok = Mfetch(xt);
+  xt += CELLL;
+  // console.assert(tok < this.jsFunctions.length); // commented out for efficiency, a fail will just break in the next line anyway.
+  f[tok](xt); // Run the token function - like tokenDoList or tokenVar - doesnt return - (JS returns null or a Promise)
 }
+
+
+// ported below L.2382-
+void MS() { delay(SPpop()); } // ms --; delay for a period of time.
+void BYE() {  romIP = 0; } // Should exit all the way out
+
+// Unwind the effect of tokenDoList restoring IP to the next definition out.
+// The XT of this is stored in this.js2xt.EXIT
+void EXIT() { romIP = RPpop(); }
+
+// EXECUTE runs the word on the stack,
+// and because there is nothing after the return from threadtoken which would get executed out of order
+// Note that it has a return which could be a promise, which the 'run' will await on.
+// This pattern may or may not work in other situations.
+void EXECUTE() { threadtoken(SPpop()); }
+
+// === Basic low level key I/O and links to OS - Zen pg 35
+// This section will need editing for other systems.
+/*
+ * Input call chain is
+ * ?RX  read one char if present
+ * ?KEY via '?KEY to ?RX
+ * KEY loop till ?KEY
+ * accept read a line via KEY, processing control chars via 'TAP  to kTAP
+ * QUERY read a line via 'EXPECT to accept into TIB and reset >IN
+ * que read an evaluate a line
+ * QUIT loop over que, handling errors
+ *
+ * See https://github.com/mitra42/webForth/issues/17 for strategy for async version
+ */
+
+// Call chain is ?RX < '?KEY  < ?KEY < KEY < accept < 'EXPECT < QUERY < que < QUIT
+// -- char T | F
+void QRX() {
+  if (Serial.available() > 0) {
+    SPpush(Serial.read());
+    SPpush(forthTrue);
+  } else {
+    SPpush(0);
+  }
+}
+// Low level TX!, output one character to stdout, inefficient, but not likely to be bottleneck.
+
+void TXbang() { Serial.write(SPpop()); }
+void bangIO() { Serial.begin(57600); } // Initialize IO port
+
+// === Literals and Branches - using next value in dictionary === eForthAndZen#37
+
+// push the value in the next code word
+// The XT of this is stored in this.doLIT
+void doLIT() { SPpush(IPnext()); }
+
+// See DOES> and CREATE, this patches the field after the token compiled by the create to point to the code following the DOES>
+// : DOES> R> LAST @ 2 CELLS - @ CELLL + ! ; // Untested Forth version, note side effect of the R> of doing an exit.
+void DOES() {
+  Mstore(
+    Mfetch(Ufetch(LASToffset) - (2 << CELLSHIFT) ) + CELLL, // field after tokenVar compile by CREATE
+    romIP << CELLSHIFT // The address after the doDOES
+  );
+  EXIT(); // Exit the CREATE part
+}
+
+// Address Literals (aka branches and jumps) eForthAndZen#38
+
+// decrement count on Return stack, and branch if not decremented past zero (FOR..NEXT)
+// noinspection JSUnusedGlobalSymbols
+void next() {
+  CELLTYPE x = RPpop();
+  const CELLTYPE destn = IPnext(); // Increments over it
+  if (--x >= 0) {
+    RPpush(x);
+    romIP = ROMADDR(destn); // Jump back
+  }
+}
+
+// Jump if flag on stack is zero to destn in dictionary
+void qBranch() {
+  const CELLTYPE destn = IPnext();
+  if (!SPpop()) {
+    romIP = ROMADDR(destn);
+  }
+}
+
+// Unconditional jump to destn in dictionary
+void branch() { romIP = ROMADDR(IPnext()); }
+
+
+// TODO-ported above L.2382-
+
+
 
 // ==== NEXT GROUP - HAVE TO BE MOVED DOWN BECAUSE OF USE === 
 // L.1853 jsFunctions[]=
-const void (*f[20])(CELLTYPE) = { tokenVocabulary, tokenNextVal, tokenDoList, tokenUser, tokenVar, ALIGNED };
+const void (*f[30])(CELLTYPE) = { tokenVocabulary, tokenNextVal, tokenDoList, tokenUser, tokenVar, ALIGNED, find, OVERT, dollarCommaN /* $,n */, ToNAME /* >NAME */, MS,
+  BYE, EXIT, EXECUTE, QRX /* ?RX */, TXbang /* TX! */, bangIO /*bangIO */, doLIT, DOES /* DOES> */, next, qBranch /* ?branch */, branch  };
+//TODO-ARDUINO 
 
 const CELLTYPE rom[ROMCELLS] = { 1, 2, 3 };
 
@@ -210,14 +468,6 @@ void setup() {
   Ustore(RP0offset, RP0);
   // builddictionary()
   //TODO------------> working from here  from start of builddictionary
-  /*
-   *   { n: 'find' }, // Fast version of find - see Forth definition later
-  { n: 'OVERT', replaced: true },
-  // { n: '?UNIQUE', f: 'qUnique' }, // Not used yet
-  { n: '$,n', f: 'dollarCommaN', replaced: true },
-  { n: '>NAME', f: 'ToNAME' }, // Fast version of >NAME - see Forth definition later
-  'debugNA', 'testing3', 'break', 'debugPrintTIB', 'TEST',
-   */
 }
 
 void loop() {
