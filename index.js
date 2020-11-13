@@ -905,7 +905,7 @@ const forthInForth = `
     ( debugNA )       ( uncomment for debugging find - will report each name as checked)
     IF                ( na=0 at the end of a vocabulary )
       DUP @           ( not end of vocabulary, test 1st cell )
-      [ CELLMASK ] LITERAL AND ( mask off lexicon bits ) ( TODO-11-CELLL may fail if endian wrong unless assumption matches what comparing against and CELLMASK correct endian)
+      [ CELLMASK ] LITERAL AND ( mask off lexicon bits - note CELLMASK is endian dependent )
       R@ XOR          ( compare with 1st cell in string )
       IF              ( 1st cells do not match )
         CELL+ -1      ( try the next name in the vocabulary )
@@ -1820,8 +1820,6 @@ class Forth {
     this.CELLL = CELLL;  // 2,3 or 4. Needs to be big enough for an address
     this.CELLbits = CELLL * 8; // Number of bits in a cell - used for loops and shifts
     // mask used when masking cells in fast search for name ERRATA Zen uses this but its not defined e.g. 0x1FFFFF if CELLL = 3
-    this.CELLMASK = forthTrue ^ ((0xFF ^ l['=BYTEMASK']) << (this.CELLbits - 8)); // TODO-11-CELLL will be endian dependent
-
     // Support parameters for TODO-27-MEMORY TODO-28-MULTI
     // === Support for Debugging ============
 
@@ -1864,11 +1862,18 @@ class Forth {
     this.m = new (memClass || MemClasses[`${MEM}_${this.CELLbits}`])({ length: EM, celll: this.CELLL });
     this.jsFunctions = [];  // Maps tokens to executable functions
 
+    // Needs to be after the call to create this.m, its endian dependent as lowest address byte is always the countr
+    if (this.m.littleEndian) {
+      this.CELLMASK = forthTrue ^ (0xFF ^ l['=BYTEMASK']);
+    } else {
+      this.CELLMASK = forthTrue ^ ((0xFF ^ l['=BYTEMASK']) << (this.CELLbits - 8));
+    }
+
     // === Standard pointers used - Zen pg22
     // TODO-28-MULTI think about how these may need to be Task specific
     this.IP = 0;    // Interpreter Pointer
     this.cellSP = this.cellSPP;  // Data Stack Pointer but in MEM units rather than bytes
-    this.cellRP = RP0 / this.CELLL;  // Return Stack Pointer (aka BP in 8086)
+    this.cellRP = (RP0 / this.CELLL)>>0;  // Return Stack Pointer (aka BP in 8086)
     this.UP = UPP;  // User Area Pointer // TODO-28-MULTI will move this around
     this._USER = 0; // Incremented by this.CELLL as define USER's
     // create data structures
@@ -1910,6 +1915,7 @@ class Forth {
     // Make some functions available as Forth words
     jsFunctionAttributes.forEach((attribs) => {
       // Shortcut
+      if (this.testing & 0x01) console.log(">> ", attribs);
       if (typeof attribs === 'string') {
         attribs = { n: attribs };
       }
@@ -1921,7 +1927,7 @@ class Forth {
       this.jsFunctions.push(f);
       if (attribs.token) {
         this.buildConstant(n, tok);
-      // regular code functions that just need a pointer.
+        // regular code functions that just need a pointer.
       } else {
         const xt = this.buildCode(n, tok, attribs);
         //console.assert(xt === this.JStoXT(n));
@@ -1954,6 +1960,7 @@ class Forth {
     return xt;
   }
   buildUser(name, init) {
+    if (this.testing & 0x01) console.log("USER>>",name,init);
     init = typeof init === 'string'
       ? (typeof this[init] !== 'undefined' ? this[init] : this.JStoXT(init)) // Either field of this, or function
       : typeof init === 'undefined'
@@ -2095,31 +2102,27 @@ class Forth {
   // cell1  if present, gives it a quick first-cell test to apply.
   // xt     if present we are looking for name pointing at this executable (for decompiler)
   // returns 0 or na
-  // TODO-11-CELLL optimize to cells
-  _sameq(na1, na2, chars) { // return f
+  _sameq(na1, na2, cells) { // return f
     // Note this is similar to SAME? but takes a count (not count of cells, and returns boolean
-    for (let i = 0; i < chars; i++) {
-      if (this.Mfetch8(na1 + i) !== this.Mfetch8(na2 + i)) {
+    const bytes = cells * this.CELLL;
+    for (let i = 0; i < bytes; i += this.CELLL) {
+      if (this.Mfetch(na1 + i) !== this.Mfetch(na2 + i)) {
         return false;
       }
     }
     return true;
   }
 
-  _find(va, na, byte1, xt) { // return na that matches or 0
+  _find(va, na) { // return na that matches or 0
+    const cellCount = ((this.Mfetch8(na) & l["=BYTEMASK"])  / this.CELLL) >>0; // Count of cells after first one
+    const cell1 = this.Mfetch(na);  // Could be little or big-endian
     let p = va;
     while (p = this.Mfetch(p)) {
       //console.log('_find: comparing:', this.countedToJS(p)) // comment out except when debugging find
-      if (xt) {
-        if (this.na2xt(p) === xt) {
+      const c1 = this.Mfetch(p) & this.CELLMASK; // count
+      if (!cell1 || (cell1 === c1)) { // first cell matches (if cell1 not passed then does slow compare
+        if (this._sameq(p + this.CELLL, na + this.CELLL, cellCount)) {
           return p;
-        }
-      } else { // Searching on na
-        const b1 = this.Mfetch8(p) & l['=BYTEMASK']; // count TODO-11-CELLL optimize to use cells use CELLMASK but careful of mask endian-ness (
-        if (!byte1 || (byte1 === b1)) { // first cell matches (if cell1 not passed then does slow compare
-          if (this._sameq(p + 1, na + 1, b1)) {
-            return p;
-          }
         }
       }
       p -= this.CELLL; // point at link address and loop for next word
@@ -2134,9 +2137,8 @@ class Forth {
     const va = this.SPpop();
     const a = this.SPpop();
     this.m.assertAlign(a);
-    const byte1 = this.Mfetch8(a); //TODO-11-CELLL optimize >> _find >> sameq to use cells
     //console.log('find: Looking for', name) // comment out except when debugging find
-    const na = this._find(va, a, byte1);
+    const na = this._find(va, a);  // return matching na or 0
     if (na) {
       this.SPpush(this.na2xt(na));
       this.SPpush(na);
@@ -2148,8 +2150,21 @@ class Forth {
 
   // Traverse dictionary to convert xt back to a na (for decompiler or debugging)
   xt2na(xt) {
-    return this._find(this.currentFetch(), undefined, undefined, xt);
+    let p = this.currentFetch(); // vocabulary
+    while (p = this.Mfetch(p)) {
+      //console.log('_find: comparing:', this.countedToJS(p)) // comment out except when debugging find
+      if (this.na2xt(p) === xt) {
+        return p;
+      }
+      p -= this.CELLL; // point at link address and loop for next word
+    }
+    // Drop through not found
+    return 0;
   }
+
+
+
+
 
   // Convert xt to a Javascript string of its name or 'undefined' (only used for debugging).
   xt2name(xt) {
@@ -2205,7 +2220,7 @@ class Forth {
   // Same profile as ?UNIQUE but not turned into a code word as not used prior to
   qUnique() {
     this.SPpush(this.SPfetch());      // DUP
-    this.SPpush(this.currentFetch()); // dictionary to search
+    this.SPpush(this.currentFetch()); // a a va; dictionary to search
     this.find();                 // a xt na | a a F
     if (this.SPpop()) {
       const xt = this.SPpop();              // Discard xt
@@ -2456,14 +2471,14 @@ class Forth {
 
   // Return stack words eForthAndZen#40
   RPat() { this.SPpush(this.cellRP * this.CELLL); } //RP@
-  RPbang() { this.cellRP = this.SPpop() / this.CELLL; } // RP!
+  RPbang() { this.cellRP = this.SPpop() / this.CELLL; } // RP! must be aligned
   Rfrom() { this.SPpush(this.RPpop()); } // R>
   Rat() { this.SPpush(this.RPfetch()); } // R@
   toR() { this.RPpush(this.SPpop()); } // >R
 
   // Data stack initialization eForthAndZen#41
   SPat() { this.SPpush(this.cellSP * this.CELLL); } //SP@
-  SPbang() { this.cellSP = this.SPpop() / this.CELLL; } //SP!
+  SPbang() { this.cellSP = this.SPpop() / this.CELLL; } //SP! must be aligned
 
   // Classic Data stack words eForthAndZen#42
   DROP() { this.cellSP++; }
@@ -2552,7 +2567,8 @@ class Forth {
     const u = Math.min(this.SPpop(), nameMaxLength); // length of string
     const b = this.SPpop(); // start of string
     const np = this.m.align(this.npFetch() - u - this.CELLL); // Enough space in Name Directory to copy string optionally with one zero after
-    this.Mstore(this.m.align(np + u + 1 - this.CELLL), 0); // Write a zero in the last cell where the last letter of word will be written
+    // Careful if edit next formula, m.align doesnt change if mem=8, AND in this case np may not be on a cell boundary
+    this.Mstore(np + ((u / this.CELLL)>>0) * this.CELLL); // Write a zero in the last cell where the last letter of word will be written
     this.m.copyWithin(np + 1, b, b + u);
     this.Mstore8(np, u);  // 1 byte count
     this.SPpush(np); // Note that NP is not updated, the same buffer will be used for each word until hit ':'
