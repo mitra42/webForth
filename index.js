@@ -2120,7 +2120,7 @@ class Forth {
     while (p = this.Mfetch(p)) {
       //console.log('_find: comparing:', this.countedToJS(p)) // comment out except when debugging find
       const c1 = this.Mfetch(p) & this.CELLMASK; // count
-      if (!cell1 || (cell1 === c1)) { // first cell matches (if cell1 not passed then does slow compare
+      if (cell1 === c1) { // first cell matches (if cell1 not passed then does slow compare
         if (this._sameq(p + this.CELLL, na + this.CELLL, cellCount)) {
           return p;
         }
