@@ -2088,7 +2088,7 @@ class Forth {
     while (p = this.Mfetch(p)) {
       //console.log('_find: comparing:', this.countedToJS(p)) // comment out except when debugging find
       const c1 = this.Mfetch(p) & this.CELLMASK; // count
-      if (!cell1 || (cell1 === c1)) { // first cell matches (if cell1 not passed then does slow compare
+      if (cell1 === c1) { // first cell matches (if cell1 not passed then does slow compare
         if (this._sameq(p + this.CELLL, na + this.CELLL, cellCount)) {
           return p;
         }
@@ -2422,9 +2422,9 @@ class Forth {
 
   // Memory access eForthAndZen#39
   store() { this.Mstore(this.SPpop(), this.SPpop()); } //!  w a -- , Store
-  fetch() { this.SPpush(this.Mfetch(this.SPpop())); }//@ a -- w, fetch
-  cStore() { this.Mstore8(this.SPpop(), this.SPpop()); }//C! c a -- , Store character
-  cFetch() { this.SPpush(this.Mfetch8(this.SPpop())); }//C@ a -- c, Fetch character
+  fetch() { this.SPpush(this.Mfetch(this.SPpop())); } //@ a -- w, fetch
+  cStore() { this.Mstore8(this.SPpop(), this.SPpop()); } //C! c a -- , Store character
+  cFetch() { this.SPpush(this.Mfetch8(this.SPpop())); } //C@ a -- c, Fetch character
 
   // Return stack words eForthAndZen#40
   RPat() { this.SPpush(this.cellRP * this.CELLL); } //RP@
