@@ -130,6 +130,24 @@ CELLTYPE IPnext() { return rom[romIP++]; }
 CELLTYPE Ufetch(byte userindex) { return ram[ramUP + userindex]; } // userindex is a cell index, not a byte index
 void Ustore(byte userindex, CELLTYPE w) { ram[ramUP + userindex] = w; } // userindex is a cell index not a byte index
 
+//L.2098
+// Inner function of find, traverses a linked list Name dictionary.
+// name   javascript string looking for
+// va     pointer holding address of first element in the list.
+// cell1  if present, gives it a quick first-cell test to apply.
+// xt     if present we are looking for name pointing at this executable (for decompiler)
+// returns 0 or na
+// TODO-11-CELLL optimize to cells
+bool _sameq(na1, na2, cells) {
+  // Note this is similar to SAME? but takes a count (not count of cells, and returns boolean
+  for (let i = 0; i < chars; i++) {
+    if (this.Mfetch8(na1 + i) !== this.Mfetch8(na2 + i)) {
+      return false;
+    }
+  }
+  return true;
+}
+
 //L.2278-
 void tokenVocabulary(CELLTYPE romAddr) {
   Ustore(CONTEXToffset, romAddr << CELLSHIFT);
