@@ -9,6 +9,9 @@
  * Builddictionary() -> Arduino
  * cross comp 
  * Backport - use of ramSP ramRP
+ * 
+ * NOTES
+ * See https://www.arduino.cc/reference/en/language/variables/utilities/progmem/ for reading program memory (where dictionary will be)
  */
 
 //TODO-ARDUINO OPTIMIZATION - check for constant parameters to functions nad mark constant in definition
@@ -37,7 +40,9 @@
 //#define WRITEROM 1 // Define if want to write to "rom" area
 
 //L.1794
-#define EM 0x2000 * CELLL
+//#define EM 0x2000 * CELLL
+#define ROMSIZE 0x2000 * CELLL
+// RAMSIZE is defined by the size of the parts that go there
 
 #define LITTLEENDIAN true // Arduino is little endian
 
@@ -71,25 +76,29 @@ const CELLTYPE forthTrue = -1; // Not quite correct, should be masked BUT when p
 #define VPoffset 37
 #define _USER 38
 
-//L.17
-//L.1778
+//L.1823
 #define CELLbits CELLL * 8 // Number of bits in a cell - used for loops and shifts
 // mask used when masking cells in fast search for name ERRATA Zen uses this but its not defined e.g. 0x1FFFFF if CELLL = 3
 // TODO-CELLL assumes CELLL = 2
 const CELLTYPE CELLMASK = forthTrue ^ ((0xFF ^ BYTEMASK) << (CELLbits - 8)); // TODO-11-CELLL will be endian dependent
 
-//L.1797
-// EM is top of RAM
+//L.1831
+static byte testing = 0;
+
+//L.1840
+#define RAM0 0x8000 // Arbitrary address to use for RAM
+#define SPS (0x40 << CELLSHIFT) // Size of data stack 64 Cells (128 bytes) for now
+#define SPP (RAM0 + SPS) // Top of stack
+// 8 cell buffer between Stack and TIB
+#define TIB0 (SPP + (8 << CELLSHIFT)) // Terminal input buffer - shares space with Return stack //TODO-28-MULTITASK will move
+#define RTS (0x40 << CELLSHIFT) // return stack/TIB size // eFORTH-DIFF was 64 which is tiny for any kind of string handling
+#define RP0 (TIB0 + RTS)  // top of return stack RP0 - there is an 8 cell buffer which is probably just for safety.
+// 8 cell buffer between RP0 and UPP 
+#define UPP (RP0 + (8 << CELLSHIFT)) // start of user area // TODO-28-MULTI UP should be a variable, and used in most places UPP is
 #define US (40 << CELLSHIFT)  // user area size in cells i.e. 64 variables - standard usage below is using about 37
-#define UPP (EM - US) // start of user area // TODO-28-MULTI UP should be a variable, and used in most places UPP is
-#define RP0 (UPP - (8 << CELLSHIFT))  // top of return stack RP0 - there is an 8 cell buffer which is probably just for safety.
-#define RTS (0x80 << CELLSHIFT) // return stack/TIB size // eFORTH-DIFF was 64 which is tiny for any kind of string handling
-#define TIB0 (RP0 - RTS) // Terminal input buffer - shares space with Return stack //TODO-28-MULTITASK will move
-#define SPP (TIB0 - (8 << CELLSHIFT)) // 8 cell gap between TIB0 and SPP
-#define SPS (0x80 << CELLSHIFT) // Size of data stack 256 128 bytes for now
-#define NAMEE (TIB0 - SPS) // name dictionary
-#define RAM0 NAMEE
-#define RAMSIZE (EM - RAM0) // TODO-RAM maybe want to build up from e.g. 0x8000 instead of down from EM
+#define EM (UPP + US)
+#define RAMSIZE (EM - RAM0) // Size of RAM used 
+
 
 #define RAMADDR(x) ((x - RAM0) >> CELLSHIFT)
 #define ROMADDR(x) (x >> CELLSHIFT)
@@ -99,7 +108,7 @@ const CELLTYPE CELLMASK = forthTrue ^ ((0xFF ^ BYTEMASK) << (CELLbits - 8)); // 
 // Now some cell based pointers into RAM
 #define ramSPP RAMADDR(SPP) // start of data stack - grows down, points at top of stack - 8 word buffer for safety
 #define RAMCELLS (RAMSIZE >> CELLSHIFT) // Approx 624 bytes  TODO-RAM
-#define ROMCELLS (NAMEE >> CELLSHIFT)
+#define ROMCELLS (ROMSIZE >> CELLSHIFT)
 #define ramRP0 RAMADDR(RP0)
 #define ramUP0 RAMADDR(UPP)
 
@@ -120,6 +129,7 @@ extern const void (*f[60])(CELLTYPE); // Forward reference
 // Above UZERO is a store of initial values for User variables
 #define CODEE (UZERO + US) // code dictionary grows up from here towards NAME dictionary.
 // PAD is 80 bytes above the current top of the Code directory, and HLD (where numbers are build for output) is a few bytes growing down from PAD.
+#define NAMEE ROMSIZE
 
 //L.1852
 static CELLTYPE ram[RAMCELLS]; // Equivalent of Mem16_16 in webForth
@@ -132,21 +142,18 @@ static CELLTYPE ramRP = ramRP0;  // Return Stack Pointer (aka BP in 8086) (this 
 static CELLTYPE ramUP = ramUP0;  // User Area Pointer // TODO-28-MULTI will move this around
 
 //L.2023
-void debugNA() { Serial.print('NAME='); printCounted(SPfetch()); } // Print the NA on console
-
-//L.2033
+void debugNA() { Serial.print(F("NAME=")); printCounted(SPfetch()); } // Print the NA on console
 // Put testing3 in a definition to start outputing stack trace on console.
-static byte testing = 0;
 void testing3() { testing |= 3; };
 
 // Put break in a definition.
 void Fbreak() {
-  Serial.println('\nbreak in a FORTH word'); 
+  Serial.println(F("\nbreak in a FORTH word")); 
 } // Put a breakpoint in your IDE at this line
 
 // debugPrintTIB will print the current TIB.
 void debugPrintTIB() {
-  Serial.print('TIB: '); TXbangS(Ufetch(TIBoffset) + Ufetch(INoffset), Ufetch(nTIBoffset) - Ufetch(INoffset));
+  Serial.print(F("TIB: ")); TXbangS(Ufetch(TIBoffset) + Ufetch(INoffset), Ufetch(nTIBoffset) - Ufetch(INoffset));
 }
 
 // TEST will (destructively) check the stack matches expected result, used for testing the compiler.
@@ -154,15 +161,15 @@ void debugPrintTIB() {
 void TEST() { //  a1 a2 a3 b1 b2 b3 n -- ; Check n parameters on stack
   const byte stackDepth = SPpop();
   if ((ramSPP - ramSP) != (stackDepth << 1)) {
-    Serial.println("Stack depth wrong");
+    Serial.println(F("Stack depth wrong"));
   } else {
     for (byte i = 0; i < stackDepth; i++) {
       const CELLTYPE onStack = cellRamFetch(ramSP + i);
       const CELLTYPE expected = SPpop(); // What we expect to see 
       if (onStack != expected) { 
-        Serial.print("Expected"); 
+        Serial.print(F("Expected")); 
         Serial.print(expected); 
-        Serial.print("got"); 
+        Serial.print(F("got")); 
         Serial.println(onStack); 
       }
     }
@@ -172,7 +179,12 @@ void TEST() { //  a1 a2 a3 b1 b2 b3 n -- ; Check n parameters on stack
 }
 
 // TODO if only used here then might merge into Mfetch and Mstore
-CELLTYPE cellRomFetch(CELLTYPE cellAddr) { return rom[cellAddr]; };
+#ifdef WRITEROM
+#define ROM(cellAddr) rom[cellAddr]
+#else
+#define ROM(cellAddr) pgm_read_word_near(rom + cellAddr)
+#endif 
+CELLTYPE cellRomFetch(CELLTYPE cellAddr) { return ROM(cellAddr); }; 
 CELLTYPE cellRamFetch(CELLTYPE cellAddr) { return ram[cellAddr]; };
 CELLTYPE cellRamStore(CELLTYPE cellAddr, CELLTYPE v) { ram[cellAddr] = v; };
 #ifdef WRITEROM
@@ -229,7 +241,7 @@ void SPpush(CELLTYPE v) { ram[--ramSP] = v; }
 CELLTYPE RPfetch() { return ram[ramRP]; }
 CELLTYPE RPpop() { return ram[ramRP++]; }
 void RPpush(CELLTYPE v) { ram[--ramRP] = v; }
-CELLTYPE IPnext() { return rom[romIP++]; }
+CELLTYPE IPnext() { return ROM(romIP++); }
 CELLTYPE Ufetch(byte userindex) { return ram[ramUP + userindex]; } // userindex is a cell index, not a byte index
 void Ustore(byte userindex, CELLTYPE w) { ram[ramUP + userindex] = w; } // userindex is a cell index not a byte index
 // === Access to the USER variables before they are defined
@@ -307,8 +319,6 @@ void find() { // a va -- ca na | a 0
     SPpush(0);
   }
 }
-
-//L.2177-
 // Traverse dictionary to convert xt back to a na (for decompiler or debugging)
 CELLTYPE xt2na(CELLTYPE xt) {
   CELLTYPE p = currentFetch(); // vocabulary
@@ -352,11 +362,11 @@ void qUnique() {
   find();                 // a xt na | a a F
   if (SPpop()) {
     const CELLTYPE xt = SPpop();              // Discard xt
-    Serial.println('Duplicate definition of'); // Catch duplicates - report, but allow
+    Serial.println(F("Duplicate definition of")); // Catch duplicates - report, but allow
     /*TODO-ARDUINO
       const char* name = countedToJS(SPfetch());
       if (!['foo', 'bar'].includes(name)) {
-        Serial.println('Duplicate definition of', name); // Catch duplicates - report, but allow
+        Serial.println(F("Duplicate definition of"), name); // Catch duplicates - report, but allow
         //Serial.println(jsFunctionAttributes[Mfetch(xt)].replaced ? 'Expected' : '', 'Duplicate definition of', countedToJS(SPfetch())); // Catch duplicates - report, but allow
       }
     */
@@ -385,7 +395,7 @@ void dollarCommaN() {
     Mstore(a, cpFetch()); // ca=CP ;
     Ustore(NPoffset, a); // ca=CP ;
   } else {                    // THEN $" name" THROW ;
-    Serial.println('name error'); // This is an error - in FORTH equivalent its a THROW
+    Serial.println(F("name error")); // This is an error - in FORTH equivalent its a THROW
   }
 }
 
@@ -402,7 +412,8 @@ void tokenVocabulary(CELLTYPE romAddr) {
 };
 // Put the contents of the payload (1 word) onto Stack, used for CONSTANT
 void tokenNextVal(CELLTYPE romAddr) {  // TODO check if could pass romAddr instead of byteAddr
-  SPpush(rom[romAddr]);
+  SPpush(cellRomFetch(romAddr));
+
 };
 
 // This is the most important token function - used for a Colon word to iterate over the list.
@@ -416,7 +427,7 @@ void tokenUser(CELLTYPE romAddr) { SPpush(FROMRAMADDR(rom[romAddr] + ramUP)); }
 // Put the address of the payload onto Stack - used for CREATE which is used by VARIABLE
 //TODO-15-EPROM should allocate in a space that might be elsewhere.
 void _tokenDoes(CELLTYPE romAddr) {
-  const CELLTYPE does = rom[romAddr];
+  const CELLTYPE does = cellRomFetch(romAddr);
   if (does) {
     //debugPush();
     RPpush(romIP);
@@ -630,7 +641,7 @@ void userAreaSave() {
       cellRomStore(UZERO + a, Ufetch(a));
     }
   #else
-    Serial.println("Cannot write to Rom area");
+    Serial.println(F("Cannot write to Rom area"));
   #endif
 }
 
@@ -679,7 +690,7 @@ void NUMBERQ() {
   bool neg = false;
   CELLTYPE acc = 0;
   for (byte i = Mfetch8(a++); i > 0; i--) {
-    const byte c = Mfetch8(a++); 
+    byte c = Mfetch8(a++); 
     if (c == '-') {
        neg = true;
     } else if ((c > '9') || (c < '0')) {
@@ -687,7 +698,7 @@ void NUMBERQ() {
         SPpush(0);
         return;
     } else {
-      c == c - '0';
+      c = c - '0';
       acc = (acc * radix) + acc;
     }
   }
@@ -729,7 +740,7 @@ void dCOMPILE() { // a -- ...; same signature as to $COMPILE at Zen pg96
         DW(SPpop());
       } else {
         // TODO-32-ERRORS handle error in Forth-ish way (via Throw) - this is harder than it looks !
-        Serial.print('Cannot find or convert to number'); printCounted(SPpop());
+        Serial.print(F("Cannot find or convert to number")); printCounted(SPpop());
       }
     }
   }
@@ -744,7 +755,7 @@ void dINTERPRET() { // a -- ...; Based on signature of $INTERPRET at Zen pg83
     runXT(Ufetch(NUMBERoffset)); // n T | a F
     if (!SPpop()) {
       // TODO-32-ERRORS handle error in Forth-ish way (via Throw) - this is harder than it looks !
-      Serial.print('Cannot find or convert to number'); printCounted(SPpop());
+      Serial.print(F("Cannot find or convert to number")); printCounted(SPpop());
     }
   }
 }
@@ -837,7 +848,7 @@ void tick() { // -- xt; Search for next word in input stream
   findName(); // xt na | a 0
   const CELLTYPE na = SPpop();
   if (!na) {
-    printCounted(SPpop()); Serial.println("not found during '");
+    printCounted(SPpop()); Serial.println(F("not found during"));
   } else {
     // For debugging need to make sure we are not including code that will replaced by Forth versions.
     // checkNotCompilingReplaceable(SPfetch(), na);
@@ -872,14 +883,14 @@ const void (*f[60])(CELLTYPE) = {
 #ifdef WRITEROM
 CELLTYPE rom[ROMCELLS] = { 1, 2, 3 };
 #else
-const CELLTYPE rom[ROMCELLS] = { 1, 2, 3 };
+const CELLTYPE rom[ROMCELLS] PROGMEM = { 1, 2, 3 }; 
 #endif
 void setup() {
   // put your setup code here, to run once:
   Serial.begin(57600); // Initialize IO port TODO move to somewhere Forth wants it
-  Serial.println('Starting');
+  Serial.println(F("Starting"));
   // TODO: Serial.println('Space for', NAMEE - CODEE, 'bytes for code and names');
-  //(*f[0])(); // TEST function pointer 
+  (*f[0])(0); // TEST function pointer 
   //L.1864
   Ustore(CPoffset, CODEE);
   Ustore(NPoffset, NAMEE); // Pointer to where writing name stack
