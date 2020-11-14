@@ -110,6 +110,7 @@ const tokenUser = 3;
 const tokenVar = 4;
 const tokenCreate = 5;
 
+// TODO ported to Arduino below to L.123-
 // === Memory Map - Zen pg26
 const l = {}; // Constants that will get compiled into the dictionary
 l['=COMP'] = 0x40; // bit in first char of name field to indicate 'compile-only'  ERRATA Zen uses this but its not defined
@@ -122,7 +123,6 @@ const nameMaxLength = 31; // Max number of characters in a name, length needs to
 console.assert(nameMaxLength === l['=BYTEMASK']); // If this isn't true then check each of the usages below
 l.BL = 32;
 
-// TODO ported to Arduino below to L.125-
 // === Data table used to build users.
 // later the FORTH word 'USER' is defined but unlike this function it doesn't setup initialization, nor does it auto-increment to next available user slot.
 // These definitions can refer to v: 'foo' to be initialized to a Forth word (which must be in jsFunctionAttributes)
@@ -1820,14 +1820,19 @@ class Forth {
   constructor({ CELLL = 2, MEM = 8, memClass = undefined, EM = undefined, overrides = {} }) {
     // ERRATA Zen doesnt define CELLL (and presumes is 2 in multiple places)
     this.CELLL = CELLL;  // 2,3 or 4. Needs to be big enough for an address
+    // TODO ported from here to L.1823
     this.CELLbits = CELLL * 8; // Number of bits in a cell - used for loops and shifts
     // mask used when masking cells in fast search for name ERRATA Zen uses this but its not defined e.g. 0x1FFFFF if CELLL = 3
     // Support parameters for TODO-27-MEMORY TODO-28-MULTI
+    // TODO ported above
+
     // === Support for Debugging ============
 
     this.debugExcecutionStack = []; // Maintains a position, like a stack trace, don't manipulate directly use functions below
     this.debugName = '?'; // Set in threadtoken()
+    // TODO ported from here to L.1831
     this.testing = 0x0; // 0x01 display words passed to interpreters; 0x02 each word in tokenthread - typically set by 'testing3'
+    // TODO ported above
     this.testingDepth = 1;
     this.padTestLength = 0; // Display pad length
     // === Javascript structures - implement the memory map and record the full state.
@@ -1837,6 +1842,7 @@ class Forth {
     // Now the memory map itself, starting at the top of memory.
     // ERRATA In Zen the definitions on Zen pg26 dont come close to matching the addresses given as the example below. In particular UPP and RPP(RP0) overlap !
     EM = EM || (0x2000 * this.CELLL); // top of memory default to 4K cells
+    // TODO ported below to L.1840
     const US = 0x40 * this.CELLL;  // user area size in cells i.e. 64 variables - standard usage below is using about 37
     const UPP = EM - US; // start of user area // TODO-28-MULTI UP should be a variable, and used in most places UPP is
     const RP0 = UPP - (8 * this.CELLL);  // top of return stack RP0 - there is an 8 cell buffer which is probably just for safety.
@@ -1878,6 +1884,8 @@ class Forth {
     this.cellRP = (RP0 / this.CELLL)>>0;  // Return Stack Pointer (aka BP in 8086)
     this.UP = UPP;  // User Area Pointer // TODO-28-MULTI will move this around
     this._USER = 0; // Incremented by this.CELLL as define USER's
+    // TODO ported above
+
     // create data structures
     // Setup pointers for first dictionary entries.
     this.Ustore(CPoffset, CODEE); // Pointer to where compiling into dic
@@ -2019,15 +2027,14 @@ class Forth {
       }
     }
   }
+
+  // TODO-ported below L.2023
+
   // === Code words to support debugging on the console
   // Put debugNA in a definition to print a counted string on the console
   debugNA() { console.log('NAME=', this.countedToJS(this.SPfetch())); } // Print the NA on console
-  debugTIB() {
-    return this.m.decodeString(this.Ufetch(TIBoffset) + this.Ufetch(INoffset), this.Ufetch(TIBoffset) + this.Ufetch(nTIBoffset));
-  }
   // Put testing3 in a definition to start outputing stack trace on console.
-  testing3() {
-    this.testing |= 3; }
+  testing3() { this.testing |= 3; }
   // Put break in a definition.
   break() {
     console.log('\nbreak in a FORTH word'); } // Put a breakpoint in your IDE at this line
@@ -2055,7 +2062,6 @@ class Forth {
     this.debugClear(); // Reset Debug Stack as can be mucked up by THROW and CATCH
   }
 
-  // TODO-ported below L.2049
   // === Functions to simplify storing and retrieving 16 bit values into 8 bit stacks etc.
   // These aren't part of eForth, but are here to simplify storing multi-byte words into 8 bit bytes in the Buffer.
   Mfetch(a) { return this.m.fetchCell(a); }
@@ -2063,7 +2069,7 @@ class Forth {
   // 8 bit equivalents
   Mfetch8(a) { return this.m.fetch8(a); } // Returns byte at a
   Mstore8(a, v) { this.m.store8(a, v); }
-ALIGNED() { this.SPpush(this.m.align(this.SPpop())); }
+  ALIGNED() { this.SPpush(this.m.align(this.SPpop())); }
   SPfetch() { return this.m.cellFetchCell(this.cellSP); }
   SPpop() { return this.m.cellFetchCell(this.cellSP++); }
   SPpush(v) { this.m.cellStoreCell(--this.cellSP, v); }
@@ -2086,8 +2092,6 @@ ALIGNED() { this.SPpush(this.m.align(this.SPpop())); }
   lastFetch() { return this.Ufetch(LASToffset); }
   padPtr() { return this.vpFetch() + 80; } // Sometimes JS needs the pad pointer
 
-  // TODO-ported above
-
   // === Functions related to building 'find'  and its wrappers ====
 
   // Convert a string made up of a count and that many bytes to a Javascript string.
@@ -2096,7 +2100,6 @@ ALIGNED() { this.SPpush(this.m.align(this.SPpop())); }
   countedToJS(a) {
     return this.m.decodeString(a + 1, a + (this.Mfetch8(a) & l['=BYTEMASK']) + 1);
   }
-  // TODO-porting below to L.2096-
   // Convert a name address to the code dictionary definition.
   na2xt(na) {
     return this.Mfetch(na - (2 * this.CELLL));
@@ -2154,8 +2157,6 @@ ALIGNED() { this.SPpush(this.m.align(this.SPpop())); }
     }
   }
 
-
-  // TODO-ported below L.2177-
   // Traverse dictionary to convert xt back to a na (for decompiler or debugging)
   xt2na(xt) {
     let p = this.currentFetch(); // vocabulary
@@ -2177,9 +2178,8 @@ ALIGNED() { this.SPpush(this.m.align(this.SPpop())); }
     return na ? this.countedToJS(na) : 'undefined';
   }
 
-  // TODO-ported below L.2177-
+  // TODO-ported below L.2180-
   ToNAME() { this.SPpush(this.xt2na(this.SPpop())); }  // Fast version of >NAME see Forth definition below
-  // TODO-ported above L.2278-
 
   // TODO-29-VOCABULARY This just looks up a in the Context vocabulary, it makes no attempt to use multiple vocabularies
   // If required then fixing this to iterate over the context array should not break anything (this is what NAME? does)
@@ -2187,6 +2187,7 @@ ALIGNED() { this.SPpush(this.m.align(this.SPpop())); }
     this.SPpush(this.Ufetch(CONTEXToffset));  // a va
     this.find();                           // xt na | a F
   }
+  // TODO-ported above L.2180-
 
   // -- a; Push a Javascript string to a temporary location as a counted string, and put its address on the stack
   JStoCounted(s) {
@@ -2211,6 +2212,7 @@ ALIGNED() { this.SPpush(this.m.align(this.SPpop())); }
     }
   }
 
+  // TODO ported to Arduino below to L.2214-
   // === JS Functions to be able to define words ==== in Zen pg30 these are Macros.
 
   // Compile one or more words into the next consecutive code cells.
@@ -2223,7 +2225,6 @@ ALIGNED() { this.SPpush(this.m.align(this.SPpop())); }
     this.Ustore(CPoffset, cp);
   }
 
-  // TODO ported to Arduino below to L.2221-
   // a -- a; Check if a definition of the word at 'a' would be unique and display warning (but continue) if it would not be.
   // Same profile as ?UNIQUE but not turned into a code word as not used prior to
   qUnique() {
@@ -2338,7 +2339,6 @@ ALIGNED() { this.SPpush(this.m.align(this.SPpop())); }
     this.SPpush(this.Mfetch(payload + this.CELLL));
     this._tokenDoes(payload);
   }
-  // TODO-ported above L.2278-
 
   // === INNER INTERPRETER YES THIS IS IT ! ==================== eForthAndZen#36
   // This is quite different from eForth as its token-threaded rather than direct threaded
@@ -2365,8 +2365,6 @@ ALIGNED() { this.SPpush(this.m.align(this.SPpop())); }
     while (this.IP) {
       // console.assert(this.IP >= CODEE && this.IP <= NAMEE); // uncomment if tracking down jumping into odd places
       xt = this.IPnext();
-      // Comment this out except when needed for debugging, they are slow
-      // debugTIB =  this.m.decodeString(this.Ufetch(TIBoffset) + this.Ufetch(INoffset), this.Ufetch(TIBoffset) + this.Ufetch(nTIBoffset));
       // 'await this.threadtoken(xt)' would be legit, but creates a stack frame in critical inner loop, when usually not reqd.
       const maybePromise = this.threadtoken(xt);
       if (maybePromise) {
@@ -2379,7 +2377,6 @@ ALIGNED() { this.SPpush(this.m.align(this.SPpop())); }
     }
   }
 
-  // TODO-ported below L.2382-
   async MS() { // ms --; delay for a period of time.
     await new Promise((resolve) => setTimeout(resolve, this.SPpop()));
   }
@@ -2476,8 +2473,6 @@ ALIGNED() { this.SPpush(this.m.align(this.SPpop())); }
 
   // Unconditional jump to destn in dictionary
   branch() { this.IP = this.IPnext(); }
-
-  // TODO-ported above L.2382-
 
   // === Primitive words for memory, stack and return access.
 
@@ -2586,13 +2581,15 @@ ALIGNED() { this.SPpush(this.m.align(this.SPpop())); }
     const b = this.SPpop(); // start of string
     const np = this.m.align(this.npFetch() - u - this.CELLL); // Enough space in Name Directory to copy string optionally with one zero after
     // Careful if edit next formula, m.align doesnt change if mem=8, AND in this case np may not be on a cell boundary
-    this.Mstore(np + ((u / this.CELLL)>>0) * this.CELLL); // Write a zero in the last cell where the last letter of word will be written
+    // TODO-backport extra parm 0 to main
+    this.Mstore(np + ((u / this.CELLL)>>0) * this.CELLL, 0); // Write a zero in the last cell where the last letter of word will be written
     this.m.copyWithin(np + 1, b, b + u);
     this.Mstore8(np, u);  // 1 byte count
     this.SPpush(np); // Note that NP is not updated, the same buffer will be used for each word until hit ':'
   }
 
   NUMBERQ() { // Same footprint as NUMBER?, this will be stored vectored from 'NUMBER
+    // TODO-backport simple number conversion from Arduino
     const a = this.SPpop();
     const w = this.countedToJS(a); // I believe this is the only place we use this.countedToJS to make JS strings outside of debugging
     const base = this.Ufetch(BASEoffset);
@@ -2672,7 +2669,7 @@ ALIGNED() { this.SPpush(this.m.align(this.SPpop())); }
     }
     const prompt = this.Ufetch(PROMPToffset);
     if (prompt) {
-      await this.run(this.Ufetch(PROMPToffset));
+      await this.run(prompt); //TODO-BACKPORT changed line
     }
   }
 
@@ -2749,6 +2746,8 @@ ALIGNED() { this.SPpush(this.m.align(this.SPpop())); }
   console() {
     return this.run(this.JStoXT('WARM'));
   }
+  // TODO-ported above L.2382-
+
   // TODO-29-DOES define DOES> for CREATE-DOES> and tokenDoes - this is not part of eForth, THEN defined Vocabulary as CREATE-DOES word
   //tokenDoes = Forth.tokenFunction(payload => { this.RPpush(this.IP); this.IP = (this.Mfetch8(payload++)<<8)+this.Mfetch8(payload++); this.SPpush(payload++); ); // Almost same as tokenDoList
 }
