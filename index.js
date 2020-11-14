@@ -2581,7 +2581,6 @@ class Forth {
     const b = this.SPpop(); // start of string
     const np = this.m.align(this.npFetch() - u - this.CELLL); // Enough space in Name Directory to copy string optionally with one zero after
     // Careful if edit next formula, m.align doesnt change if mem=8, AND in this case np may not be on a cell boundary
-    // TODO-backport extra parm 0 to main
     this.Mstore(np + ((u / this.CELLL)>>0) * this.CELLL, 0); // Write a zero in the last cell where the last letter of word will be written
     this.m.copyWithin(np + 1, b, b + u);
     this.Mstore8(np, u);  // 1 byte count
@@ -2601,6 +2600,30 @@ class Forth {
       this.SPpush(n);
       this.SPpush(forthTrue);
     }
+    /*
+      // ALTERNATIVE without using parseInt and countedToJS (backported from Arduino
+      const a = this.SPpop();
+      const aa = a;
+      const radix = this.Ufetch(BASEoffset); //TODO handle base other than 10 BUT maybe not needed as switch to Forth version before ever use non-decimal
+      let neg = false;
+      let acc = 0;
+      for (let i = this.Mfetch8(a++); i > 0; i--) {
+        const c = this.Mfetch8(a++);
+        if (c === '-') { // TODO not sure can compare byte to char
+           neg = true;
+        } else if ((c > '9') || (c < '0')) {
+            this.SPpush(aa);
+            this.SPpush(0);
+            return;
+        } else {
+          c = c - '0';
+          acc = (acc * radix) + acc;
+        }
+      }
+      if (neg) { acc = -acc; }
+      this.SPpush(acc);
+      this.SPpush(forthTrue);
+    */
   }
 
   // If we are going to compile it, then check its not compiling into the dict, code we plan on replacing. (See same code on "'")
