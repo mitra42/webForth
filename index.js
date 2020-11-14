@@ -84,7 +84,6 @@ const jsFunctionAttributes = [
   // { n: '?UNIQUE', f: 'qUnique' }, // Not used yet
   { n: '$,n', f: 'dollarCommaN', replaced: true },
   { n: '>NAME', f: 'ToNAME' }, // Fast version of >NAME - see Forth definition later
-  'debugNA', 'testing3', 'break', 'debugPrintTIB', 'TEST',
   'MS', 'BYE', { n: 'EXIT', jsNeeds: true }, 'EXECUTE',
   { n: '?RX', f: 'QRX' }, {  n: 'TX!', f: 'TXbang' }, { n: '!IO', f: 'bangIO' },
   { n: 'doLIT', jsNeeds: true }, { n: 'DOES>', f: 'DOES' }, 'next', { n: '?branch', f: 'qBranch' }, 'branch',
@@ -98,6 +97,7 @@ const jsFunctionAttributes = [
   { n: '$COMPILE', replaced: true, jsNeeds: true }, { n: '$INTERPRET', replaced: true, jsNeeds: true },
   { n: '[', f: 'openBracket', immediate: true, replaced: true }, { n: ']', f: 'closeBracket', replaced: true },
   { n: ':', f: 'colon', replaced: true }, { n: ';', f: 'semicolon', immediate: true, replaced: true }, { n: "'", f: 'tick', replaced: true },
+  'debugNA', 'testing3', 'break', 'debugPrintTIB', 'TEST',
 ];
 
 // Define the tokens used in the first cell of each word.
@@ -1990,12 +1990,8 @@ class Forth {
   // === Code words to support debugging on the console
   // Put debugNA in a definition to print a counted string on the console
   debugNA() { console.log('NAME=', this.countedToJS(this.SPfetch())); } // Print the NA on console
-  debugTIB() {
-    return this.m.decodeString(this.Ufetch(TIBoffset) + this.Ufetch(INoffset), this.Ufetch(TIBoffset) + this.Ufetch(nTIBoffset));
-  }
   // Put testing3 in a definition to start outputing stack trace on console.
-  testing3() {
-    this.testing |= 3; }
+  testing3() { this.testing |= 3; }
   // Put break in a definition.
   break() {
     console.log('\nbreak in a FORTH word'); } // Put a breakpoint in your IDE at this line
@@ -2129,9 +2125,6 @@ class Forth {
     // Drop through not found
     return 0;
   }
-
-
-
 
 
   // Convert xt to a Javascript string of its name or 'undefined' (only used for debugging).
@@ -2311,8 +2304,6 @@ class Forth {
     while (this.IP) {
       // console.assert(this.IP >= CODEE && this.IP <= NAMEE); // uncomment if tracking down jumping into odd places
       xt = this.IPnext();
-      // Comment this out except when needed for debugging, they are slow
-      // debugTIB =  this.m.decodeString(this.Ufetch(TIBoffset) + this.Ufetch(INoffset), this.Ufetch(TIBoffset) + this.Ufetch(nTIBoffset));
       // 'await this.threadtoken(xt)' would be legit, but creates a stack frame in critical inner loop, when usually not reqd.
       const maybePromise = this.threadtoken(xt);
       if (maybePromise) {
@@ -2324,6 +2315,7 @@ class Forth {
       }
     }
   }
+
   async MS() { // ms --; delay for a period of time.
     await new Promise((resolve) => setTimeout(resolve, this.SPpop()));
   }
@@ -2338,6 +2330,7 @@ class Forth {
     this.debugPop(); // Pushed in tokenDoList
     this.IP = this.RPpop();
   }
+
   // EXECUTE runs the word on the stack,
   // TODO-ASYNC it works because it itself is a code word, included in colon words
   // and because there is nothing after the return from threadtoken which would get executed out of order
@@ -2373,7 +2366,7 @@ class Forth {
 
   // Low level TX!, output one character to stdout, inefficient, but not likely to be bottleneck.
   TXbangC(c) { // noinspection JSUnresolvedFunction
-    this.TXbangS(String.fromCharCode(c)); }
+    this.TXbangS(String.fromCharCode(c)); } // TXbangS is passed in by node
   TXbang() { this.TXbangC(this.SPpop()); }
   qrx() { return [false]; } // Overridden by node
 
@@ -2415,6 +2408,7 @@ class Forth {
       this.IP = destn;
     }
   }
+
   // Unconditional jump to destn in dictionary
   branch() { this.IP = this.IPnext(); }
 
@@ -2525,13 +2519,14 @@ class Forth {
     const b = this.SPpop(); // start of string
     const np = this.m.align(this.npFetch() - u - this.CELLL); // Enough space in Name Directory to copy string optionally with one zero after
     // Careful if edit next formula, m.align doesnt change if mem=8, AND in this case np may not be on a cell boundary
-    this.Mstore(np + ((u / this.CELLL)>>0) * this.CELLL); // Write a zero in the last cell where the last letter of word will be written
+    this.Mstore(np + ((u / this.CELLL)>>0) * this.CELLL, 0); // Write a zero in the last cell where the last letter of word will be written
     this.m.copyWithin(np + 1, b, b + u);
     this.Mstore8(np, u);  // 1 byte count
     this.SPpush(np); // Note that NP is not updated, the same buffer will be used for each word until hit ':'
   }
 
   NUMBERQ() { // Same footprint as NUMBER?, this will be stored vectored from 'NUMBER
+    // TODO-backport simple number conversion from Arduino
     const a = this.SPpop();
     const w = this.countedToJS(a); // I believe this is the only place we use this.countedToJS to make JS strings outside of debugging
     const base = this.Ufetch(BASEoffset);
@@ -2543,13 +2538,37 @@ class Forth {
       this.SPpush(n);
       this.SPpush(forthTrue);
     }
+    /*
+      // ALTERNATIVE without using parseInt and countedToJS (backported from Arduino
+      const a = this.SPpop();
+      const aa = a;
+      const radix = this.Ufetch(BASEoffset); //TODO handle base other than 10 BUT maybe not needed as switch to Forth version before ever use non-decimal
+      let neg = false;
+      let acc = 0;
+      for (let i = this.Mfetch8(a++); i > 0; i--) {
+        const c = this.Mfetch8(a++);
+        if (c === '-') { // TODO not sure can compare byte to char
+           neg = true;
+        } else if ((c > '9') || (c < '0')) {
+            this.SPpush(aa);
+            this.SPpush(0);
+            return;
+        } else {
+          c = c - '0';
+          acc = (acc * radix) + acc;
+        }
+      }
+      if (neg) { acc = -acc; }
+      this.SPpush(acc);
+      this.SPpush(forthTrue);
+    */
   }
 
   // If we are going to compile it, then check its not compiling into the dict, code we plan on replacing. (See same code on "'")
   checkNotCompilingReplaceable(xt, na) {
     if (jsFunctionAttributes[this.Mfetch(xt)].replaced) {
       const inDefOf = this.countedToJS(this.lastFetch());
-      if (!['[COMPILE]', '(', 'CREATE'].includes(inDefOf)) { // We redefine ( so ok with redefinition
+      if (!['[COMPILE]', '(', 'create', 'CREATE', 'vCREATE'].includes(inDefOf)) { // Intentionally redefine ( so ok with redefinition
         console.log('Compiling', this.countedToJS(na), 'in', inDefOf, 'when code will be deleted');
         console.assert(false); // Break here, shouldn't be happening.
       }
@@ -2611,7 +2630,7 @@ class Forth {
     }
     const prompt = this.Ufetch(PROMPToffset);
     if (prompt) {
-      await this.run(this.Ufetch(PROMPToffset));
+      await this.run(prompt); //TODO-BACKPORT changed line
     }
   }
 
