@@ -21,15 +21,15 @@ If you only want to host the web version, then cloning the git repo should be su
 ## Running
 
 ```
-const {Forth, ForthNodeOverrides} = require('webforth');
+const {Forth, ForthNodeExtensions} = require('webforth');
 ```
 Or alternatively if running node v13, or `node --experimental-modules`
 ```
-import {Forth, ForthNodeOverrides} from 'webforth';
+import {Forth, ForthNodeExtensions} from 'webforth';
 ```
 Then ...
 ```
-const foo = new Forth({overrides: ForthNodeOverrides);
+const foo = new Forth({extensions: ForthNodeExtensions);
 foo.compileForthInForth()
   .then(() => foo.interpret('1 2 3 ROT .S')) // Pass forth to interpret
   .then(() => foo.console()) // Interactive console
@@ -52,9 +52,9 @@ In particular we'll be adding ability to load forth files into an instance.
 Note, it should be possible to run multiple instances, but this isn't tested fully yet.
 e.g. 
 ```
-import {Forth, ForthNodeOverrides} from webforth;
-const foo1 = new Forth({overrides: ForthNodeOverrides});
-const foo2 = new Forth({overrides: ForthNodeOverrides});
+import {Forth, ForthNodeExtensions} from webforth;
+const foo1 = new Forth({extensions: ForthNodeExtensions});
+const foo2 = new Forth({extensions: ForthNodeExtensions});
 foo2.compileForthInForth().then(() => foo2.console());
 foo1.compileForthInForth().then(() => foo1.interpret('1 2 .S'));
 ```
