@@ -1180,7 +1180,7 @@ CREATE NULL$ 0 , ( EFORTH-ZEN-ERRATA inserts a string "coyote" after this, no id
   ( Select I/O vectors for terminal interface.)
   [ ' .OK  ] LITERAL  ( say 'ok' if all is well)
   ( ERRATA zen, Staapl uses 'EMIT @, current version of emit, V5's use of EMIT is better because respects changes to 'EMIT)
-  ( Web overrides to Drop as echoing is handled at UI level)
+  ( Web extends to Drop as echoing is handled at UI level)
   [ ' EMIT ] LITERAL  ( echo characters ) 
   [ ' kTAP ] LITERAL  ( ignore control characters )
   XIO ;
@@ -1817,7 +1817,7 @@ const MemClasses = {
 // noinspection JSBitwiseOperatorUsage,JSUnusedGlobalSymbols
 class Forth {
   // Build and return an initialized Forth memory obj
-  constructor({ CELLL = 2, MEM = 8, memClass = undefined, EM = undefined, overrides = {} }) {
+  constructor({ CELLL = 2, MEM = 8, memClass = undefined, EM = undefined, extensions = [] }) {
     // ERRATA Zen doesnt define CELLL (and presumes is 2 in multiple places)
     this.CELLL = CELLL;  // 2,3 or 4. Needs to be big enough for an address
     // TODO ported from here to L.1823
@@ -1894,11 +1894,28 @@ class Forth {
     //console.assert(this.npFetch() > 0); // Quick test that above worked - should be commented out
     this.Ustore(RP0offset, RP0);
     this.Ustore(SP0offset, this.cellSPP * this.CELLL);
-    // Allow Overrides of functions by caller - used for example to vector console I/O
+    // Allow extensions of functions by caller - used for example to vector console I/O
     // Order is significant, as buildDictionary will define a jsFunction that points to the function as defined then.
-    ['TXbangC', 'TXbangS', 'bangIO', 'qrx'].forEach((k) => {
-      if (typeof overrides[k] === 'function') {
-        this[k] = overrides[k]; } });
+    extensions.forEach((e) => {
+      // Replace any of Forth's functions, or add new ones
+      if (typeof e.f === 'function') {
+        let fname = e.f.name; // Might be 'f' if undefined
+        if (fname.startsWith('bound ')) { fname = fname.slice(6); } // name gets changed if bind it.
+        if (fname === 'f') fname = undefined; // an anonymous function will be called 'f' since assigned to a field f.
+        if (fname) {
+          this[fname] = e.f;
+        }
+      }
+      if (e.n) { // Have a forth name for this
+        // Add to or replace jsFunctionAttributes for dictionary building.
+        const i = jsFunctionAttributes.findIndex(j => j.n === e.n);
+        if (i === -1) { // Not found and have a name (forth name) for it.
+          jsFunctionAttributes.push(e);
+        } else {
+          Object.keys(e).forEach(k => jsFunctionAttributes[i].k = e.k); // Copy over attributes as may not define all of the options
+        }
+      }
+    });
     this.buildDictionary();
     // compiling forthInForth is done outside this as it is async. TODO-23-NODEAPI may change
   }
@@ -2428,11 +2445,11 @@ class Forth {
 
   // Low level TX!, output one character to stdout, inefficient, but not likely to be bottleneck.
   TXbangC(c) { // noinspection JSUnresolvedFunction
-    this.TXbangS(String.fromCharCode(c)); } // TXbangS is passed in by node
+    this.TXbangS(String.fromCharCode(c)); } // TXbangS is passed in by node and console.js
   TXbang() { this.TXbangC(this.SPpop()); }
   qrx() { return [false]; } // Overridden by node
 
-  bangIO() { } // Default to nothing to do, but Node overrides
+  bangIO() { } // Default to nothing to do, but Node extends
 
   // === Literals and Branches - using next value in dictionary === eForthAndZen#37
 
@@ -2774,35 +2791,42 @@ class Forth {
   // TODO-29-DOES define DOES> for CREATE-DOES> and tokenDoes - this is not part of eForth, THEN defined Vocabulary as CREATE-DOES word
   //tokenDoes = Forth.tokenFunction(payload => { this.RPpush(this.IP); this.IP = (this.Mfetch8(payload++)<<8)+this.Mfetch8(payload++); this.SPpush(payload++); ); // Almost same as tokenDoList
 }
-// noinspection JSUnusedGlobalSymbols
-const ForthNodeOverrides = {
-  TXbangS: (s) => process.stdout.write(s),
-  // Setup I/O to the terminal
-  bangIO: () => {
-    if (process.stdin.isTTY) {
-      // process.stdout.write('RAW');
-      process.stdin.setRawMode(true);
-    }
-    process.stdin.setEncoding('utf8');
-    process.stdout.setEncoding('utf8');
-  },
-  // Call chain is ?RX < '?KEY  < ?KEY < KEY < accept < 'EXPECT < QUERY < que < QUIT
-  qrx: () => {
-    // If there is no data in the buffer, check the stdin and reload the buffer.
-    if (!(stdinBuffer && stdinBuffer.length)) {
-      const s = process.stdin.read(); // Synchronous
-      if (s) stdinBuffer = Buffer.from(s, 'utf8');
-    }
-    // If there is any data (old or new) in the buffer, return the first character and True
-    if (stdinBuffer && stdinBuffer.length) {
-      const c = stdinBuffer[0];
-      stdinBuffer = stdinBuffer.slice(1);
-      return [true, c];
-    } else {
-      // If there is nothing (old or new) return False
-      return [false];
-    }
-  },
 
-};
-export { Forth, ForthNodeOverrides, Mem8_16, Mem8_24, Mem8_32, Mem16_16, Mem16_32, Mem32_16, Mem32_32 };
+/*
+{  n: 'foo'    Name of forth word - do NOT specify a name if this also appears in
+  f: bar      Links to Forth.prototype.bar (defaults to same as 'n'
+  token: true Create a token word that can be used as first cell of a definition - order must match constants below
+  replaced: true  This word will be replaced by a Forth definition, so check for its being compiled into other definitions.
+  jsNeeds: true The execution address of this word is needed by the JS o will be stored in js2xt[n]
+*/
+const ForthNodeExtensions = [
+  { f: function TXbangS(s) { process.stdout.write(s); } }, // Named function so will override in Forth instance
+  { n: '!IO',
+    f: function bangIO() {
+      if (process.stdin.isTTY) {
+        // process.stdout.write('RAW');
+        process.stdin.setRawMode(true);
+      }
+      process.stdin.setEncoding('utf8');
+      process.stdout.setEncoding('utf8');
+    }},
+  // Call chain is ?RX < '?KEY  < ?KEY < KEY < accept < 'EXPECT < QUERY < que < QUIT
+  { // Note - replacing qrx() not QRX() so there is no forth name for this
+    f: function qrx() {
+      // If there is no data in the buffer, check the stdin and reload the buffer.
+      if (!(stdinBuffer && stdinBuffer.length)) {
+        const s = process.stdin.read(); // Synchronous
+        if (s) stdinBuffer = Buffer.from(s, 'utf8');
+      }
+      // If there is any data (old or new) in the buffer, return the first character and True
+      if (stdinBuffer && stdinBuffer.length) {
+        const c = stdinBuffer[0];
+        stdinBuffer = stdinBuffer.slice(1);
+        return [true, c];
+      } else {
+        // If there is nothing (old or new) return False
+        return [false];
+      }
+    }},
+];
+export { Forth, ForthNodeExtensions, Mem8_16, Mem8_24, Mem8_32, Mem16_16, Mem16_32, Mem32_16, Mem32_32 };

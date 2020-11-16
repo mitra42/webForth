@@ -7,8 +7,8 @@ https://developer.mozilla.org/en-US/docs/Web/JavaScript/Guide/Modules
 let Forth; // Will hold class when loaded
 let forth; // Will hold instance
 
-async function ForthLoad({ overrides = {} } = {}) {
-  const fLog = overrides.TXbangS || console.log
+async function ForthLoad({ extensions = [] } = {}) {
+  const fLog = extensions.map(x=>x.f).find(f => f.name === "bound TXbangS") || console.log;
   const CELLL = 2;
   const MEM = 8;
   const EM = 0x2000 * CELLL; // default is 0x2000 * CELLL
@@ -17,7 +17,7 @@ async function ForthLoad({ overrides = {} } = {}) {
     Forth = module.Forth; // Make available globally to this file
     const f = new Forth({
       CELLL, EM, MEM, memClass: module.Mem8_16, // Define memory
-      overrides,
+      extensions,
     });         // Setup I/O (just output currently)
     fLog('\nCompiling Forth from Forth\n');
     // noinspection JSUnresolvedFunction
@@ -110,11 +110,12 @@ class ForthConsole extends HTMLElement {
     // Create an input area, but only attach once Forth is loaded.
     this.input = EL('forth-input', { stack: this.stack });
     // Define hooks for IO to these areas
-    const overrides = { TXbangS: (s) => this.output.TXbangS_web(s) };
+    const extensions = [{ f: (function TXbangS(s) {
+      this.output.TXbangS_web(s); }).bind(this) }]; // Note this is instance of ForthConsole not Forth
     // Load Forth can also define CELL, EM, memClass
     const CELLL = 2;
     const MEM = 8;
-    ForthLoad({ CELLL, MEM, overrides })
+    ForthLoad({ CELLL, MEM, extensions })
       .then(() => this.grid.append(this.input, this.stack)) // Only add input area when Forth defined
       .then(() => forth.interpret1('version'));
     // returns a promise that is ignored
