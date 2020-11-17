@@ -81,7 +81,7 @@ const jsFunctionAttributes = [
   { n: 'tokenVar', token: true },
   { n: 'tokenCreate', token: true },
   'ALIGNED',
-  { n: 'find' }, // Fast version of find - see Forth definition later
+  { n: 'find', f: 'jsFind' }, // Fast version of find - see Forth definition later
   { n: 'OVERT', replaced: true },
   // { n: '?UNIQUE', f: 'qUnique' }, // Not used yet
   { n: '$,n', f: 'dollarCommaN', replaced: true },
@@ -96,10 +96,10 @@ const jsFunctionAttributes = [
   { n: '0<', f: 'less0' }, 'AND', 'OR', 'XOR', { n: 'UM+', f: 'UMplus' },
   'userAreaInit', 'userAreaSave',
   { n: 'PARSE', replaced: true }, { n: 'TOKEN', replaced: true }, { n: 'NUMBER?', f: 'NUMBERQ', replaced: true },
-  { n: '$COMPILE', replaced: true, jsNeeds: true }, { n: '$INTERPRET', replaced: true, jsNeeds: true },
+  { n: '$COMPILE', f: 'dCOMPILE', replaced: true, jsNeeds: true }, { n: '$INTERPRET', f: 'dINTERPRET', replaced: true, jsNeeds: true },
   { n: '[', f: 'openBracket', immediate: true, replaced: true }, { n: ']', f: 'closeBracket', replaced: true },
   { n: ':', f: 'colon', replaced: true }, { n: ';', f: 'semicolon', immediate: true, replaced: true }, { n: "'", f: 'tick', replaced: true },
-  'debugNA', 'testing3', 'break', 'debugPrintTIB', 'TEST',
+  'debugNA', 'testing3', 'Fbreak', 'debugPrintTIB', 'TEST',
 ];
 
 // Define the tokens used in the first cell of each word.
@@ -488,7 +488,7 @@ const forthInForth = `
   DUP CELL+ @ SWAP @ ;
 ( HERE is defined in moved forward words)
 
-( Support Data separation from Code )
+( Support Data separation from Code TODO rethink this as always having some code)
 : vHERE ( -- a; top of data space - code space if none) VP @ ?DUP IF EXIT THEN HERE ;
 : v, ( w --; Compile an integer into the data area if used, else code dictionary (not part of eForth)
   VP @ ?DUP IF ALIGNED DUP CELL+ VP ! ! ELSE , THEN ;
@@ -496,13 +496,13 @@ const forthInForth = `
 : vCREATE ( -- ; <string> ) VP @ ?DUP 0= IF CREATE ELSE tokenVar create , THEN ; ( Compile pointer to data area )
 
 : PAD ( -- a; Return address of a temporary buffer above code dic)
-  vHERE 80 + ;
+  HERE 80 + ;
 
 : TIB ( -- a; Return address of terminal input buffer)
   #TIB CELL+ @ ; ( 1 cell after #TIB)
 : @EXECUTE ( a -- ; execute vector -if any- stored in address a)
   @ ?DUP IF EXECUTE
-  ELSE break
+  ELSE Fbreak
   THEN ;
 
 \\T HLD @ 2 HLD +! HLD @ SWAP - 2 1 TEST
@@ -1819,7 +1819,7 @@ const MemClasses = {
 // noinspection JSBitwiseOperatorUsage,JSUnusedGlobalSymbols
 class Forth {
   // Build and return an initialized Forth memory obj
-  constructor({ CELLL = 2, MEM = 8, memClass = undefined, ROMSIZE = undefined, extensions = [] }) {
+  constructor({ CELLL = 2, MEM = 8, memClass = undefined, DATAS = 0, ROMSIZE = undefined, RAMSIZE = undefined, extensions = [] }) {
     // ERRATA Zen doesnt define CELLL (and presumes is 2 in multiple places)
     this.CELLL = CELLL;  // 2,3 or 4. Needs to be big enough for an address
     // TODO ported from here to L.1823
@@ -1841,37 +1841,48 @@ class Forth {
 
     // === Memory layout
     // Memory may be aligned to a boundary depending on underlying mem store (which may or may not match CELLL), this assumption should be confined to ALIGNED
-    // Now the memory map itself, starting at the bottom of memory (unlike webForth which defines from top)
+    // Now the memory map itself, starting at the top of memory.
     // ERRATA In Zen the definitions on Zen pg26 dont come close to matching the addresses given as the example below. In particular UPP and RPP(RP0) overlap !
+    this.RAM0 = ROMSIZE ? 0x8000 : 0; // Arbitrary address to use for RAM
+    const EM = this.RAM0 + RAMSIZE; // top of memory default to 4K cells
     // TODO ported below to L.1840
-    const RAM0 = 0x8000; // Arbitrary address to use for RAM
-    //TODO-ARDUINO port DATAS
-    const DATAS = 0; // Use code space for data
-    //const DATAS = 0x80 * this.CELLL; // Space for variable data
-    const DATA0 = DATAS ? RAM0 : 0; // 0 means use code space
-    const SPS = 0x40 * this.CELLL; // Size of data stack 64 Cells (128 bytes) for now
-    const SPP = RAM0 + DATAS + SPS; // Top of stack
-    this.cellSPP = (SPP / this.CELLL) >> 0; // start of data stack - grows down, points at top of stack - 8 word buffer for safety
-    // 8 cell buffer between Stack and TIB
-    this.TIB0 = SPP + (8 * this.CELLL); // Terminal input buffer - shares space with Return stack //TODO-28-MULTITASK will move
-    const RTS = (0x80 * this.CELLL); // return stack/TIB size // eFORTH-DIFF was 64 which is tiny for any kind of string handling
-    const RP0 = (this.TIB0 + RTS);  // top of return stack RP0 - there is an 8 cell buffer which is probably just for safety.
+    const US = 0x40 * this.CELLL;  // user area size in cells i.e. 64 variables - standard usage below is using about 37
+    this.UPP = EM - US; // start of user area // TODO-28-MULTI UP should be a variable, and used in most places UPP is
     // 8 cell buffer between RP0 and UPP
-    const UPP = (RP0 + (8 * this.CELLL)); // start of user area // TODO-28-MULTI UP should be a variable, and used in most places UPP is
-    const US = (40 * this.CELLL);  // user area size in cells i.e. 64 variables - standard usage below is using about 37
-    const EM = (UPP + US);
-    const RAMSIZE = (EM - RAM0); // Size of RAM used
+    const RP0 = this.UPP - (8 * this.CELLL);  // top of return stack RP0
+    const RTS = 0x80 * this.CELLL; // return stack/TIB size // eFORTH-DIFF was 64 which is tiny for any kind of string handling
+    this.TIB0 = RP0 - RTS; // Terminal input buffer - shares space with Return stack //TODO-28-MULTITASK will move
+    // 8 cell buffer between Stack and TIB
+    const SPP = this.TIB0 - 8 * this.CELLL; // top of data stack SP0
+    this.cellSPP = (SPP / this.CELLL) >> 0; // start of data stack - grows down, points at top of stack - 8 word buffer for safety
+    const SPS = 0x80 * this.CELLL; // Size of data stack 256 bytes for now
+    //DATAS defined as argument defaults to 0 to not use
+    // Start of Ram (Below here should only be changed during compilation),
+    // In a real EPROM system CP and NP would be pointed into bottom of RAM for new definitions and DATA0 put above them
+    // PAD is 80 bytes above the current top of Data space or Code directory, and HLD (where numbers are build for output) is a few bytes growing down from PAD.
+    const DATA0 = DATAS ? this.SPP-SPS-DATAS : 0; // 0 means use code space
+    this.NAMEE = SPP - SPS - DATAS; // name dictionary in Ram (there may be another in Rom)
+    // And then building from the bottom up. The gap in middle is code directory
+    // cold start vector - its unclear if these bottom 0x100 are useful outside of the DOS context and for DOS it would need code at this address I think?
+    // const COLDD = 0x100;
+
 
     // TODO-ARDUINO In a real EPROM system CP and NP would be pointed into bottom of RAM for new definitions and DATA0 put above them
-    // Memory definition in ROM area
     this.UZERO = 0;
     // Above UZERO is a store of initial values for User variables
     // cold start vector - its unclear if these bottom 0x100 are useful outside of the DOS context and for DOS it would need code at this address I think?
     // const COLDD = 0x100;
-    this.CODEE = this.UZERO + US; // code dictionary grows up from here towards NAME dictionary.
+    this.CODEE = ROMSIZE ?  this.RAM0 : (this.UZERO + US) ; // code dictionary grows up from here towards NAME dictionary.
     // PAD is 80 bytes above the current top of Data space or Code directory, and HLD (where numbers are build for output) is a few bytes growing down from PAD.
-    this.NAMEE = ROMSIZE
     console.log('Space for', this.NAMEE - this.CODEE, 'bytes for code and names');
+
+    // Memory definition in ROM area - during startup
+    if (ROMSIZE) {
+      this.ROMNAMEE = ROMSIZE;
+      this.ROMCODEE = this.UZERO + US;
+    }
+    //TODO-ARDUINO find uses of NAMEE and CODEE and switch initial ones to ROMNAMEE and ROMCODEE
+    //TODO-ARDUINO need link from most recent ROM name to first Ram name, and switch NP and CP
 
     // Get a instance of a class to store in
     this.m = new (memClass || MemClasses[`${MEM}_${this.CELLbits}`])({ length: EM, celll: this.CELLL });
@@ -1889,14 +1900,14 @@ class Forth {
     this.IP = 0;    // Interpreter Pointer
     this.cellSP = this.cellSPP;  // Data Stack Pointer but in MEM units rather than bytes
     this.cellRP = (RP0 / this.CELLL)>>0;  // Return Stack Pointer (aka BP in 8086)
-    this.UP = UPP;  // User Area Pointer // TODO-28-MULTI will move this around
+    this.UP = this.UPP;  // User Area Pointer // TODO-28-MULTI will move this around
     this._USER = 0; // Incremented by this.CELLL as define USER's
     // TODO ported above
 
     // create data structures
     // Setup pointers for first dictionary entries.
-    this.Ustore(CPoffset, this.CODEE); // Pointer to where compiling into dic
-    this.Ustore(NPoffset, this.NAMEE); // Pointer to where writing name stack
+    this.Ustore(CPoffset, this.ROMCODEE || this.CODEE); // Pointer to where compiling into dic
+    this.Ustore(NPoffset, this.ROMNAMEE || this.NAMEE); // Pointer to where writing name stack
     this.Ustore(VPoffset, DATA0); // Pointer to start of writing variables, might be 0 if using code space like eForth does
     //console.assert(this.npFetch() > 0); // Quick test that above worked - should be commented out
     this.Ustore(RP0offset, RP0);
@@ -2065,8 +2076,8 @@ class Forth {
   debugNA() { console.log('NAME=', this.countedToJS(this.SPfetch())); } // Print the NA on console
   // Put testing3 in a definition to start outputing stack trace on console.
   testing3() { this.testing |= 3; }
-  // Put break in a definition.
-  break() {
+  // Put Fbreak in a definition.
+  Fbreak() {
     console.log('\nbreak in a FORTH word'); } // Put a breakpoint in your IDE at this line
   // debugPrintTIB will print the current TIB.
   debugPrintTIB() {
@@ -2172,7 +2183,7 @@ class Forth {
 
   // Search a single vocabulary for a string
   // This has same footprint as eForth's 'find' but we do not replace it since this is approx 8x faster
-  find() { // a va -- ca na | a 0
+  jsFind() { // a va -- ca na | a 0
     const va = this.SPpop();
     const a = this.SPpop();
     this.m.assertAlign(a);
@@ -2215,7 +2226,7 @@ class Forth {
   // If required then fixing this to iterate over the context array should not break anything (this is what NAME? does)
   findName() { // a -- xt na | a F
     this.SPpush(this.Ufetch(CONTEXToffset));  // a va
-    this.find();                           // xt na | a F
+    this.jsFind();                           // xt na | a F
   }
   // TODO-ported above L.2180-
 
@@ -2260,7 +2271,7 @@ class Forth {
   qUnique() {
     this.SPpush(this.SPfetch());      // DUP
     this.SPpush(this.currentFetch()); // a a va; dictionary to search
-    this.find();                 // a xt na | a a F
+    this.jsFind();                 // a xt na | a a F
     if (this.SPpop()) {
       const xt = this.SPpop();              // Discard xt
       const name = this.countedToJS(this.SPfetch());
@@ -2576,6 +2587,7 @@ class Forth {
   // The opposite of userAreaInit - save values for restoration at COLD
   // Note it saves the value of LAST which is also in "FORTH", the "OVERT" in COLD restores that
   userAreaSave() {
+    this.useRam(); // If were using ROM then switch
     for (let a = 0; a < this._USER; a++) {
       this.Mstore(this.UZERO + a * this.CELLL, this.Ufetch(a));
     }
@@ -2667,7 +2679,7 @@ class Forth {
     }
   }
 
-  async $COMPILE() { // a -- ...; same signature as to $COMPILE at Zen pg96
+  async dCOMPILE() { // a -- ...; same signature as to $COMPILE at Zen pg96
     this.findName(); // xt na | a F
     const na = this.SPpop();
     if (na) { // ca
@@ -2692,7 +2704,7 @@ class Forth {
     }
   }
 
-  async $INTERPRET() { // a -- ...; Based on signature of $INTERPRET at Zen pg83
+  async dINTERPRET() { // a -- ...; Based on signature of $INTERPRET at Zen pg83
     this.findName(); // xt na | a F
     const na = this.SPpop();
     if (na) { // ca
@@ -2796,6 +2808,16 @@ class Forth {
     }
   }
 
+  useRam() {
+    // Move CP and NP pointers to ram dictionary
+    // LAST points to entry in ROM which first word in RAM should link to
+    if (this.ROMCODEE) {
+      this.romCodeTop = this.cpFetch();
+      this.romNameBottom = this.npFetch();
+      this.Ustore(NPoffset, this.NAMEE);
+      this.Ustore(CPoffset, this.CODEE);
+    }
+  }
   console() {
     return this.run(this.JStoXT('WARM'));
   }
@@ -2842,4 +2864,6 @@ const ForthNodeExtensions = [
       }
     }},
 ];
-export { Forth, ForthNodeExtensions, Mem8_16, Mem8_24, Mem8_32, Mem16_16, Mem16_32, Mem32_16, Mem32_32 };
+export { Forth, ForthNodeExtensions, Mem8_16, Mem8_24, Mem8_32, Mem16_16, Mem16_32, Mem32_16, Mem32_32,
+  //TODO-ARDUINO some of next line might not be needed, check
+  jsFunctionAttributes, RP0offset};
