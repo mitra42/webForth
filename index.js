@@ -73,6 +73,7 @@
  */
 // it is used to build the dictionary in each instance.
 const jsFunctionAttributes = [
+  0, // 0 is not a valid token
   { n: 'tokenVocabulary', token: true }, // Token used for Vocabularies must be first 0
   { n: 'tokenNextVal', token: true }, // Token used for Constants must be next (1)
   { n: 'tokenDoList', token: true },
@@ -103,12 +104,13 @@ const jsFunctionAttributes = [
 
 // Define the tokens used in the first cell of each word.
 // Order must match the order of functions defined above with token: true
-const tokenVocabulary = 0;
-const tokenNextVal = 1;
-const tokenDoList = 2;
-const tokenUser = 3;
-const tokenVar = 4;
-const tokenCreate = 5;
+// 0 is an invalid token so that a 0 is never indirected through.
+const tokenVocabulary = 1;
+const tokenNextVal = 2;
+const tokenDoList = 3;
+const tokenUser = 4;
+const tokenVar = 5;
+const tokenCreate = 6;
 
 // TODO ported to Arduino below to L.123-
 // === Memory Map - Zen pg26
@@ -1817,7 +1819,7 @@ const MemClasses = {
 // noinspection JSBitwiseOperatorUsage,JSUnusedGlobalSymbols
 class Forth {
   // Build and return an initialized Forth memory obj
-  constructor({ CELLL = 2, MEM = 8, memClass = undefined, EM = undefined, extensions = [] }) {
+  constructor({ CELLL = 2, MEM = 8, memClass = undefined, ROMSIZE = undefined, extensions = [] }) {
     // ERRATA Zen doesnt define CELLL (and presumes is 2 in multiple places)
     this.CELLL = CELLL;  // 2,3 or 4. Needs to be big enough for an address
     // TODO ported from here to L.1823
@@ -1839,36 +1841,41 @@ class Forth {
 
     // === Memory layout
     // Memory may be aligned to a boundary depending on underlying mem store (which may or may not match CELLL), this assumption should be confined to ALIGNED
-    // Now the memory map itself, starting at the top of memory.
+    // Now the memory map itself, starting at the bottom of memory (unlike webForth which defines from top)
     // ERRATA In Zen the definitions on Zen pg26 dont come close to matching the addresses given as the example below. In particular UPP and RPP(RP0) overlap !
-    EM = EM || (0x2000 * this.CELLL); // top of memory default to 4K cells
     // TODO ported below to L.1840
-    const US = 0x40 * this.CELLL;  // user area size in cells i.e. 64 variables - standard usage below is using about 37
-    const UPP = EM - US; // start of user area // TODO-28-MULTI UP should be a variable, and used in most places UPP is
-    const RP0 = UPP - (8 * this.CELLL);  // top of return stack RP0 - there is an 8 cell buffer which is probably just for safety.
-    const RTS = 0x80 * this.CELLL; // return stack/TIB size // eFORTH-DIFF was 64 which is tiny for any kind of string handling
-    this.TIB0 = RP0 - RTS; // Terminal input buffer - shares space with Return stack //TODO-28-MULTITASK will move
-    this.cellSPP = ((this.TIB0 - (8 * this.CELLL)) / this.CELLL) >> 0; // start of data stack - grows down, points at top of stack - 8 word buffer for safety
-    const SPS = 0x80 * this.CELLL; // Size of data stack 256 bytes for now
-    //const DATAS = 0; // Use code space for data
-    const DATAS = 0x80 * this.CELLL; // Space for variable data
-    // Start of Ram (Below here should only be changed during compilation),
-    // In a real EPROM system CP and NP would be pointed into bottom of RAM for new definitions and DATA0 put above them
-    // PAD is 80 bytes above the current top of Data space or Code directory, and HLD (where numbers are build for output) is a few bytes growing down from PAD.
-    const DATA0 = DATAS ? this.SPP-SPS-DATAS : 0; // 0 means use code space
-    const NAMEE = (this.cellSPP * this.CELLL) - SPS - DATAS; // name dictionary
-    // And then building from the bottom up. The gap in middle is code directory
-    // cold start vector - its unclear if these bottom 0x100 are useful outside of the DOS context and for DOS it would need code at this address I think?
-    // const COLDD = 0x100;
+    const RAM0 = 0x8000; // Arbitrary address to use for RAM
+    //TODO-ARDUINO port DATAS
+    const DATAS = 0; // Use code space for data
+    //const DATAS = 0x80 * this.CELLL; // Space for variable data
+    const DATA0 = DATAS ? RAM0 : 0; // 0 means use code space
+    const SPS = 0x40 * this.CELLL; // Size of data stack 64 Cells (128 bytes) for now
+    const SPP = RAM0 + DATAS + SPS; // Top of stack
+    this.cellSPP = (SPP / this.CELLL) >> 0; // start of data stack - grows down, points at top of stack - 8 word buffer for safety
+    // 8 cell buffer between Stack and TIB
+    this.TIB0 = SPP + (8 * this.CELLL); // Terminal input buffer - shares space with Return stack //TODO-28-MULTITASK will move
+    const RTS = (0x80 * this.CELLL); // return stack/TIB size // eFORTH-DIFF was 64 which is tiny for any kind of string handling
+    const RP0 = (this.TIB0 + RTS);  // top of return stack RP0 - there is an 8 cell buffer which is probably just for safety.
+    // 8 cell buffer between RP0 and UPP
+    const UPP = (RP0 + (8 * this.CELLL)); // start of user area // TODO-28-MULTI UP should be a variable, and used in most places UPP is
+    const US = (40 * this.CELLL);  // user area size in cells i.e. 64 variables - standard usage below is using about 37
+    const EM = (UPP + US);
+    const RAMSIZE = (EM - RAM0); // Size of RAM used
+
+    // TODO-ARDUINO In a real EPROM system CP and NP would be pointed into bottom of RAM for new definitions and DATA0 put above them
+    // Memory definition in ROM area
     this.UZERO = 0;
     // Above UZERO is a store of initial values for User variables
+    // cold start vector - its unclear if these bottom 0x100 are useful outside of the DOS context and for DOS it would need code at this address I think?
+    // const COLDD = 0x100;
+    this.CODEE = this.UZERO + US; // code dictionary grows up from here towards NAME dictionary.
     // PAD is 80 bytes above the current top of Data space or Code directory, and HLD (where numbers are build for output) is a few bytes growing down from PAD.
-    const CODEE = this.UZERO + US; // code dictionary grows up from here towards NAME dictionary.
-    console.log('Space for', NAMEE - CODEE, 'bytes for code and names');
+    this.NAMEE = ROMSIZE
+    console.log('Space for', this.NAMEE - this.CODEE, 'bytes for code and names');
 
     // Get a instance of a class to store in
     this.m = new (memClass || MemClasses[`${MEM}_${this.CELLbits}`])({ length: EM, celll: this.CELLL });
-    this.jsFunctions = [];  // Maps tokens to executable functions
+    this.jsFunctions = [];  // Maps tokens to executable functions - first is zero as a invalid token
 
     // Needs to be after the call to create this.m, its endian dependent as lowest address byte is always the countr
     if (this.m.littleEndian) {
@@ -1888,8 +1895,8 @@ class Forth {
 
     // create data structures
     // Setup pointers for first dictionary entries.
-    this.Ustore(CPoffset, CODEE); // Pointer to where compiling into dic
-    this.Ustore(NPoffset, NAMEE); // Pointer to where writing name stack
+    this.Ustore(CPoffset, this.CODEE); // Pointer to where compiling into dic
+    this.Ustore(NPoffset, this.NAMEE); // Pointer to where writing name stack
     this.Ustore(VPoffset, DATA0); // Pointer to start of writing variables, might be 0 if using code space like eForth does
     //console.assert(this.npFetch() > 0); // Quick test that above worked - should be commented out
     this.Ustore(RP0offset, RP0);
@@ -1941,24 +1948,30 @@ class Forth {
 
     // Make some functions available as Forth words
     jsFunctionAttributes.forEach((attribs) => {
-      // Shortcut
-      if (this.testing & 0x01) console.log(">> ", attribs);
-      if (typeof attribs === 'string') {
-        attribs = { n: attribs };
-      }
-      const n = attribs.n;
-      // noinspection JSUnresolvedVariable
-      const f = this[attribs.f || n];
-      const tok = this.jsFunctions.length; // Where function will be pushed
-      // special case: token Functions that need constants
-      this.jsFunctions.push(f);
-      if (attribs.token) {
-        this.buildConstant(n, tok);
-        // regular code functions that just need a pointer.
+      if (attribs === 0) {
+        this.jsFunctions.push(attribs); // Intentionally invalid pointer in slot 0
       } else {
-        const xt = this.buildCode(n, tok, attribs);
-        //console.assert(xt === this.JStoXT(n));
-        if (attribs.jsNeeds) { this.js2xt[n] = xt; }
+        // Shortcut
+        if (this.testing & 0x01) console.log(">> ", attribs);
+        if (typeof attribs === 'string') {
+          attribs = {n: attribs};
+        }
+        const n = attribs.n;
+        // noinspection JSUnresolvedVariable
+        const f = this[attribs.f || n];
+        const tok = this.jsFunctions.length; // Where function will be pushed
+        // special case: token Functions that need constants
+        this.jsFunctions.push(f);
+        if (attribs.token) {
+          this.buildConstant(n, tok);
+          // regular code functions that just need a pointer.
+        } else {
+          const xt = this.buildCode(n, tok, attribs);
+          //console.assert(xt === this.JStoXT(n));
+          if (attribs.jsNeeds) {
+            this.js2xt[n] = xt;
+          }
+        }
       }
     });
 
@@ -2361,7 +2374,7 @@ class Forth {
   // This is quite different from eForth as its token-threaded rather than direct threaded
 
   threadtoken(xt) {
-    // console.assert(xt >= CODEE && xt < NAMEE); // Uncomment to catch bizarre xt values earlier
+    // console.assert(xt >= this.CODEE && xt < this.NAMEE); // Uncomment to catch bizarre xt values earlier
     // This next section is only done while testing, and outputs a trace, so set it on (with testing3) immediately before a likely error.
     this.debugThread(xt);
     const tok = this.Mfetch(xt);
@@ -2380,7 +2393,7 @@ class Forth {
     await this.threadtoken(xt);
     // If this returns without changing program Counter, it will exit
     while (this.IP) {
-      // console.assert(this.IP >= CODEE && this.IP <= NAMEE); // uncomment if tracking down jumping into odd places
+      // console.assert(this.IP >= this.CODEE && this.IP <= this.NAMEE); // uncomment if tracking down jumping into odd places
       xt = this.IPnext();
       // 'await this.threadtoken(xt)' would be legit, but creates a stack frame in critical inner loop, when usually not reqd.
       const maybePromise = this.threadtoken(xt);
