@@ -1900,7 +1900,7 @@ class Forth {
     this.IP = 0;    // Interpreter Pointer
     this.cellSP = this.cellSPP;  // Data Stack Pointer but in MEM units rather than bytes
     this.cellRP = (RP0 / this.CELLL)>>0;  // Return Stack Pointer (aka BP in 8086)
-    this.UP = this.UPP;  // User Area Pointer // TODO-28-MULTI will move this around
+    this.cellUP = (this.UPP / this.CELLL)>>0;  // User Area Pointer // TODO-28-MULTI will move this around
     this._USER = 0; // Incremented by this.CELLL as define USER's
     // TODO ported above
 
@@ -2019,7 +2019,7 @@ class Forth {
         : init;
     console.assert(typeof init !== 'undefined');
     this.Ustore(this._USER, init);         // Initialize the variable for live compilation
-    const offsetInBytes = this._USER * this.CELLL;
+    const offsetInBytes = this._USER;
     //UZERO is initialized at userAreaSave
     if (name) {                       // Put into dictionary
       this.CODE(name);
@@ -2119,9 +2119,9 @@ class Forth {
   RPpush(v) { this.m.cellStoreCell(--this.cellRP, v); }
   IPnext() { const v = this.Mfetch(this.IP); this.IP += this.CELLL; return v; }
   Ufetch(userindex) {
-    return this.Mfetch(this.UP + userindex * this.CELLL); }
+    return this.m.cellFetchCell(this.cellUP + userindex); }
   Ustore(userindex, w) {
-    this.Mstore(this.UP + userindex * this.CELLL, w); }
+    this.m.cellStoreCell(this.cellUP + userindex, w); }
 
   // === Access to the USER variables before they are defined
   currentFetch() { return this.Ufetch(CURRENToffset); }
@@ -2359,7 +2359,7 @@ class Forth {
   }
 
   // Leaves an address in the user area, note it doesnt compile the actual address since UP will change when multi-tasking
-  tokenUser(payload) { this.SPpush(this.Mfetch(payload) + this.UP); }
+  tokenUser(payload) { this.SPpush((this.Mfetch(payload) + this.cellUP) * this.CELLL); }
 
   // Put the address of the payload onto Stack - used for CREATE which is used by VARIABLE
   //TODO-15-EPROM should allocate in a space that might be elsewhere.
@@ -2581,7 +2581,7 @@ class Forth {
   userAreaInit() {
     for (let a = 0; a < this._USER; a++) {
       //console.log(a, this.Ufetch(a), this.Mfetch(this.UZERO + a * this.CELLL));
-      this.Ustore(a, this.Mfetch(this.UZERO + a * this.CELLL));
+      this.Ustore(a, this.m.cellFetchCell(this.UZERO / this.CELLL + a));
     }
   }
   // The opposite of userAreaInit - save values for restoration at COLD
@@ -2589,7 +2589,7 @@ class Forth {
   userAreaSave() {
     this.useRam(); // If were using ROM then switch
     for (let a = 0; a < this._USER; a++) {
-      this.Mstore(this.UZERO + a * this.CELLL, this.Ufetch(a));
+      this.m.cellStoreCell(this.UZERO / this.CELLL + a, this.Ufetch(a));
     }
   }
 
