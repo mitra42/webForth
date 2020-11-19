@@ -42,6 +42,8 @@ class ForthDumper extends Forth {
     this.xcLine(`\n#define RAMCELLS ${RAMSIZE / this.CELLL}`);
     this.xcLine(`\n#define SPP ${this.cellSPP * this.CELLL}`);
     this.xcLine(`\n#define RP0 ${this.Ufetch(RP0offset)}`);
+    this.xcLine(`\n#define NAMEE ${this.NAMEE}`);
+    this.xcLine(`\n#define CODEE ${this.CODEE}`);
   }
   xcNames() {
     this.xcLine('\n/* === Dumping Arduino source from names === */');
@@ -64,17 +66,18 @@ class ForthDumper extends Forth {
   xcFunctions() {
     this.xcLine('\n/* === Function table - maps tokens to functions === */');
     this.jsFunctions.forEach((func, token) => {
-      if (func) {
+      if (func && !jsFunctionAttributes[token].replaced) {
         const arduinoFuncName = this.xcNameEncode(func.name);
         this.xcLine(`\nextern void ${arduinoFuncName}(CELLTYPE byteAddr);`);
       }
     });
-    this.xcLine(`\nconst void (*xcf[${this.jsFunctions.length+1}])(CELLTYPE) = {`);
+    // This is the actual array of functions - will have 0 for replaced ones
+    this.xcLine(`\nconst void (*f[${this.jsFunctions.length+1}])(CELLTYPE) = {`);
     const itemsPerLine = 4;
     let itemsToGoOnLine = 0;
     this.jsFunctions.forEach((func, token) => {
       if (!itemsToGoOnLine--) { itemsToGoOnLine = itemsPerLine-1; this.xcLine('\n'); }
-      if (!func) {
+      if (!func || jsFunctionAttributes[token].replaced) {
         this.xcLine('0, ');
       } else {
         const arduinoFuncName = this.xcNameEncode(func.name);
@@ -167,7 +170,7 @@ const forth = new ForthDumper({CELLL, ROMSIZE, RAMSIZE, MEM, extensions});
 forth.compileForthInForth()
   .then(() => console.log('===forthInForth compiled'))
   //.then(() => forth.cleanupBootstrap()).then(() => console.log('===forthInForth cleaned up'))
-  //.then(() => forth.interpret("WARM"));
+  //.then(() => forth.interpret("COLD"))
   //.then(() => forth.console()) // Interactive console
   .then(() => forth.xcDictionary()) // Interactive console
   .then(() => console.log('\n// arduino dump complete'));

@@ -489,12 +489,12 @@ const forthInForth = `
 ( HERE is defined in moved forward words)
 
 ( Support Data separation from Code TODO rethink this as always having some code)
-: vHERE ( -- a; top of data space - code space if none) VP @ ?DUP IF EXIT THEN HERE ;
+: vHERE ( -- a; top of data space - code space if none or after back in Ram) VP @ ?DUP IF EXIT THEN HERE ;
 : v, ( w --; Compile an integer into the data area if used, else code dictionary (not part of eForth)
   VP @ ?DUP IF ALIGNED DUP CELL+ VP ! ! ELSE , THEN ;
 ( vCREATE is like CREATE but if VP is set it makes space in the writable DATA area) 
-: vCREATE ( -- ; <string> ) VP @ ?DUP 0= IF CREATE ELSE tokenVar create , THEN ; ( Compile pointer to data area )
-
+: vALIGN VP @ ALIGNED VP ! ; 
+: vCREATE ( -- ; <string> ) VP @ ?DUP IF tokenVar create vALIGN , ELSE CREATE THEN ; ( Compile pointer to data area )
 : PAD ( -- a; Return address of a temporary buffer above code dic)
   HERE 80 + ;
 
@@ -1320,7 +1320,6 @@ vCREATE I/O  ' ?RX v, ' TX! v, ( Array to store default I/O vectors. )
 ( TODO-ZEN-V5-STAAPL - COMPARE BELOW HERE )
   
 : OVERT ( -- ) ( Redefining code word in Forth)
-  ( TODO-15-EPROM can't write into Code space to update dict - see also code version)
   ( Link a successfully defined word into the current vocabulary. )
   LAST @        ( name field address of last word )
   CURRENT @  ! ; ( link it to current vocabulary )
@@ -1533,11 +1532,10 @@ vCREATE 'BOOT  ' hi v, ( application vector )
     PRESET        ( Initialize TIB and SP )
     CONSOLE
     'BOOT @EXECUTE ( Vectored Boot routine, defaults to hi)
-    FORTH          ( Make FORTH context vocabulary - searches)
-    CONTEXT @ DUP CURRENT 2! ( Definitions in FORTH as well ) ( TODO-15-EPROM)
+    EMPTY          ( Make FORTH context vocabulary -and empty out definitions ) ( TODO-15-EPROM)
     OVERT         ( And Reset FORTH definition to last definition from the userAreaInit  )
     QUIT          ( Invoke Forth "operating system" )
-    ( TODO-15-EPROM consider how to initialize variable area, esp FORTH I/O and 'BOOT )
+    ( TODO-15-EPROM consider how to initialize variables esp FORTH I/O and 'BOOT )
   AGAIN ;         ( Safeguard the Forth interpreter )
 
 : WARM CONSOLE 'BOOT @EXECUTE QUIT ;
@@ -1839,13 +1837,13 @@ class Forth {
     this.padTestLength = 0; // Display pad length
     // === Javascript structures - implement the memory map and record the full state.
 
+    // TODO ported below to L.1840 - but most things output by XC
     // === Memory layout
     // Memory may be aligned to a boundary depending on underlying mem store (which may or may not match CELLL), this assumption should be confined to ALIGNED
     // Now the memory map itself, starting at the top of memory.
     // ERRATA In Zen the definitions on Zen pg26 dont come close to matching the addresses given as the example below. In particular UPP and RPP(RP0) overlap !
     this.RAM0 = ROMSIZE ? 0x8000 : 0; // Arbitrary address to use for RAM
     const EM = this.RAM0 + RAMSIZE; // top of memory default to 4K cells
-    // TODO ported below to L.1840
     const US = 0x40 * this.CELLL;  // user area size in cells i.e. 64 variables - standard usage below is using about 37
     this.UPP = EM - US; // start of user area // TODO-28-MULTI UP should be a variable, and used in most places UPP is
     // 8 cell buffer between RP0 and UPP
@@ -1858,16 +1856,12 @@ class Forth {
     const SPS = 0x80 * this.CELLL; // Size of data stack 256 bytes for now
     //DATAS defined as argument defaults to 0 to not use
     // Start of Ram (Below here should only be changed during compilation),
-    // In a real EPROM system CP and NP would be pointed into bottom of RAM for new definitions and DATA0 put above them
     // PAD is 80 bytes above the current top of Data space or Code directory, and HLD (where numbers are build for output) is a few bytes growing down from PAD.
-    const DATA0 = DATAS ? this.SPP-SPS-DATAS : 0; // 0 means use code space
-    this.NAMEE = SPP - SPS - DATAS; // name dictionary in Ram (there may be another in Rom)
+    this.NAMEE = SPP - SPS; // name dictionary in Ram (there may be another in Rom)
     // And then building from the bottom up. The gap in middle is code directory
     // cold start vector - its unclear if these bottom 0x100 are useful outside of the DOS context and for DOS it would need code at this address I think?
     // const COLDD = 0x100;
 
-
-    // TODO-ARDUINO In a real EPROM system CP and NP would be pointed into bottom of RAM for new definitions and DATA0 put above them
     this.UZERO = 0;
     // Above UZERO is a store of initial values for User variables
     // cold start vector - its unclear if these bottom 0x100 are useful outside of the DOS context and for DOS it would need code at this address I think?
@@ -1881,8 +1875,6 @@ class Forth {
       this.ROMNAMEE = ROMSIZE;
       this.ROMCODEE = this.UZERO + US;
     }
-    //TODO-ARDUINO find uses of NAMEE and CODEE and switch initial ones to ROMNAMEE and ROMCODEE
-    //TODO-ARDUINO need link from most recent ROM name to first Ram name, and switch NP and CP
 
     // Get a instance of a class to store in
     this.m = new (memClass || MemClasses[`${MEM}_${this.CELLbits}`])({ length: EM, celll: this.CELLL });
@@ -1904,11 +1896,12 @@ class Forth {
     this._USER = 0; // Incremented by this.CELLL as define USER's
     // TODO ported above
 
+    // Ported to Android below to L.1898
     // create data structures
     // Setup pointers for first dictionary entries.
     this.Ustore(CPoffset, this.ROMCODEE || this.CODEE); // Pointer to where compiling into dic
     this.Ustore(NPoffset, this.ROMNAMEE || this.NAMEE); // Pointer to where writing name stack
-    this.Ustore(VPoffset, DATA0); // Pointer to start of writing variables, might be 0 if using code space like eForth does
+    this.Ustore(VPoffset, this.ROMCODEE ? this.CODEE : 0); // Pointer to start of writing variables, might be 0 if using code space like eForth does
     //console.assert(this.npFetch() > 0); // Quick test that above worked - should be commented out
     this.Ustore(RP0offset, RP0);
     this.Ustore(SP0offset, this.cellSPP * this.CELLL);
@@ -1942,13 +1935,15 @@ class Forth {
   // === Build dictionary, mostly from jsFunctionAttributes
   buildDictionary() {
     // Define the first word in the dictionary, I'm using 'FORTH' for this because we need this variable to define everything else.
-    // TODO-15-EPROM
+    // TODO-15-EPROM TODO-ARDUINO - put this in "VP" area  figure out how survives romming
     this.CODE('FORTH');
     this.DW(tokenVocabulary); // Uses assumption that tokenVocabulary is first in jsFunctionAttributes
-    this.Ustore(CURRENToffset, this.cpFetch()); // Initialize Current. Context & Current+CELLL initialized in USER process Zen pg46
-    this.Ustore(CURRENToffset + 1, this.cpFetch()); // Initialize Current. Context & Current+CELLL initialized in USER process Zen pg46
-    this.Ustore(CONTEXToffset, this.cpFetch()); // Initialize Current. Context & Current+CELLL initialized in USER process Zen pg46
-    this.DW(0, 0);
+    const vp = this.vpFetch();
+    this.DW(this.vpFetch()); // Point to first cell in VP (data area in RAM)
+    this.Ustore(VPoffset, vp + 2 * this.CELLL ); // ALLOT 2 spaces (should default to zero)
+    this.Ustore(CURRENToffset, vp); // Initialize Current. Context & Current+CELLL initialized in USER process Zen pg46
+    this.Ustore(CURRENToffset + 1, vp); // Initialize Current. Context & Current+CELLL initialized in USER process Zen pg46
+    this.Ustore(CONTEXToffset, vp); // Initialize Current. Context & Current+CELLL initialized in USER process Zen pg46
     this.OVERT(); // Uses the initialization done by this.Ustore(CURRENToffset) above.
 
     // copy constants over
@@ -2307,7 +2302,6 @@ class Forth {
   }
 
   // Make the most recent definition available in the directory. This is part of closing every 'defining word'
-  // TODO-15-EPROM - see also forth version
   OVERT() {
     this.Mstore(this.currentFetch(), this.lastFetch()); // LAST @ CURRENT @ !
   }
@@ -2345,7 +2339,7 @@ class Forth {
   // TODO-15-EPROM can't store a pointer to code space
   tokenVocabulary(payload) {
     // : doVOC R> CONTEXT ! ;
-    this.Ustore(CONTEXToffset, payload);
+    this.Ustore(CONTEXToffset, this.Mfetch(payload));
   }
 
   // Put the contents of the payload (1 word) onto Stack, used for CONSTANT
@@ -2362,7 +2356,6 @@ class Forth {
   tokenUser(payload) { this.SPpush((this.Mfetch(payload) + this.cellUP) * this.CELLL); }
 
   // Put the address of the payload onto Stack - used for CREATE which is used by VARIABLE
-  //TODO-15-EPROM should allocate in a space that might be elsewhere.
   _tokenDoes(payload) {
     const does = this.Mfetch(payload);
     if (does) {
@@ -2376,6 +2369,7 @@ class Forth {
     this._tokenDoes(payload);
   }
 
+  // Used when the data is going to be in Ram and Code in ROM
   tokenVar(payload) {
     this.SPpush(this.Mfetch(payload + this.CELLL));
     this._tokenDoes(payload);
@@ -2398,7 +2392,7 @@ class Forth {
   // In particular you cannot use this to nest forth in code in forth
   // If that becomes necessary, it MIGHT work to save IP (where?) and restore after while loop
   // Cant use R or S for it as words use that across calls to the 'EVAL
-  async run(xt) {
+  async runXT(xt) {
     let waitFrequency = 0;
     console.assert(this.IP === 0); // Cant nest run()
     await this.threadtoken(xt);
@@ -2687,14 +2681,14 @@ class Forth {
       const ch = this.Mfetch8(na);
       // noinspection JSBitwiseOperatorUsage
       if (ch & l['=IMED']) {
-        await this.run(xt); // This will work as long as this $INTERPRET never called from Forth as cant nest 'run' even indirectly
+        await this.runXT(xt); // This will work as long as this $INTERPRET never called from Forth as cant nest 'run' even indirectly
       } else {
         this.checkNotCompilingReplaceable(xt, na);
         if (this.testing & 0x02) console.log('COMPILING:', this.countedToJS(na));
         this.DW(xt);
       }
     } else { // a
-      await this.run(this.Ufetch(NUMBERoffset)); // n T | a F // Works as long as NUMBER is code, OR this is called from code.
+      await this.runXT(this.Ufetch(NUMBERoffset)); // n T | a F // Works as long as NUMBER is code, OR this is called from code.
       if (this.SPpop()) {
         this.DW(this.js2xt.doLIT, this.SPpop());
       } else {
@@ -2709,9 +2703,9 @@ class Forth {
     const na = this.SPpop();
     if (na) { // ca
       const xt = this.SPpop();
-      await this.run(xt); //TODO-ASYNC maybe should be threadToken - but that won't work if this isn't running inside run already
+      await this.runXT(xt); //TODO-ASYNC maybe should be threadToken - but that won't work if this isn't running inside run already
     } else {
-      await this.run(this.Ufetch(NUMBERoffset)); // n T | a F
+      await this.runXT(this.Ufetch(NUMBERoffset)); // n T | a F
       if (!this.SPpop()) {
         // TODO-32-ERRORS handle error in Forth-ish way (via Throw) - this is harder than it looks !
         console.log('Number conversion of', this.countedToJS(this.SPpop()), 'failed');
@@ -2727,7 +2721,7 @@ class Forth {
         this.SPpop();
       } else {
         // This is currently OK since its calling JS routines that may call Forth, there is no Forth-in-Forth
-        await this.run(this.Ufetch(EVALoffset));
+        await this.runXT(this.Ufetch(EVALoffset));
       }
       // TODO-28-MULTITASK RP0 will move
       console.assert(this.cellSP <= this.cellSPP && (this.cellRP * this.CELLL) <= this.Ufetch(RP0offset)); // Side effect of making SP and SPP available to debugger.
@@ -2762,7 +2756,7 @@ class Forth {
   }
   async interpret1(inp) {
     this.JStoTIB(inp);
-    await this.run(this.JStoXT('quit1', true));
+    await this.runXT(this.JStoXT('quit1', true));
   }
   // === A group of words required for the JS interpreter redefined later
 
@@ -2815,11 +2809,12 @@ class Forth {
       this.romCodeTop = this.cpFetch();
       this.romNameBottom = this.npFetch();
       this.Ustore(NPoffset, this.NAMEE);
-      this.Ustore(CPoffset, this.CODEE);
+      this.Ustore(CPoffset, this.Ufetch(VPoffset)); // Started at CODEE then moved up as vALLOT or v,
+      this.Ustore(VPoffset, 0);
     }
   }
   console() {
-    return this.run(this.JStoXT('WARM'));
+    return this.runXT(this.JStoXT('WARM'));
   }
   // TODO-ported above L.2382-
 
