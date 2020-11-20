@@ -1188,7 +1188,8 @@ CREATE NULL$ 0 , ( EFORTH-ZEN-ERRATA inserts a string "coyote" after this, no id
   XIO ;
 
 ( EFORTH-ZEN-ERRATA has 'RX?' should be '?RX'
-vCREATE I/O  ' ?RX v, ' TX! v, ( Array to store default I/O vectors. )
+( EPROM note, this is in Rom, not Ram as otherwise need to be initialized - and from what ?
+CREATE I/O  ' ?RX , ' TX! , ( Array to store default I/O vectors. )
 
 : CONSOLE ( -- )
   ( Initiate terminal interface.)
@@ -1518,11 +1519,12 @@ vCREATE I/O  ' ?RX v, ' TX! v, ( Array to store default I/O vectors. )
   version ; COMPILE-ONLY
 
 ( === Hardware Reset Zen pg106 COLD )
-: EMPTY ( -- ) ( TODO-15-EPROM)
+: EMPTY ( -- )
   ( Empty out any definitions)
   FORTH CONTEXT @ DUP CURRENT 2! ;
 
-vCREATE 'BOOT  ' hi v, ( application vector )
+( Note this is in ROM, as default BOOT it has to be) 
+CREATE 'BOOT  ' hi , ( application vector )
 
 ( ERRATA ZEN uses but doesnt define U0 and assumes US=37 )
 : COLD ( -- )
@@ -1532,10 +1534,10 @@ vCREATE 'BOOT  ' hi v, ( application vector )
     PRESET        ( Initialize TIB and SP )
     CONSOLE
     'BOOT @EXECUTE ( Vectored Boot routine, defaults to hi)
-    EMPTY          ( Make FORTH context vocabulary -and empty out definitions ) ( TODO-15-EPROM)
+    ( EPROM: EMPTY OVERT will initialize LAST (from usersave -> FORTH -> CONTEXT & CURRENT )
+    EMPTY          ( Make FORTH context vocabulary -and empty out definitions )
     OVERT         ( And Reset FORTH definition to last definition from the userAreaInit  )
     QUIT          ( Invoke Forth "operating system" )
-    ( TODO-15-EPROM consider how to initialize variables esp FORTH I/O and 'BOOT )
   AGAIN ;         ( Safeguard the Forth interpreter )
 
 : WARM CONSOLE 'BOOT @EXECUTE QUIT ;
@@ -1935,7 +1937,6 @@ class Forth {
   // === Build dictionary, mostly from jsFunctionAttributes
   buildDictionary() {
     // Define the first word in the dictionary, I'm using 'FORTH' for this because we need this variable to define everything else.
-    // TODO-15-EPROM TODO-ARDUINO - put this in "VP" area  figure out how survives romming
     this.CODE('FORTH');
     this.DW(tokenVocabulary); // Uses assumption that tokenVocabulary is first in jsFunctionAttributes
     const vp = this.vpFetch();
@@ -2335,8 +2336,7 @@ class Forth {
   // Tokens are just JS functions with an entry in jsFunctions with token:true
   // Words that will use a Javascript function for its action are just JS functions with an entry in jsFunctionAttributes
 
-  //TODO-29 define VOCABULARY as CREATE DOES> word then come back and replace this
-  // TODO-15-EPROM can't store a pointer to code space
+  //TODO-29 define VOCABULARY as CREATE DOES> word then come back and replace this note on EPROM can't store a pointer to code space
   tokenVocabulary(payload) {
     // : doVOC R> CONTEXT ! ;
     this.Ustore(CONTEXToffset, this.Mfetch(payload));
@@ -2394,7 +2394,7 @@ class Forth {
   // Cant use R or S for it as words use that across calls to the 'EVAL
   async runXT(xt) {
     let waitFrequency = 0;
-    console.assert(this.IP === 0); // Cant nest run()
+    console.assert(this.IP === 0); // Cant nest runXT()
     await this.threadtoken(xt);
     // If this returns without changing program Counter, it will exit
     while (this.IP) {
@@ -2859,6 +2859,8 @@ const ForthNodeExtensions = [
       }
     }},
 ];
-export { Forth, ForthNodeExtensions, Mem8_16, Mem8_24, Mem8_32, Mem16_16, Mem16_32, Mem32_16, Mem32_32,
-  //TODO-ARDUINO some of next line might not be needed, check
-  jsFunctionAttributes, RP0offset};
+export { Forth,
+  ForthNodeExtensions,  // Needed by example_node_api.js and test_dump.mjs (XC Cross compiler)
+  Mem8_16, Mem8_24, Mem8_32, Mem16_16, Mem16_32, Mem32_16, Mem32_32, // Needed by console.js
+  jsFunctionAttributes, RP0offset, // Needed by test_dump.mjs (XC Cross compiler)
+};

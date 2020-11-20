@@ -68,11 +68,11 @@ class ForthDumper extends Forth {
     this.jsFunctions.forEach((func, token) => {
       if (func && !jsFunctionAttributes[token].replaced) {
         const arduinoFuncName = this.xcNameEncode(func.name);
-        this.xcLine(`\nextern void ${arduinoFuncName}(CELLTYPE byteAddr);`);
+        this.xcLine(`\nextern void ${arduinoFuncName}();`);
       }
     });
     // This is the actual array of functions - will have 0 for replaced ones
-    this.xcLine(`\nconst void (*f[${this.jsFunctions.length+1}])(CELLTYPE) = {`);
+    this.xcLine(`\nconst void (*f[${this.jsFunctions.length+1}])() = {`);
     const itemsPerLine = 4;
     let itemsToGoOnLine = 0;
     this.jsFunctions.forEach((func, token) => {
