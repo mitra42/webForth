@@ -3,14 +3,14 @@
  * See https://www.arduino.cc/reference/en/language/variables/utilities/progmem/ for reading program memory (where dictionary will be)
  */
 
-// === Dumping Arduino source from dictionary === 
+// === Dumping Arduino source from dictionary ===
 #define RAM0 32768
 #define CELLL 2
 #define ROMCELLS undefined
 #define TIB0 33392
 #define UPP 33664
 #define UZERO 0
-#define CELLTYPE int
+#define CELLTYPE unsigned
 #define ROMCELLS 4096
 #define RAMCELLS 512
 #define SPP 33376
@@ -413,21 +413,21 @@ extern void Fbreak();
 extern void debugPrintTIB();
 extern void TEST();
 const void (*f[62])() = {
-0, tokenVocabulary, tokenNextVal, tokenDoList, 
-tokenUser, tokenVar, tokenCreate, ALIGNED, 
-/* find */ jsFind, 0, 0, /* >NAME */ ToNAME, 
-MS, BYE, EXIT, EXECUTE, 
-/* ?RX */ QRX, /* TX! */ TXbang, /* !IO */ bangIO, doLIT, 
-/* DOES> */ DOES, next, /* ?branch */ qBranch, branch, 
-/* ! */ store, /* @ */ fetch, /* C@ */ cFetch, /* C! */ cStore, 
-/* RP@ */ RPat, /* RP! */ RPbang, /* R> */ Rfrom, /* R@ */ Rat, 
-/* >R */ toR, /* SP@ */ SPat, /* SP! */ SPbang, DROP, 
-DUP, SWAP, OVER, /* 0< */ less0, 
-AND, OR, XOR, /* UM+ */ UMplus, 
-userAreaInit, userAreaSave, 0, 0, 
-0, 0, 0, 0, 
-0, 0, 0, 0, 
-debugNA, testing3, Fbreak, debugPrintTIB, 
+0, tokenVocabulary, tokenNextVal, tokenDoList,
+tokenUser, tokenVar, tokenCreate, ALIGNED,
+/* find */ jsFind, 0, 0, /* >NAME */ ToNAME,
+MS, BYE, EXIT, EXECUTE,
+/* ?RX */ QRX, /* TX! */ TXbang, /* !IO */ bangIO, doLIT,
+/* DOES> */ DOES, next, /* ?branch */ qBranch, branch,
+/* ! */ store, /* @ */ fetch, /* C@ */ cFetch, /* C! */ cStore,
+/* RP@ */ RPat, /* RP! */ RPbang, /* R> */ Rfrom, /* R@ */ Rat,
+/* >R */ toR, /* SP@ */ SPat, /* SP! */ SPbang, DROP,
+DUP, SWAP, OVER, /* 0< */ less0,
+AND, OR, XOR, /* UM+ */ UMplus,
+userAreaInit, userAreaSave, 0, 0,
+0, 0, 0, 0,
+0, 0, 0, 0,
+debugNA, testing3, Fbreak, debugPrintTIB,
 TEST,  0 };
 const CELLTYPE rom[ROMCELLS] PROGMEM = {
 /* ==== USER VARIABLE SAVE AREA ==== */
@@ -496,315 +496,315 @@ const CELLTYPE rom[ROMCELLS] PROGMEM = {
 /* 0x7c */ 0,
 /* 0x7e */ 0,
 /* ==== CODE DICTIONARY ==== */
-/* 0x80: FORTH */ F_tokenVocabulary, 0x8000, 
-/* 0x84: CELLL */ F_tokenNextVal, 2, 
-/* 0x88: CELLbits */ F_tokenNextVal, 0x10, 
-/* 0x8c: CELLMASK */ F_tokenNextVal, 0xff1f, 
-/* 0x90: TIB0 */ F_tokenNextVal, 0x8270, 
-/* 0x94: =COMP */ F_tokenNextVal, 0x40, 
-/* 0x98: =IMED */ F_tokenNextVal, XT_FORTH, 
-/* 0x9c: =BYTEMASK */ F_tokenNextVal, 0x1f, 
-/* 0xa0: BL */ F_tokenNextVal, 0x20, 
-/* 0xa4: tokenVocabulary */ F_tokenNextVal, 1, 
-/* 0xa8: tokenNextVal */ F_tokenNextVal, 2, 
-/* 0xac: tokenDoList */ F_tokenNextVal, 3, 
-/* 0xb0: tokenUser */ F_tokenNextVal, 4, 
-/* 0xb4: tokenVar */ F_tokenNextVal, 5, 
-/* 0xb8: tokenCreate */ F_tokenNextVal, 6, 
-/* 0xbc: ALIGNED */ F_ALIGNED, 
-/* 0xbe: find */ F_jsFind, 
-/* 0xc0: OVERT */ F_OVERT, 
-/* 0xc2: $,n */ F_dollarCommaN, 
-/* 0xc4: >NAME */ F_ToNAME, 
-/* 0xc6: MS */ F_MS, 
-/* 0xc8: BYE */ F_BYE, 
-/* 0xca: EXIT */ F_EXIT, 
-/* 0xcc: EXECUTE */ F_EXECUTE, 
-/* 0xce: ?RX */ F_QRX, 
-/* 0xd0: TX! */ F_TXbang, 
-/* 0xd2: !IO */ F_bangIO, 
-/* 0xd4: doLIT */ F_doLIT, 
-/* 0xd6: DOES> */ F_DOES, 
-/* 0xd8: next */ F_next, 
-/* 0xda: ?branch */ F_qBranch, 
-/* 0xdc: branch */ F_branch, 
-/* 0xde: ! */ F_store, 
-/* 0xe0: @ */ F_fetch, 
-/* 0xe2: C@ */ F_cFetch, 
-/* 0xe4: C! */ F_cStore, 
-/* 0xe6: RP@ */ F_RPat, 
-/* 0xe8: RP! */ F_RPbang, 
-/* 0xea: R> */ F_Rfrom, 
-/* 0xec: R@ */ F_Rat, 
-/* 0xee: >R */ F_toR, 
-/* 0xf0: SP@ */ F_SPat, 
-/* 0xf2: SP! */ F_SPbang, 
-/* 0xf4: DROP */ F_DROP, 
-/* 0xf6: DUP */ F_DUP, 
-/* 0xf8: SWAP */ F_SWAP, 
-/* 0xfa: OVER */ F_OVER, 
-/* 0xfc: 0< */ F_less0, 
-/* 0xfe: AND */ F_AND, 
-/* 0x100: OR */ F_OR, 
-/* 0x102: XOR */ F_XOR, 
-/* 0x104: UM+ */ F_UMplus, 
-/* 0x106: userAreaInit */ F_userAreaInit, 
-/* 0x108: userAreaSave */ F_userAreaSave, 
-/* 0x10a: PARSE */ F_PARSE, 
-/* 0x10c: TOKEN */ F_TOKEN, 
-/* 0x10e: NUMBER? */ F_NUMBERQ, 
-/* 0x110: $COMPILE */ F_dCOMPILE, 
-/* 0x112: $INTERPRET */ F_dINTERPRET, 
-/* 0x114: [ */ F_openBracket, 
-/* 0x116: ] */ F_closeBracket, 
-/* 0x118: : */ F_colon, 
-/* 0x11a: ; */ F_semicolon, 
-/* 0x11c: ' */ F_tick, 
-/* 0x11e: debugNA */ F_debugNA, 
-/* 0x120: testing3 */ F_testing3, 
-/* 0x122: Fbreak */ F_Fbreak, 
-/* 0x124: debugPrintTIB */ F_debugPrintTIB, 
-/* 0x126: TEST */ F_TEST, 
-/* 0x128: SP0 */ F_tokenUser, 4, 
-/* 0x12c: RP0 */ F_tokenUser, 5, 
-/* 0x130: '?KEY */ F_tokenUser, 6, 
-/* 0x134: 'EMIT */ F_tokenUser, 7, 
-/* 0x138: 'EXPECT */ F_tokenUser, 8, 
-/* 0x13c: 'TAP */ F_tokenUser, 9, 
-/* 0x140: 'ECHO */ F_tokenUser, 0xa, 
-/* 0x144: 'PROMPT */ F_tokenUser, 0xb, 
-/* 0x148: BASE */ F_tokenUser, 0xc, 
-/* 0x14c: temp */ F_tokenUser, 0xd, 
-/* 0x150: SPAN */ F_tokenUser, 0xe, 
-/* 0x154: >IN */ F_tokenUser, 0xf, 
-/* 0x158: #TIB */ F_tokenUser, 0x10, 
-/* 0x15c: CSP */ F_tokenUser, 0x12, 
-/* 0x160: 'EVAL */ F_tokenUser, 0x13, 
-/* 0x164: 'NUMBER */ F_tokenUser, 0x14, 
-/* 0x168: HLD */ F_tokenUser, 0x15, 
-/* 0x16c: HANDLER */ F_tokenUser, 0x16, 
-/* 0x170: CONTEXT */ F_tokenUser, 0x17, 
-/* 0x174: CURRENT */ F_tokenUser, 0x20, 
-/* 0x178: CP */ F_tokenUser, 0x22, 
-/* 0x17c: NP */ F_tokenUser, 0x23, 
-/* 0x180: LAST */ F_tokenUser, 0x24, 
-/* 0x184: VP */ F_tokenUser, 0x25, 
-/* 0x188: 2DROP */ F_tokenDoList, XT_DROP, XT_DROP, XT_EXIT, 
-/* 0x190: setHeaderBits */ F_tokenDoList, XT_LAST, XT__40, XT_C_40, XT_OR, XT_LAST, XT__40, XT_C_21, XT_EXIT, 
-/* 0x1a2: COMPILE-ONLY */ F_tokenDoList, XT__3DCOMP, XT_setHeaderBits, XT_EXIT, 
-/* 0x1aa: IMMEDIATE */ F_tokenDoList, XT__3DIMED, XT_setHeaderBits, XT_EXIT, 
-/* 0x1b2: ( */ F_tokenDoList, XT_doLIT, 0x29, XT_PARSE, XT_2DROP, XT_EXIT, 
-/* 0x1be: \ */ F_tokenDoList, XT__23TIB, XT__40, XT__3EIN, XT__21, XT_EXIT, 
-/* 0x1ca: \T */ F_tokenDoList, XT__23TIB, XT__40, XT__3EIN, XT__21, XT_EXIT, 
-/* 0x1d6: NIP */ F_tokenDoList, XT_SWAP, XT_DROP, XT_EXIT, 
-/* 0x1de: HERE */ F_tokenDoList, XT_CP, XT__40, XT_EXIT, 
-/* 0x1e6: CELL+ */ F_tokenDoList, XT_CELLL, XT_UM_2B, XT_DROP, XT_EXIT, 
-/* 0x1f0: , */ F_tokenDoList, XT_HERE, XT_ALIGNED, XT_DUP, XT_CELL_2B, XT_CP, XT__21, XT__21, XT_EXIT, 
-/* 0x202: [COMPILE] */ F_tokenDoList, XT__27, XT__2C, XT_EXIT, 
-/* 0x20a: COMPILE */ F_tokenDoList, XT_R_3E, XT_DUP, XT__40, XT__2C, XT_CELL_2B, XT__3ER, XT_EXIT, 
-/* 0x21a: LITERAL */ F_tokenDoList, XT_COMPILE, XT_doLIT, XT__2C, XT_EXIT, 
-/* 0x224: create */ F_tokenDoList, XT_TOKEN, XT__24_2Cn, XT_OVERT, XT__2C, XT_doLIT, 0, XT__2C, XT_EXIT, 
-/* 0x236: CREATE */ F_tokenDoList, XT_tokenCreate, XT_create, XT_EXIT, 
-/* 0x23e: <MARK */ F_tokenDoList, XT_HERE, XT_EXIT, 
-/* 0x244: <RESOLVE */ F_tokenDoList, XT__2C, XT_EXIT, 
-/* 0x24a: >MARK */ F_tokenDoList, XT_HERE, XT_doLIT, 0, XT__2C, XT_EXIT, 
-/* 0x256: >RESOLVE */ F_tokenDoList, XT__3CMARK, XT_SWAP, XT__21, XT_EXIT, 
-/* 0x260: FOR */ F_tokenDoList, XT_COMPILE, XT__3ER, XT__3CMARK, XT_EXIT, 
-/* 0x26a: BEGIN */ F_tokenDoList, XT__3CMARK, XT_EXIT, 
-/* 0x270: NEXT */ F_tokenDoList, XT_COMPILE, XT_next, XT__3CRESOLVE, XT_EXIT, 
-/* 0x27a: UNTIL */ F_tokenDoList, XT_COMPILE, XT__3Fbranch, XT__3CRESOLVE, XT_EXIT, 
-/* 0x284: AGAIN */ F_tokenDoList, XT_COMPILE, XT_branch, XT__3CRESOLVE, XT_EXIT, 
-/* 0x28e: IF */ F_tokenDoList, XT_COMPILE, XT__3Fbranch, XT__3EMARK, XT_EXIT, 
-/* 0x298: AHEAD */ F_tokenDoList, XT_COMPILE, XT_branch, XT__3EMARK, XT_EXIT, 
-/* 0x2a2: REPEAT */ F_tokenDoList, XT_AGAIN, XT__3ERESOLVE, XT_EXIT, 
-/* 0x2aa: THEN */ F_tokenDoList, XT__3ERESOLVE, XT_EXIT, 
-/* 0x2b0: AFT */ F_tokenDoList, XT_DROP, XT_AHEAD, XT_BEGIN, XT_SWAP, XT_EXIT, 
-/* 0x2bc: ELSE */ F_tokenDoList, XT_AHEAD, XT_SWAP, XT_THEN, XT_EXIT, 
-/* 0x2c6: WHEN */ F_tokenDoList, XT_IF, XT_OVER, XT_EXIT, 
-/* 0x2ce: WHILE */ F_tokenDoList, XT_IF, XT_SWAP, XT_EXIT, 
-/* 0x2d6: ?DUP */ F_tokenDoList, XT_DUP, XT__3Fbranch, XT__3FDUP + 0xa, XT_DUP, XT_EXIT, 
-/* 0x2e2: ROT */ F_tokenDoList, XT__3ER, XT_SWAP, XT_R_3E, XT_SWAP, XT_EXIT, 
-/* 0x2ee: -ROT */ F_tokenDoList, XT_SWAP, XT__3ER, XT_SWAP, XT_R_3E, XT_EXIT, 
-/* 0x2fa: 2DUP */ F_tokenDoList, XT_OVER, XT_OVER, XT_EXIT, 
-/* 0x302: + */ F_tokenDoList, XT_UM_2B, XT_DROP, XT_EXIT, 
-/* 0x30a: D+ */ F_tokenDoList, XT__3ER, XT_SWAP, XT__3ER, XT_UM_2B, XT_R_3E, XT_R_3E, XT__2B, XT__2B, XT_EXIT, 
-/* 0x31e: INVERT */ F_tokenDoList, XT_doLIT, 0xffff, XT_XOR, XT_EXIT, 
-/* 0x328: NEGATE */ F_tokenDoList, XT_INVERT, XT_doLIT, 1, XT__2B, XT_EXIT, 
-/* 0x334: DNEGATE */ F_tokenDoList, XT_INVERT, XT__3ER, XT_INVERT, XT_doLIT, 1, XT_UM_2B, XT_R_3E, XT__2B, XT_EXIT, 
-/* 0x348: - */ F_tokenDoList, XT_NEGATE, XT__2B, XT_EXIT, 
-/* 0x350: ABS */ F_tokenDoList, XT_DUP, XT_0_3C, XT__3Fbranch, XT_ABS + 0xc, XT_NEGATE, XT_EXIT, 
-/* 0x35e: 0= */ F_tokenDoList, XT__3Fbranch, XT_0_3D + 0xe, XT_doLIT, 0, XT_branch, XT_0_3D + 0x12, XT_doLIT, 0xffff, XT_EXIT, 
-/* 0x372: = */ F_tokenDoList, XT_XOR, XT__3Fbranch, XT__3D + 0xe, XT_doLIT, 0, XT_EXIT, XT_doLIT, 0xffff, XT_EXIT, 
-/* 0x386: U< */ F_tokenDoList, XT_2DUP, XT_XOR, XT_0_3C, XT__3Fbranch, XT_U_3C + 0x12, XT_NIP, XT_0_3C, XT_EXIT, XT__2D, XT_0_3C, XT_EXIT, 
-/* 0x39e: < */ F_tokenDoList, XT_2DUP, XT_XOR, XT_0_3C, XT__3Fbranch, XT__3C + 0x12, XT_DROP, XT_0_3C, XT_EXIT, XT__2D, XT_0_3C, XT_EXIT, 
-/* 0x3b6: MAX */ F_tokenDoList, XT_2DUP, XT__3C, XT__3Fbranch, XT_MAX + 0xc, XT_SWAP, XT_DROP, XT_EXIT, 
-/* 0x3c6: MIN */ F_tokenDoList, XT_2DUP, XT_SWAP, XT__3C, XT__3Fbranch, XT_MIN + 0xe, XT_SWAP, XT_DROP, XT_EXIT, 
-/* 0x3d8: WITHIN */ F_tokenDoList, XT_OVER, XT__2D, XT__3ER, XT__2D, XT_R_3E, XT_U_3C, XT_EXIT, 
-/* 0x3e8: UM/MOD */ F_tokenDoList, XT_2DUP, XT_U_3C, XT__3Fbranch, XT_UM_2FMOD + 0x58, XT_NEGATE, XT_CELLbits, XT__3ER, XT_branch, XT_UM_2FMOD + 0x4e, XT__3ER, XT_DUP, XT_UM_2B, XT__3ER, XT__3ER, XT_DUP, XT_UM_2B, XT_R_3E, XT__2B, XT_DUP, XT_R_3E, XT_R_40, XT_SWAP, XT__3ER, XT_UM_2B, XT_R_3E, XT_OR, XT__3Fbranch, XT_UM_2FMOD + 0x4a, XT__3ER, XT_DROP, XT_doLIT, 1, XT__2B, XT_R_3E, XT_branch, XT_UM_2FMOD + 0x4c, XT_DROP, XT_R_3E, XT_next, XT_UM_2FMOD + 0x14, XT_DROP, XT_SWAP, XT_EXIT, XT_DROP, XT_2DROP, XT_doLIT, 0xffff, XT_DUP, XT_EXIT, 
-/* 0x44c: M/MOD */ F_tokenDoList, XT_DUP, XT_0_3C, XT_DUP, XT__3ER, XT__3Fbranch, XT_M_2FMOD + 0x16, XT_NEGATE, XT__3ER, XT_DNEGATE, XT_R_3E, XT__3ER, XT_DUP, XT_0_3C, XT__3Fbranch, XT_M_2FMOD + 0x24, XT_R_40, XT__2B, XT_R_3E, XT_UM_2FMOD, XT_R_3E, XT__3Fbranch, XT_M_2FMOD + 0x34, XT_SWAP, XT_NEGATE, XT_SWAP, XT_EXIT, 
-/* 0x482: /MOD */ F_tokenDoList, XT_OVER, XT_0_3C, XT_SWAP, XT_M_2FMOD, XT_EXIT, 
-/* 0x48e: MOD */ F_tokenDoList, XT__2FMOD, XT_DROP, XT_EXIT, 
-/* 0x496: / */ F_tokenDoList, XT__2FMOD, XT_NIP, XT_EXIT, 
-/* 0x49e: UM* */ F_tokenDoList, XT_doLIT, 0, XT_SWAP, XT_CELLbits, XT__3ER, XT_branch, XT_UM_2A + 0x30, XT_DUP, XT_UM_2B, XT__3ER, XT__3ER, XT_DUP, XT_UM_2B, XT_R_3E, XT__2B, XT_R_3E, XT__3Fbranch, XT_UM_2A + 0x30, XT__3ER, XT_OVER, XT_UM_2B, XT_R_3E, XT__2B, XT_next, XT_UM_2A + 0x10, XT_ROT, XT_DROP, XT_EXIT, 
-/* 0x4d8: * */ F_tokenDoList, XT_UM_2A, XT_DROP, XT_EXIT, 
-/* 0x4e0: M* */ F_tokenDoList, XT_2DUP, XT_XOR, XT_0_3C, XT__3ER, XT_ABS, XT_SWAP, XT_ABS, XT_UM_2A, XT_R_3E, XT__3Fbranch, XT_M_2A + 0x1a, XT_DNEGATE, XT_EXIT, 
-/* 0x4fc: * /MOD */ F_tokenDoList, XT__3ER, XT_M_2A, XT_R_3E, XT_M_2FMOD, XT_EXIT, 
-/* 0x508: * / */ F_tokenDoList, XT__2A_2FMOD, XT_NIP, XT_EXIT, 
-/* 0x510: CELL- */ F_tokenDoList, XT_CELLL, XT__2D, XT_EXIT, 
-/* 0x518: CELLS */ F_tokenDoList, XT_CELLL, XT__2A, XT_EXIT, 
-/* 0x520: >CHAR */ F_tokenDoList, XT_doLIT, 0x7f, XT_AND, XT_DUP, XT_doLIT, 0x7f, XT_BL, XT_WITHIN, XT__3Fbranch, XT__3ECHAR + 0x1c, XT_DROP, XT_doLIT, 0x5f, XT_EXIT, 
-/* 0x53e: DEPTH */ F_tokenDoList, XT_SP_40, XT_SP0, XT__40, XT_SWAP, XT__2D, XT_CELLL, XT__2F, XT_EXIT, 
-/* 0x550: PICK */ F_tokenDoList, XT_doLIT, 1, XT__2B, XT_CELLS, XT_SP_40, XT__2B, XT__40, XT_EXIT, 
-/* 0x562: +! */ F_tokenDoList, XT_SWAP, XT_OVER, XT__40, XT__2B, XT_SWAP, XT__21, XT_EXIT, 
-/* 0x572: 2! */ F_tokenDoList, XT_SWAP, XT_OVER, XT__21, XT_CELL_2B, XT__21, XT_EXIT, 
-/* 0x580: 2@ */ F_tokenDoList, XT_DUP, XT_CELL_2B, XT__40, XT_SWAP, XT__40, XT_EXIT, 
-/* 0x58e: vHERE */ F_tokenDoList, XT_VP, XT__40, XT__3FDUP, XT__3Fbranch, XT_vHERE + 0xe, XT_EXIT, XT_HERE, XT_EXIT, 
-/* 0x5a0: v, */ F_tokenDoList, XT_VP, XT__40, XT__3FDUP, XT__3Fbranch, XT_v_2C + 0x1c, XT_ALIGNED, XT_DUP, XT_CELL_2B, XT_VP, XT__21, XT__21, XT_branch, XT_v_2C + 0x1e, XT__2C, XT_EXIT, 
-/* 0x5c0: vALIGN */ F_tokenDoList, XT_VP, XT__40, XT_ALIGNED, XT_VP, XT__21, XT_EXIT, 
-/* 0x5ce: vCREATE */ F_tokenDoList, XT_VP, XT__40, XT__3FDUP, XT__3Fbranch, XT_vCREATE + 0x18, XT_tokenVar, XT_create, XT_vALIGN, XT__2C, XT_branch, XT_vCREATE + 0x1a, XT_CREATE, XT_EXIT, 
-/* 0x5ea: PAD */ F_tokenDoList, XT_HERE, XT_doLIT, 0x50, XT__2B, XT_EXIT, 
-/* 0x5f6: TIB */ F_tokenDoList, XT__23TIB, XT_CELL_2B, XT__40, XT_EXIT, 
-/* 0x600: @EXECUTE */ F_tokenDoList, XT__40, XT__3FDUP, XT__3Fbranch, XT__40EXECUTE + 0x10, XT_EXECUTE, XT_branch, XT__40EXECUTE + 0x12, XT_Fbreak, XT_EXIT, 
-/* 0x614: COUNT */ F_tokenDoList, XT_DUP, XT_doLIT, 1, XT__2B, XT_SWAP, XT_C_40, XT_EXIT, 
-/* 0x624: CMOVE */ F_tokenDoList, XT__3ER, XT_branch, XT_CMOVE + 0x20, XT__3ER, XT_DUP, XT_C_40, XT_R_40, XT_C_21, XT_doLIT, 1, XT__2B, XT_R_3E, XT_doLIT, 1, XT__2B, XT_next, XT_CMOVE + 8, XT_2DROP, XT_EXIT, 
-/* 0x64c: FILL */ F_tokenDoList, XT_SWAP, XT__3ER, XT_SWAP, XT_branch, XT_FILL + 0x16, XT_2DUP, XT_C_21, XT_doLIT, 1, XT__2B, XT_next, XT_FILL + 0xc, XT_2DROP, XT_EXIT, 
-/* 0x66a: -TRAILING */ F_tokenDoList, XT__3ER, XT_branch, XT__2DTRAILING + 0x22, XT_BL, XT_OVER, XT_R_40, XT__2B, XT_C_40, XT__3C, XT__3Fbranch, XT__2DTRAILING + 0x22, XT_R_3E, XT_doLIT, 1, XT__2B, XT_EXIT, XT_next, XT__2DTRAILING + 8, XT_doLIT, 0, XT_EXIT, 
-/* 0x696: PACK$ */ F_tokenDoList, XT_ALIGNED, XT_DUP, XT__3ER, XT_OVER, XT_DUP, XT_doLIT, 0, XT_CELLL, XT_UM_2FMOD, XT_DROP, XT__2D, XT_OVER, XT__2B, XT_doLIT, 0, XT_SWAP, XT__21, XT_2DUP, XT_C_21, XT_doLIT, 1, XT__2B, XT_SWAP, XT_CMOVE, XT_R_3E, XT_EXIT, XT_EXIT, XT_EXIT, 
-/* 0x6d0: DIGIT */ F_tokenDoList, XT_doLIT, 9, XT_OVER, XT__3C, XT_doLIT, 7, XT_AND, XT__2B, XT_doLIT, 0x30, XT__2B, XT_EXIT, 
-/* 0x6ea: EXTRACT */ F_tokenDoList, XT_doLIT, 0, XT_SWAP, XT_UM_2FMOD, XT_SWAP, XT_DIGIT, XT_EXIT, 
-/* 0x6fa: <# */ F_tokenDoList, XT_PAD, XT_HLD, XT__21, XT_EXIT, 
-/* 0x704: HOLD */ F_tokenDoList, XT_HLD, XT__40, XT_doLIT, 1, XT__2D, XT_DUP, XT_HLD, XT__21, XT_C_21, XT_EXIT, 
-/* 0x71a: # */ F_tokenDoList, XT_BASE, XT__40, XT_EXTRACT, XT_HOLD, XT_EXIT, 
-/* 0x726: #S */ F_tokenDoList, XT__23, XT_DUP, XT__3Fbranch, XT__23S + 0xe, XT_branch, XT__23S + 2, XT_EXIT, 
-/* 0x736: SIGN */ F_tokenDoList, XT_0_3C, XT__3Fbranch, XT_SIGN + 0xe, XT_doLIT, 0x2d, XT_HOLD, XT_EXIT, 
-/* 0x746: #> */ F_tokenDoList, XT_DROP, XT_HLD, XT__40, XT_PAD, XT_OVER, XT__2D, XT_EXIT, 
-/* 0x756: EMIT */ F_tokenDoList, XT__27EMIT, XT__40EXECUTE, XT_EXIT, 
-/* 0x75e: SPACE */ F_tokenDoList, XT_BL, XT_EMIT, XT_EXIT, 
-/* 0x766: CHARS */ F_tokenDoList, XT_SWAP, XT_doLIT, 0, XT_MAX, XT__3ER, XT_branch, XT_CHARS + 0x14, XT_DUP, XT_EMIT, XT_next, XT_CHARS + 0x10, XT_DROP, XT_EXIT, 
-/* 0x782: SPACES */ F_tokenDoList, XT_BL, XT_CHARS, XT_EXIT, 
-/* 0x78a: TYPE */ F_tokenDoList, XT__3ER, XT_branch, XT_TYPE + 0x14, XT_DUP, XT_C_40, XT_EMIT, XT_doLIT, 1, XT__2B, XT_next, XT_TYPE + 8, XT_DROP, XT_EXIT, 
-/* 0x7a6: .$ */ F_tokenDoList, XT_COUNT, XT_TYPE, XT_EXIT, 
-/* 0x7ae: str */ F_tokenDoList, XT_DUP, XT__3ER, XT_ABS, XT__3C_23, XT__23S, XT_R_3E, XT_SIGN, XT__23_3E, XT_EXIT, 
-/* 0x7c2: HEX */ F_tokenDoList, XT_doLIT, 0x10, XT_BASE, XT__21, XT_EXIT, 
-/* 0x7ce: DECIMAL */ F_tokenDoList, XT_doLIT, 0xa, XT_BASE, XT__21, XT_EXIT, 
-/* 0x7da: .R */ F_tokenDoList, XT__3ER, XT_str, XT_R_3E, XT_OVER, XT__2D, XT_SPACES, XT_TYPE, XT_EXIT, 
-/* 0x7ec: U.R */ F_tokenDoList, XT__3ER, XT__3C_23, XT__23S, XT__23_3E, XT_R_3E, XT_OVER, XT__2D, XT_SPACES, XT_TYPE, XT_EXIT, 
-/* 0x802: U. */ F_tokenDoList, XT__3C_23, XT__23S, XT__23_3E, XT_SPACE, XT_TYPE, XT_EXIT, 
-/* 0x810: . */ F_tokenDoList, XT_BASE, XT__40, XT_doLIT, 0xa, XT_XOR, XT__3Fbranch, XT__2E + 0x14, XT_U_2E, XT_EXIT, XT_str, XT_SPACE, XT_TYPE, XT_EXIT, 
-/* 0x82c: ? */ F_tokenDoList, XT__40, XT__2E, XT_EXIT, 
-/* 0x834: DIGIT? */ F_tokenDoList, XT__3ER, XT_doLIT, 0x30, XT__2D, XT_doLIT, 9, XT_OVER, XT__3C, XT__3Fbranch, XT_DIGIT_3F + 0x26, XT_doLIT, 7, XT__2D, XT_DUP, XT_doLIT, 0xa, XT__3C, XT_OR, XT_DUP, XT_R_3E, XT_U_3C, XT_EXIT, 
-/* 0x862: NUMBER? */ F_tokenDoList, XT_BASE, XT__40, XT__3ER, XT_doLIT, 0, XT_OVER, XT_COUNT, XT_OVER, XT_C_40, XT_doLIT, 0x24, XT__3D, XT__3Fbranch, XT_NUMBER_3F + 0x30, XT_HEX, XT_SWAP, XT_doLIT, 1, XT__2B, XT_SWAP, XT_doLIT, 1, XT__2D, XT_OVER, XT_C_40, XT_doLIT, 0x2d, XT__3D, XT__3ER, XT_SWAP, XT_R_40, XT__2D, XT_SWAP, XT_R_40, XT__2B, XT__3FDUP, XT__3Fbranch, XT_NUMBER_3F + 0x9a, XT_doLIT, 1, XT__2D, XT__3ER, XT_DUP, XT__3ER, XT_C_40, XT_BASE, XT__40, XT_DIGIT_3F, XT__3Fbranch, XT_NUMBER_3F + 0x8c, XT_SWAP, XT_BASE, XT__40, XT__2A, XT__2B, XT_R_3E, XT_doLIT, 1, XT__2B, XT_next, XT_NUMBER_3F + 0x56, XT_DROP, XT_R_40, XT__3Fbranch, XT_NUMBER_3F + 0x86, XT_NEGATE, XT_SWAP, XT_branch, XT_NUMBER_3F + 0x98, XT_R_3E, XT_R_3E, XT_2DROP, XT_2DROP, XT_doLIT, 0, XT_DUP, XT_R_3E, XT_2DROP, XT_R_3E, XT_BASE, XT__21, XT_EXIT, 
-/* 0x908: ?KEY */ F_tokenDoList, XT__27_3FKEY, XT__40EXECUTE, XT_EXIT, 
-/* 0x910: KEY */ F_tokenDoList, XT_doLIT, 0, XT_MS, XT_doLIT, XT_BYE, XT__3FKEY, XT__3Fbranch, XT_KEY + 6, XT_NIP, XT_EXIT, 
-/* 0x926: NUF? */ F_tokenDoList, XT__3FKEY, XT_DUP, XT__3Fbranch, XT_NUF_3F + 0x14, XT_2DROP, XT_KEY, XT_doLIT, 0xd, XT__3D, XT_EXIT, 
-/* 0x93c: PACE */ F_tokenDoList, XT_doLIT, 0xb, XT_EMIT, XT_EXIT, 
-/* 0x946: CR */ F_tokenDoList, XT_doLIT, 0xd, XT_EMIT, XT_doLIT, 0xa, XT_EMIT, XT_EXIT, 
-/* 0x956: do$ */ F_tokenDoList, XT_R_3E, XT_R_40, XT_R_3E, XT_COUNT, XT__2B, XT_ALIGNED, XT__3ER, XT_SWAP, XT__3ER, XT_EXIT, 
-/* 0x96c: $"| */ F_tokenDoList, XT_do_24, XT_EXIT, 
-/* 0x972: ."| */ F_tokenDoList, XT_do_24, XT__2E_24, XT_EXIT, 
-/* 0x97a: parse */ F_tokenDoList, XT_temp, XT__21, XT_OVER, XT__3ER, XT_DUP, XT__3Fbranch, XT_parse + 0x9a, XT_doLIT, 1, XT__2D, XT_temp, XT__40, XT_BL, XT__3D, XT__3Fbranch, XT_parse + 0x4c, XT__3ER, XT_BL, XT_OVER, XT_C_40, XT__2D, XT_0_3C, XT_INVERT, XT__3Fbranch, XT_parse + 0x4a, XT_doLIT, 1, XT__2B, XT_next, XT_parse + 0x24, XT_R_3E, XT_DROP, XT_doLIT, 0, XT_DUP, XT_EXIT, XT_R_3E, XT_OVER, XT_SWAP, XT__3ER, XT_temp, XT__40, XT_OVER, XT_C_40, XT__2D, XT_temp, XT__40, XT_BL, XT__3D, XT__3Fbranch, XT_parse + 0x6a, XT_0_3C, XT__3Fbranch, XT_parse + 0x80, XT_doLIT, 1, XT__2B, XT_next, XT_parse + 0x52, XT_DUP, XT__3ER, XT_branch, XT_parse + 0x8e, XT_R_3E, XT_DROP, XT_DUP, XT_doLIT, 1, XT__2B, XT__3ER, XT_OVER, XT__2D, XT_R_3E, XT_R_3E, XT__2D, XT_EXIT, XT_OVER, XT_R_3E, XT__2D, XT_EXIT, 
-/* 0xa1c: PARSE */ F_tokenDoList, XT__3ER, XT_TIB, XT__3EIN, XT__40, XT__2B, XT__23TIB, XT__40, XT__3EIN, XT__40, XT__2D, XT_R_3E, XT_parse, XT__3EIN, XT__2B_21, XT_EXIT, 
-/* 0xa3c: CHAR */ F_tokenDoList, XT_BL, XT_PARSE, XT_DROP, XT_C_40, XT_EXIT, 
-/* 0xa48: CTRL */ F_tokenDoList, XT_CHAR, XT_doLIT, 0x1f, XT_AND, XT_EXIT, 
-/* 0xa54: .( */ F_tokenDoList, XT_doLIT, 0x29, XT_PARSE, XT_TYPE, XT_EXIT, 
-/* 0xa60: TOKEN */ F_tokenDoList, XT_BL, XT_PARSE, XT__3DBYTEMASK, XT_MIN, XT_NP, XT__40, XT_OVER, XT__2D, XT_CELLL, XT__2D, XT_PACK_24, XT_EXIT, 
-/* 0xa7a: WORD */ F_tokenDoList, XT_PARSE, XT_HERE, XT_PACK_24, XT_EXIT, 
-/* 0xa84: NAME> */ F_tokenDoList, XT_doLIT, 2, XT_CELLS, XT__2D, XT__40, XT_EXIT, 
-/* 0xa92: SAME? */ F_tokenDoList, XT__3ER, XT_branch, XT_SAME_3F + 0x2a, XT_OVER, XT_R_40, XT_CELLS, XT__2B, XT__40, XT_OVER, XT_R_40, XT_CELLS, XT__2B, XT__40, XT__2D, XT__3FDUP, XT__3Fbranch, XT_SAME_3F + 0x2a, XT_R_3E, XT_DROP, XT_EXIT, XT_next, XT_SAME_3F + 8, XT_doLIT, 0, XT_EXIT, 
-/* 0xac6: FORTHfind */ F_tokenDoList, XT_SWAP, XT_DUP, XT_C_40, XT_CELLL, XT__2F, XT_temp, XT__21, XT_DUP, XT__40, XT__3ER, XT_CELL_2B, XT_SWAP, XT__40, XT_DUP, XT__3Fbranch, XT_FORTHfind + 0x4a, XT_DUP, XT__40, XT_doLIT, 0xff1f, XT_AND, XT_R_40, XT_XOR, XT__3Fbranch, XT_FORTHfind + 0x3e, XT_CELL_2B, XT_doLIT, 0xffff, XT_branch, XT_FORTHfind + 0x46, XT_CELL_2B, XT_temp, XT__40, XT_SAME_3F, XT_branch, XT_FORTHfind + 0x56, XT_R_3E, XT_DROP, XT_SWAP, XT_CELL_2D, XT_SWAP, XT_EXIT, XT__3Fbranch, XT_FORTHfind + 0x62, XT_CELL_2D, XT_CELL_2D, XT_branch, XT_FORTHfind + 0x1a, XT_R_3E, XT_DROP, XT_NIP, XT_CELL_2D, XT_DUP, XT_NAME_3E, XT_SWAP, XT_EXIT, 
-/* 0xb38: NAME? */ F_tokenDoList, XT_CONTEXT, XT_DUP, XT_2_40, XT_XOR, XT__3Fbranch, XT_NAME_3F + 0x10, XT_CELL_2D, XT__3ER, XT_R_3E, XT_CELL_2B, XT_DUP, XT__3ER, XT__40, XT__3FDUP, XT__3Fbranch, XT_NAME_3F + 0x30, XT_find, XT__3FDUP, XT__3Fbranch, XT_NAME_3F + 0x12, XT_R_3E, XT_DROP, XT_EXIT, XT_R_3E, XT_DROP, XT_doLIT, 0, XT_EXIT, 
-/* 0xb72: ^H */ F_tokenDoList, XT__3ER, XT_OVER, XT_R_40, XT__3C, XT_DUP, XT__3Fbranch, XT__5EH + 0x26, XT_doLIT, 8, XT__27ECHO, XT__40EXECUTE, XT_BL, XT__27ECHO, XT__40EXECUTE, XT_doLIT, 8, XT__27ECHO, XT__40EXECUTE, XT_R_3E, XT__2B, XT_EXIT, 
-/* 0xb9e: TAP */ F_tokenDoList, XT_DUP, XT__27ECHO, XT__40EXECUTE, XT_OVER, XT_C_21, XT_doLIT, 1, XT__2B, XT_EXIT, 
-/* 0xbb2: kTAP */ F_tokenDoList, XT_DUP, XT_doLIT, 0xd, XT__3D, XT_OVER, XT_doLIT, 0xa, XT__3D, XT_OR, XT_0_3D, XT__3Fbranch, XT_kTAP + 0x3a, XT_doLIT, 8, XT__3D, XT_OVER, XT_doLIT, 0x7f, XT__3D, XT_OR, XT__3Fbranch, XT_kTAP + 0x36, XT_BL, XT_TAP, XT_branch, XT_kTAP + 0x38, XT__5EH, XT_EXIT, XT_DROP, XT_NIP, XT_DUP, XT_EXIT, 
-/* 0xbf4: accept */ F_tokenDoList, XT_OVER, XT__2B, XT_OVER, XT_2DUP, XT_XOR, XT__3Fbranch, XT_accept + 0x30, XT_KEY, XT_DUP, XT_BL, XT__2D, XT_doLIT, 0x5f, XT_U_3C, XT__3Fbranch, XT_accept + 0x28, XT_TAP, XT_branch, XT_accept + 0x2c, XT__27TAP, XT__40EXECUTE, XT_branch, XT_accept + 8, XT_DROP, XT_OVER, XT__2D, XT_EXIT, 
-/* 0xc2c: EXPECT */ F_tokenDoList, XT__27EXPECT, XT__40EXECUTE, XT_SPAN, XT__21, XT_DROP, XT_EXIT, 
-/* 0xc3a: QUERY */ F_tokenDoList, XT_TIB, XT_doLIT, 0x50, XT__27EXPECT, XT__40EXECUTE, XT__23TIB, XT__21, XT_DROP, XT_doLIT, 0, XT__3EIN, XT__21, XT_EXIT, 
-/* 0xc56: CATCH */ F_tokenDoList, XT_SP_40, XT__3ER, XT_HANDLER, XT__40, XT__3ER, XT_RP_40, XT_HANDLER, XT__21, XT_EXECUTE, XT_R_3E, XT_HANDLER, XT__21, XT_R_3E, XT_DROP, XT_doLIT, 0, XT_EXIT, 
-/* 0xc7a: THROW */ F_tokenDoList, XT_HANDLER, XT__40, XT_RP_21, XT_R_3E, XT_HANDLER, XT__21, XT_R_3E, XT_SWAP, XT__3ER, XT_SP_21, XT_DROP, XT_R_3E, XT_EXIT, 
-/* 0xc96: NULL$ */ F_tokenCreate, 0, 0, 
-/* 0xc9c: ABORT */ F_tokenDoList, XT_NULL_24, XT_THROW, XT_EXIT, 
-/* 0xca4: abort" */ F_tokenDoList, XT__3Fbranch, XT_abort_22 + 0xa, XT_do_24, XT_THROW, XT_do_24, XT_DROP, XT_EXIT, 
-/* 0xcb4: $," */ F_tokenDoList, XT_doLIT, 0x22, XT_WORD, XT_COUNT, XT__2B, XT_ALIGNED, XT_CP, XT__21, XT_EXIT, 
-/* 0xcc8: ABORT" */ F_tokenDoList, XT_COMPILE, XT_abort_22, XT__24_2C_22, XT_EXIT, 
-/* 0xcd2: ." */ F_tokenDoList, XT_COMPILE, XT__2E_22_7C, XT__24_2C_22, XT_EXIT, 
-/* 0xcdc: $INTERPRET */ F_tokenDoList, XT_NAME_3F, XT__3FDUP, XT__3Fbranch, XT__24INTERPRET + 0x26, XT_C_40, XT_doLIT, 0x40, XT_AND, XT_abort_22, 0x630c, 0x6d6f, 0x6970, 0x656c, 0x4f20, 0x4c4e, 0x59, XT_EXECUTE, XT_EXIT, XT__27NUMBER, XT__40EXECUTE, XT__3Fbranch, XT__24INTERPRET + 0x30, XT_EXIT, XT_THROW, XT_EXIT, 
-/* 0xd10: .OK */ F_tokenDoList, XT_doLIT, XT__24INTERPRET, XT__27EVAL, XT__40, XT__3D, XT__3Fbranch, XT__2EOK + 0x16, XT__2E_22_7C, 0x2003, 0x6b6f, XT_CR, XT_EXIT, 
-/* 0xd2a: ?STACK */ F_tokenDoList, XT_DEPTH, XT_0_3C, XT_abort_22, 0x7509, 0x646e, 0x7265, 0x6c66, 0x776f, XT_EXIT, 
-/* 0xd3e: EVAL */ F_tokenDoList, XT_TOKEN, XT_DUP, XT_C_40, XT__3Fbranch, XT_EVAL + 0x16, XT__27EVAL, XT__40EXECUTE, XT__3FSTACK, XT_branch, XT_EVAL + 2, XT_DROP, XT__27PROMPT, XT__40EXECUTE, XT_EXIT, 
-/* 0xd5c: [ */ F_tokenDoList, XT_doLIT, XT__24INTERPRET, XT__27EVAL, XT__21, XT_EXIT, 
-/* 0xd68: PRESET */ F_tokenDoList, XT_SP0, XT__40, XT_SP_21, XT_TIB0, XT__23TIB, XT_CELL_2B, XT__21, XT_EXIT, 
-/* 0xd7a: XIO */ F_tokenDoList, XT_doLIT, XT_accept, XT__27EXPECT, XT__21, XT__27TAP, XT__21, XT__27ECHO, XT__21, XT__27PROMPT, XT__21, XT_EXIT, 
-/* 0xd92: FILE */ F_tokenDoList, XT_doLIT, XT_PACE, XT_doLIT, XT_DROP, XT_doLIT, XT_kTAP, XT_XIO, XT_EXIT, 
-/* 0xda4: HAND */ F_tokenDoList, XT_doLIT, XT__2EOK, XT_doLIT, XT_EMIT, XT_doLIT, XT_kTAP, XT_XIO, XT_EXIT, 
-/* 0xdb6: I/O */ F_tokenCreate, 0, XT__3FRX, XT_TX_21, 
-/* 0xdbe: CONSOLE */ F_tokenDoList, XT_I_2FO, XT_2_40, XT__27_3FKEY, XT_2_21, XT_HAND, XT_EXIT, 
-/* 0xdcc: que */ F_tokenDoList, XT_QUERY, XT_EVAL, XT_EXIT, 
-/* 0xdd4: quitError */ F_tokenDoList, XT_NULL_24, XT_OVER, XT_XOR, XT__3Fbranch, XT_quitError + 0x2c, XT_CR, XT_TIB, XT__23TIB, XT__40, XT_TYPE, XT_CR, XT__3EIN, XT__40, XT_doLIT, 0x5e, XT_CHARS, XT_CR, XT__2E_24, XT__2E_22_7C, 0x2003, 0x203f, XT_PRESET, XT_EXIT, 
-/* 0xe04: QUIT */ F_tokenDoList, XT_RP0, XT__40, XT_RP_21, XT__5B, XT_doLIT, XT_que, XT_CATCH, XT__3FDUP, XT__3Fbranch, XT_QUIT + 0xa, XT_CONSOLE, XT_quitError, XT_branch, XT_QUIT + 8, XT_EXIT, 
-/* 0xe24: quit1 */ F_tokenDoList, XT_doLIT, XT_EVAL, XT_CATCH, XT__3FDUP, XT__3Fbranch, XT_quit1 + 0x12, XT_quitError, XT__5B, XT_EXIT, 
-/* 0xe38: ' */ F_tokenDoList, XT_TOKEN, XT_NAME_3F, XT__3Fbranch, XT__27 + 0xc, XT_EXIT, XT_THROW, XT_EXIT, 
-/* 0xe48: ALLOT */ F_tokenDoList, XT_CP, XT__2B_21, XT_EXIT, 
-/* 0xe50: vALLOT */ F_tokenDoList, XT_VP, XT__40, XT__3Fbranch, XT_vALLOT + 0x12, XT_VP, XT__2B_21, XT_branch, XT_vALLOT + 0x14, XT_ALLOT, XT_EXIT, 
-/* 0xe66: [COMPILE] */ F_tokenDoList, XT__27, XT__2C, XT_EXIT, 
-/* 0xe6e: RECURSE */ F_tokenDoList, XT_LAST, XT__40, XT_NAME_3E, XT__2C, XT_EXIT, 
-/* 0xe7a: $" */ F_tokenDoList, XT_COMPILE, XT__24_22_7C, XT__24_2C_22, XT_EXIT, 
-/* 0xe84: ?UNIQUE */ F_tokenDoList, XT_DUP, XT_NAME_3F, XT__3Fbranch, XT__3FUNIQUE + 0x18, XT__2E_22_7C, 0x2007, 0x6572, 0x6544, 0x2066, XT_OVER, XT__2E_24, XT_DROP, XT_EXIT, 
-/* 0xea0: $,n */ F_tokenDoList, XT_DUP, XT_C_40, XT__3Fbranch, XT__24_2Cn + 0x30, XT__3FUNIQUE, XT_DUP, XT_LAST, XT__21, XT_HERE, XT_ALIGNED, XT_SWAP, XT_CELL_2D, XT_CURRENT, XT__40, XT__40, XT_OVER, XT__21, XT_CELL_2D, XT_DUP, XT_NP, XT__21, XT__21, XT_EXIT, XT__24_22_7C, 0x6e04, 0x6d61, 0x65, XT_THROW, XT_EXIT, 
-/* 0xedc: $COMPILE */ F_tokenDoList, XT_NAME_3F, XT__3FDUP, XT__3Fbranch, XT__24COMPILE + 0x1e, XT_C_40, XT__3DIMED, XT_AND, XT__3Fbranch, XT__24COMPILE + 0x1a, XT_EXECUTE, XT_branch, XT__24COMPILE + 0x1c, XT__2C, XT_EXIT, XT__27NUMBER, XT__40EXECUTE, XT__3Fbranch, XT__24COMPILE + 0x2a, XT_LITERAL, XT_EXIT, XT_THROW, XT_EXIT, 
-/* 0xf0a: OVERT */ F_tokenDoList, XT_LAST, XT__40, XT_CURRENT, XT__40, XT__21, XT_EXIT, 
-/* 0xf18: ; */ F_tokenDoList, XT_COMPILE, XT_EXIT, XT__5B, XT_OVERT, XT_EXIT, 
-/* 0xf24: ] */ F_tokenDoList, XT_doLIT, XT__24COMPILE, XT__27EVAL, XT__21, XT_EXIT, 
-/* 0xf30: : */ F_tokenDoList, XT_TOKEN, XT__24_2Cn, XT_tokenDoList, XT__2C, XT__5D, XT_EXIT, 
-/* 0xf3e: USER */ F_tokenDoList, XT_TOKEN, XT__24_2Cn, XT_OVERT, XT_tokenUser, XT__2C, XT_EXIT, 
-/* 0xf4c: create */ F_tokenDoList, XT_TOKEN, XT__24_2Cn, XT_OVERT, XT__2C, XT_doLIT, 0, XT__2C, XT_EXIT, 
-/* 0xf5e: CREATE */ F_tokenDoList, XT_tokenCreate, XT_create, XT_EXIT, 
-/* 0xf66: vCREATE */ F_tokenDoList, XT_VP, XT__40, XT__3FDUP, XT_0_3D, XT__3Fbranch, XT_vCREATE + 0x14, XT_CREATE, XT_branch, XT_vCREATE + 0x1a, XT_tokenVar, XT_create, XT__2C, XT_EXIT, 
-/* 0xf82: VARIABLE */ F_tokenDoList, XT_vCREATE, XT_doLIT, 0, XT_v_2C, XT_EXIT, 
-/* 0xf8e: CONSTANT */ F_tokenDoList, XT_TOKEN, XT__24_2Cn, XT_OVERT, XT_tokenNextVal, XT__2C, XT__2C, XT_EXIT, 
-/* 0xf9e: _TYPE */ F_tokenDoList, XT__3ER, XT_branch, XT__5FTYPE + 0x16, XT_DUP, XT_C_40, XT__3ECHAR, XT_EMIT, XT_doLIT, 1, XT__2B, XT_next, XT__5FTYPE + 8, XT_DROP, XT_EXIT, 
-/* 0xfbc: dm+ */ F_tokenDoList, XT_OVER, XT_doLIT, 4, XT_U_2ER, XT_SPACE, XT__3ER, XT_branch, XT_dm_2B + 0x22, XT_DUP, XT_C_40, XT_doLIT, 3, XT_U_2ER, XT_doLIT, 1, XT__2B, XT_next, XT_dm_2B + 0x12, XT_EXIT, 
-/* 0xfe4: DUMP */ F_tokenDoList, XT_BASE, XT__40, XT__3ER, XT_HEX, XT_doLIT, 0x10, XT__2F, XT__3ER, XT_CR, XT_doLIT, 0x10, XT_2DUP, XT_dm_2B, XT__2DROT, XT_doLIT, 2, XT_SPACES, XT__5FTYPE, XT_NUF_3F, XT_0_3D, XT__3Fbranch, XT_DUMP + 0x36, XT_next, XT_DUMP + 0x12, XT_branch, XT_DUMP + 0x3a, XT_R_3E, XT_DROP, XT_DROP, XT_R_3E, XT_BASE, XT__21, XT_EXIT, 
-/* 0x1028: .S */ F_tokenDoList, XT_CR, XT_DEPTH, XT__3ER, XT_branch, XT__2ES + 0x12, XT_R_40, XT_PICK, XT__2E, XT_next, XT__2ES + 0xc, XT__2E_22_7C, 0x2004, 0x733c, 0x70, XT_EXIT, 
-/* 0x1048: .BASE */ F_tokenDoList, XT_BASE, XT__40, XT_DECIMAL, XT_DUP, XT__2E, XT_BASE, XT__21, XT_EXIT, 
-/* 0x105a: .FREE */ F_tokenDoList, XT_CP, XT_2_40, XT__2D, XT_U_2E, XT_EXIT, 
-/* 0x1066: !CSP */ F_tokenDoList, XT_SP_40, XT_CSP, XT__21, XT_EXIT, 
-/* 0x1070: ?CSP */ F_tokenDoList, XT_SP_40, XT_CSP, XT__40, XT_XOR, XT_abort_22, 0x730b, 0x6174, 0x6b63, 0x6420, 0x7065, 0x6874, XT_EXIT, 
-/* 0x108a: .ID */ F_tokenDoList, XT__3FDUP, XT__3Fbranch, XT__2EID + 0x12, XT_COUNT, XT__3DBYTEMASK, XT_AND, XT__5FTYPE, XT_EXIT, XT__2E_22_7C, 0x7b08, 0x6f6e, 0x614e, 0x656d, 0x7d, XT_EXIT, 
-/* 0x10aa: WORDS */ F_tokenDoList, XT_CR, XT_CONTEXT, XT__40, XT__40, XT__3FDUP, XT__3Fbranch, XT_WORDS + 0x20, XT_DUP, XT_SPACE, XT__2EID, XT_CELL_2D, XT_NUF_3F, XT__3Fbranch, XT_WORDS + 8, XT_DROP, XT_EXIT, 
-/* 0x10cc: FORTH>NAME */ F_tokenDoList, XT_CURRENT, XT_CELL_2B, XT__40, XT__3FDUP, XT__3Fbranch, XT_FORTH_3ENAME + 0x36, XT_2DUP, XT__40, XT_DUP, XT__3Fbranch, XT_FORTH_3ENAME + 0x28, XT_2DUP, XT_NAME_3E, XT_XOR, XT__3Fbranch, XT_FORTH_3ENAME + 0x28, XT_CELL_2D, XT_branch, XT_FORTH_3ENAME + 0x10, XT_NIP, XT__3FDUP, XT__3Fbranch, XT_FORTH_3ENAME + 4, XT_NIP, XT_NIP, XT_EXIT, XT_DROP, XT_doLIT, 0, XT_EXIT, 
-/* 0x110a: SEE */ F_tokenDoList, XT__27, XT_CR, XT_DUP, XT__40, XT_tokenDoList, XT__3D, XT__3Fbranch, XT_SEE + 0x6a, XT__2E_22_7C, 0x3a02, 0x20, XT_DUP, XT__3ENAME, XT__2EID, XT_CELL_2B, XT_DUP, XT__40, XT_DUP, XT__3Fbranch, XT_SEE + 0x2c, XT__3ENAME, XT__3FDUP, XT__3Fbranch, XT_SEE + 0x5a, XT_SPACE, XT__2EID, XT_DUP, XT__40, XT_doLIT, XT_EXIT, XT__3D, XT_OVER, XT_CELL_2B, XT__40, XT_doLIT, 0x14, XT__3C, XT_AND, XT__3Fbranch, XT_SEE + 0x56, XT_DROP, XT_EXIT, XT_branch, XT_SEE + 0x60, XT_DUP, XT__40, XT_U_2E, XT_NUF_3F, XT__3Fbranch, XT_SEE + 0x1e, XT_branch, XT_SEE + 0x82, XT__2E_22_7C, 0x4e14, 0x746f, 0x6320, 0x6c6f, 0x6e6f, 0x6420, 0x6665, 0x6e69, 0x7469, 0x6f69, 0x6e, XT_DROP, XT_EXIT, 
-/* 0x1190: VER */ F_tokenNextVal, 0xa, 
-/* 0x1194: version */ F_tokenDoList, XT_CR, XT__2E_22_7C, 0x770a, 0x6265, 0x4f46, 0x5452, 0x2048, 0x56, XT_VER, XT__3C_23, XT__23, XT__23, XT_doLIT, 0x2e, XT_HOLD, XT__23, XT__23, XT_doLIT, 0x2e, XT_HOLD, XT__23, XT__23_3E, XT_TYPE, XT_CR, XT_EXIT, 
-/* 0x11c8: hi */ F_tokenDoList, XT__21IO, XT_version, XT_EXIT, 
-/* 0x11d0: EMPTY */ F_tokenDoList, XT_FORTH, XT_CONTEXT, XT__40, XT_DUP, XT_CURRENT, XT_2_21, XT_EXIT, 
-/* 0x11e0: 'BOOT */ F_tokenCreate, 0, XT_hi, 
-/* 0x11e6: COLD */ F_tokenDoList, XT_userAreaInit, XT_PRESET, XT_CONSOLE, XT__27BOOT, XT__40EXECUTE, XT_EMPTY, XT_OVERT, XT_QUIT, XT_branch, XT_COLD + 2, XT_EXIT, 
-/* 0x11fe: WARM */ F_tokenDoList, XT_CONSOLE, XT__27BOOT, XT__40EXECUTE, XT_QUIT, XT_EXIT, 
+/* 0x80: FORTH */ F_tokenVocabulary, 0x8000,
+/* 0x84: CELLL */ F_tokenNextVal, 2,
+/* 0x88: CELLbits */ F_tokenNextVal, 0x10,
+/* 0x8c: CELLMASK */ F_tokenNextVal, 0xff1f,
+/* 0x90: TIB0 */ F_tokenNextVal, 0x8270,
+/* 0x94: =COMP */ F_tokenNextVal, 0x40,
+/* 0x98: =IMED */ F_tokenNextVal, XT_FORTH,
+/* 0x9c: =BYTEMASK */ F_tokenNextVal, 0x1f,
+/* 0xa0: BL */ F_tokenNextVal, 0x20,
+/* 0xa4: tokenVocabulary */ F_tokenNextVal, 1,
+/* 0xa8: tokenNextVal */ F_tokenNextVal, 2,
+/* 0xac: tokenDoList */ F_tokenNextVal, 3,
+/* 0xb0: tokenUser */ F_tokenNextVal, 4,
+/* 0xb4: tokenVar */ F_tokenNextVal, 5,
+/* 0xb8: tokenCreate */ F_tokenNextVal, 6,
+/* 0xbc: ALIGNED */ F_ALIGNED,
+/* 0xbe: find */ F_jsFind,
+/* 0xc0: OVERT */ F_OVERT,
+/* 0xc2: $,n */ F_dollarCommaN,
+/* 0xc4: >NAME */ F_ToNAME,
+/* 0xc6: MS */ F_MS,
+/* 0xc8: BYE */ F_BYE,
+/* 0xca: EXIT */ F_EXIT,
+/* 0xcc: EXECUTE */ F_EXECUTE,
+/* 0xce: ?RX */ F_QRX,
+/* 0xd0: TX! */ F_TXbang,
+/* 0xd2: !IO */ F_bangIO,
+/* 0xd4: doLIT */ F_doLIT,
+/* 0xd6: DOES> */ F_DOES,
+/* 0xd8: next */ F_next,
+/* 0xda: ?branch */ F_qBranch,
+/* 0xdc: branch */ F_branch,
+/* 0xde: ! */ F_store,
+/* 0xe0: @ */ F_fetch,
+/* 0xe2: C@ */ F_cFetch,
+/* 0xe4: C! */ F_cStore,
+/* 0xe6: RP@ */ F_RPat,
+/* 0xe8: RP! */ F_RPbang,
+/* 0xea: R> */ F_Rfrom,
+/* 0xec: R@ */ F_Rat,
+/* 0xee: >R */ F_toR,
+/* 0xf0: SP@ */ F_SPat,
+/* 0xf2: SP! */ F_SPbang,
+/* 0xf4: DROP */ F_DROP,
+/* 0xf6: DUP */ F_DUP,
+/* 0xf8: SWAP */ F_SWAP,
+/* 0xfa: OVER */ F_OVER,
+/* 0xfc: 0< */ F_less0,
+/* 0xfe: AND */ F_AND,
+/* 0x100: OR */ F_OR,
+/* 0x102: XOR */ F_XOR,
+/* 0x104: UM+ */ F_UMplus,
+/* 0x106: userAreaInit */ F_userAreaInit,
+/* 0x108: userAreaSave */ F_userAreaSave,
+/* 0x10a: PARSE */ F_PARSE,
+/* 0x10c: TOKEN */ F_TOKEN,
+/* 0x10e: NUMBER? */ F_NUMBERQ,
+/* 0x110: $COMPILE */ F_dCOMPILE,
+/* 0x112: $INTERPRET */ F_dINTERPRET,
+/* 0x114: [ */ F_openBracket,
+/* 0x116: ] */ F_closeBracket,
+/* 0x118: : */ F_colon,
+/* 0x11a: ; */ F_semicolon,
+/* 0x11c: ' */ F_tick,
+/* 0x11e: debugNA */ F_debugNA,
+/* 0x120: testing3 */ F_testing3,
+/* 0x122: Fbreak */ F_Fbreak,
+/* 0x124: debugPrintTIB */ F_debugPrintTIB,
+/* 0x126: TEST */ F_TEST,
+/* 0x128: SP0 */ F_tokenUser, 4,
+/* 0x12c: RP0 */ F_tokenUser, 5,
+/* 0x130: '?KEY */ F_tokenUser, 6,
+/* 0x134: 'EMIT */ F_tokenUser, 7,
+/* 0x138: 'EXPECT */ F_tokenUser, 8,
+/* 0x13c: 'TAP */ F_tokenUser, 9,
+/* 0x140: 'ECHO */ F_tokenUser, 0xa,
+/* 0x144: 'PROMPT */ F_tokenUser, 0xb,
+/* 0x148: BASE */ F_tokenUser, 0xc,
+/* 0x14c: temp */ F_tokenUser, 0xd,
+/* 0x150: SPAN */ F_tokenUser, 0xe,
+/* 0x154: >IN */ F_tokenUser, 0xf,
+/* 0x158: #TIB */ F_tokenUser, 0x10,
+/* 0x15c: CSP */ F_tokenUser, 0x12,
+/* 0x160: 'EVAL */ F_tokenUser, 0x13,
+/* 0x164: 'NUMBER */ F_tokenUser, 0x14,
+/* 0x168: HLD */ F_tokenUser, 0x15,
+/* 0x16c: HANDLER */ F_tokenUser, 0x16,
+/* 0x170: CONTEXT */ F_tokenUser, 0x17,
+/* 0x174: CURRENT */ F_tokenUser, 0x20,
+/* 0x178: CP */ F_tokenUser, 0x22,
+/* 0x17c: NP */ F_tokenUser, 0x23,
+/* 0x180: LAST */ F_tokenUser, 0x24,
+/* 0x184: VP */ F_tokenUser, 0x25,
+/* 0x188: 2DROP */ F_tokenDoList, XT_DROP, XT_DROP, XT_EXIT,
+/* 0x190: setHeaderBits */ F_tokenDoList, XT_LAST, XT__40, XT_C_40, XT_OR, XT_LAST, XT__40, XT_C_21, XT_EXIT,
+/* 0x1a2: COMPILE-ONLY */ F_tokenDoList, XT__3DCOMP, XT_setHeaderBits, XT_EXIT,
+/* 0x1aa: IMMEDIATE */ F_tokenDoList, XT__3DIMED, XT_setHeaderBits, XT_EXIT,
+/* 0x1b2: ( */ F_tokenDoList, XT_doLIT, 0x29, XT_PARSE, XT_2DROP, XT_EXIT,
+/* 0x1be: \ */ F_tokenDoList, XT__23TIB, XT__40, XT__3EIN, XT__21, XT_EXIT,
+/* 0x1ca: \T */ F_tokenDoList, XT__23TIB, XT__40, XT__3EIN, XT__21, XT_EXIT,
+/* 0x1d6: NIP */ F_tokenDoList, XT_SWAP, XT_DROP, XT_EXIT,
+/* 0x1de: HERE */ F_tokenDoList, XT_CP, XT__40, XT_EXIT,
+/* 0x1e6: CELL+ */ F_tokenDoList, XT_CELLL, XT_UM_2B, XT_DROP, XT_EXIT,
+/* 0x1f0: , */ F_tokenDoList, XT_HERE, XT_ALIGNED, XT_DUP, XT_CELL_2B, XT_CP, XT__21, XT__21, XT_EXIT,
+/* 0x202: [COMPILE] */ F_tokenDoList, XT__27, XT__2C, XT_EXIT,
+/* 0x20a: COMPILE */ F_tokenDoList, XT_R_3E, XT_DUP, XT__40, XT__2C, XT_CELL_2B, XT__3ER, XT_EXIT,
+/* 0x21a: LITERAL */ F_tokenDoList, XT_COMPILE, XT_doLIT, XT__2C, XT_EXIT,
+/* 0x224: create */ F_tokenDoList, XT_TOKEN, XT__24_2Cn, XT_OVERT, XT__2C, XT_doLIT, 0, XT__2C, XT_EXIT,
+/* 0x236: CREATE */ F_tokenDoList, XT_tokenCreate, XT_create, XT_EXIT,
+/* 0x23e: <MARK */ F_tokenDoList, XT_HERE, XT_EXIT,
+/* 0x244: <RESOLVE */ F_tokenDoList, XT__2C, XT_EXIT,
+/* 0x24a: >MARK */ F_tokenDoList, XT_HERE, XT_doLIT, 0, XT__2C, XT_EXIT,
+/* 0x256: >RESOLVE */ F_tokenDoList, XT__3CMARK, XT_SWAP, XT__21, XT_EXIT,
+/* 0x260: FOR */ F_tokenDoList, XT_COMPILE, XT__3ER, XT__3CMARK, XT_EXIT,
+/* 0x26a: BEGIN */ F_tokenDoList, XT__3CMARK, XT_EXIT,
+/* 0x270: NEXT */ F_tokenDoList, XT_COMPILE, XT_next, XT__3CRESOLVE, XT_EXIT,
+/* 0x27a: UNTIL */ F_tokenDoList, XT_COMPILE, XT__3Fbranch, XT__3CRESOLVE, XT_EXIT,
+/* 0x284: AGAIN */ F_tokenDoList, XT_COMPILE, XT_branch, XT__3CRESOLVE, XT_EXIT,
+/* 0x28e: IF */ F_tokenDoList, XT_COMPILE, XT__3Fbranch, XT__3EMARK, XT_EXIT,
+/* 0x298: AHEAD */ F_tokenDoList, XT_COMPILE, XT_branch, XT__3EMARK, XT_EXIT,
+/* 0x2a2: REPEAT */ F_tokenDoList, XT_AGAIN, XT__3ERESOLVE, XT_EXIT,
+/* 0x2aa: THEN */ F_tokenDoList, XT__3ERESOLVE, XT_EXIT,
+/* 0x2b0: AFT */ F_tokenDoList, XT_DROP, XT_AHEAD, XT_BEGIN, XT_SWAP, XT_EXIT,
+/* 0x2bc: ELSE */ F_tokenDoList, XT_AHEAD, XT_SWAP, XT_THEN, XT_EXIT,
+/* 0x2c6: WHEN */ F_tokenDoList, XT_IF, XT_OVER, XT_EXIT,
+/* 0x2ce: WHILE */ F_tokenDoList, XT_IF, XT_SWAP, XT_EXIT,
+/* 0x2d6: ?DUP */ F_tokenDoList, XT_DUP, XT__3Fbranch, XT__3FDUP + 0xa, XT_DUP, XT_EXIT,
+/* 0x2e2: ROT */ F_tokenDoList, XT__3ER, XT_SWAP, XT_R_3E, XT_SWAP, XT_EXIT,
+/* 0x2ee: -ROT */ F_tokenDoList, XT_SWAP, XT__3ER, XT_SWAP, XT_R_3E, XT_EXIT,
+/* 0x2fa: 2DUP */ F_tokenDoList, XT_OVER, XT_OVER, XT_EXIT,
+/* 0x302: + */ F_tokenDoList, XT_UM_2B, XT_DROP, XT_EXIT,
+/* 0x30a: D+ */ F_tokenDoList, XT__3ER, XT_SWAP, XT__3ER, XT_UM_2B, XT_R_3E, XT_R_3E, XT__2B, XT__2B, XT_EXIT,
+/* 0x31e: INVERT */ F_tokenDoList, XT_doLIT, 0xffff, XT_XOR, XT_EXIT,
+/* 0x328: NEGATE */ F_tokenDoList, XT_INVERT, XT_doLIT, 1, XT__2B, XT_EXIT,
+/* 0x334: DNEGATE */ F_tokenDoList, XT_INVERT, XT__3ER, XT_INVERT, XT_doLIT, 1, XT_UM_2B, XT_R_3E, XT__2B, XT_EXIT,
+/* 0x348: - */ F_tokenDoList, XT_NEGATE, XT__2B, XT_EXIT,
+/* 0x350: ABS */ F_tokenDoList, XT_DUP, XT_0_3C, XT__3Fbranch, XT_ABS + 0xc, XT_NEGATE, XT_EXIT,
+/* 0x35e: 0= */ F_tokenDoList, XT__3Fbranch, XT_0_3D + 0xe, XT_doLIT, 0, XT_branch, XT_0_3D + 0x12, XT_doLIT, 0xffff, XT_EXIT,
+/* 0x372: = */ F_tokenDoList, XT_XOR, XT__3Fbranch, XT__3D + 0xe, XT_doLIT, 0, XT_EXIT, XT_doLIT, 0xffff, XT_EXIT,
+/* 0x386: U< */ F_tokenDoList, XT_2DUP, XT_XOR, XT_0_3C, XT__3Fbranch, XT_U_3C + 0x12, XT_NIP, XT_0_3C, XT_EXIT, XT__2D, XT_0_3C, XT_EXIT,
+/* 0x39e: < */ F_tokenDoList, XT_2DUP, XT_XOR, XT_0_3C, XT__3Fbranch, XT__3C + 0x12, XT_DROP, XT_0_3C, XT_EXIT, XT__2D, XT_0_3C, XT_EXIT,
+/* 0x3b6: MAX */ F_tokenDoList, XT_2DUP, XT__3C, XT__3Fbranch, XT_MAX + 0xc, XT_SWAP, XT_DROP, XT_EXIT,
+/* 0x3c6: MIN */ F_tokenDoList, XT_2DUP, XT_SWAP, XT__3C, XT__3Fbranch, XT_MIN + 0xe, XT_SWAP, XT_DROP, XT_EXIT,
+/* 0x3d8: WITHIN */ F_tokenDoList, XT_OVER, XT__2D, XT__3ER, XT__2D, XT_R_3E, XT_U_3C, XT_EXIT,
+/* 0x3e8: UM/MOD */ F_tokenDoList, XT_2DUP, XT_U_3C, XT__3Fbranch, XT_UM_2FMOD + 0x58, XT_NEGATE, XT_CELLbits, XT__3ER, XT_branch, XT_UM_2FMOD + 0x4e, XT__3ER, XT_DUP, XT_UM_2B, XT__3ER, XT__3ER, XT_DUP, XT_UM_2B, XT_R_3E, XT__2B, XT_DUP, XT_R_3E, XT_R_40, XT_SWAP, XT__3ER, XT_UM_2B, XT_R_3E, XT_OR, XT__3Fbranch, XT_UM_2FMOD + 0x4a, XT__3ER, XT_DROP, XT_doLIT, 1, XT__2B, XT_R_3E, XT_branch, XT_UM_2FMOD + 0x4c, XT_DROP, XT_R_3E, XT_next, XT_UM_2FMOD + 0x14, XT_DROP, XT_SWAP, XT_EXIT, XT_DROP, XT_2DROP, XT_doLIT, 0xffff, XT_DUP, XT_EXIT,
+/* 0x44c: M/MOD */ F_tokenDoList, XT_DUP, XT_0_3C, XT_DUP, XT__3ER, XT__3Fbranch, XT_M_2FMOD + 0x16, XT_NEGATE, XT__3ER, XT_DNEGATE, XT_R_3E, XT__3ER, XT_DUP, XT_0_3C, XT__3Fbranch, XT_M_2FMOD + 0x24, XT_R_40, XT__2B, XT_R_3E, XT_UM_2FMOD, XT_R_3E, XT__3Fbranch, XT_M_2FMOD + 0x34, XT_SWAP, XT_NEGATE, XT_SWAP, XT_EXIT,
+/* 0x482: /MOD */ F_tokenDoList, XT_OVER, XT_0_3C, XT_SWAP, XT_M_2FMOD, XT_EXIT,
+/* 0x48e: MOD */ F_tokenDoList, XT__2FMOD, XT_DROP, XT_EXIT,
+/* 0x496: / */ F_tokenDoList, XT__2FMOD, XT_NIP, XT_EXIT,
+/* 0x49e: UM* */ F_tokenDoList, XT_doLIT, 0, XT_SWAP, XT_CELLbits, XT__3ER, XT_branch, XT_UM_2A + 0x30, XT_DUP, XT_UM_2B, XT__3ER, XT__3ER, XT_DUP, XT_UM_2B, XT_R_3E, XT__2B, XT_R_3E, XT__3Fbranch, XT_UM_2A + 0x30, XT__3ER, XT_OVER, XT_UM_2B, XT_R_3E, XT__2B, XT_next, XT_UM_2A + 0x10, XT_ROT, XT_DROP, XT_EXIT,
+/* 0x4d8: * */ F_tokenDoList, XT_UM_2A, XT_DROP, XT_EXIT,
+/* 0x4e0: M* */ F_tokenDoList, XT_2DUP, XT_XOR, XT_0_3C, XT__3ER, XT_ABS, XT_SWAP, XT_ABS, XT_UM_2A, XT_R_3E, XT__3Fbranch, XT_M_2A + 0x1a, XT_DNEGATE, XT_EXIT,
+/* 0x4fc: * /MOD */ F_tokenDoList, XT__3ER, XT_M_2A, XT_R_3E, XT_M_2FMOD, XT_EXIT,
+/* 0x508: * / */ F_tokenDoList, XT__2A_2FMOD, XT_NIP, XT_EXIT,
+/* 0x510: CELL- */ F_tokenDoList, XT_CELLL, XT__2D, XT_EXIT,
+/* 0x518: CELLS */ F_tokenDoList, XT_CELLL, XT__2A, XT_EXIT,
+/* 0x520: >CHAR */ F_tokenDoList, XT_doLIT, 0x7f, XT_AND, XT_DUP, XT_doLIT, 0x7f, XT_BL, XT_WITHIN, XT__3Fbranch, XT__3ECHAR + 0x1c, XT_DROP, XT_doLIT, 0x5f, XT_EXIT,
+/* 0x53e: DEPTH */ F_tokenDoList, XT_SP_40, XT_SP0, XT__40, XT_SWAP, XT__2D, XT_CELLL, XT__2F, XT_EXIT,
+/* 0x550: PICK */ F_tokenDoList, XT_doLIT, 1, XT__2B, XT_CELLS, XT_SP_40, XT__2B, XT__40, XT_EXIT,
+/* 0x562: +! */ F_tokenDoList, XT_SWAP, XT_OVER, XT__40, XT__2B, XT_SWAP, XT__21, XT_EXIT,
+/* 0x572: 2! */ F_tokenDoList, XT_SWAP, XT_OVER, XT__21, XT_CELL_2B, XT__21, XT_EXIT,
+/* 0x580: 2@ */ F_tokenDoList, XT_DUP, XT_CELL_2B, XT__40, XT_SWAP, XT__40, XT_EXIT,
+/* 0x58e: vHERE */ F_tokenDoList, XT_VP, XT__40, XT__3FDUP, XT__3Fbranch, XT_vHERE + 0xe, XT_EXIT, XT_HERE, XT_EXIT,
+/* 0x5a0: v, */ F_tokenDoList, XT_VP, XT__40, XT__3FDUP, XT__3Fbranch, XT_v_2C + 0x1c, XT_ALIGNED, XT_DUP, XT_CELL_2B, XT_VP, XT__21, XT__21, XT_branch, XT_v_2C + 0x1e, XT__2C, XT_EXIT,
+/* 0x5c0: vALIGN */ F_tokenDoList, XT_VP, XT__40, XT_ALIGNED, XT_VP, XT__21, XT_EXIT,
+/* 0x5ce: vCREATE */ F_tokenDoList, XT_VP, XT__40, XT__3FDUP, XT__3Fbranch, XT_vCREATE + 0x18, XT_tokenVar, XT_create, XT_vALIGN, XT__2C, XT_branch, XT_vCREATE + 0x1a, XT_CREATE, XT_EXIT,
+/* 0x5ea: PAD */ F_tokenDoList, XT_HERE, XT_doLIT, 0x50, XT__2B, XT_EXIT,
+/* 0x5f6: TIB */ F_tokenDoList, XT__23TIB, XT_CELL_2B, XT__40, XT_EXIT,
+/* 0x600: @EXECUTE */ F_tokenDoList, XT__40, XT__3FDUP, XT__3Fbranch, XT__40EXECUTE + 0x10, XT_EXECUTE, XT_branch, XT__40EXECUTE + 0x12, XT_Fbreak, XT_EXIT,
+/* 0x614: COUNT */ F_tokenDoList, XT_DUP, XT_doLIT, 1, XT__2B, XT_SWAP, XT_C_40, XT_EXIT,
+/* 0x624: CMOVE */ F_tokenDoList, XT__3ER, XT_branch, XT_CMOVE + 0x20, XT__3ER, XT_DUP, XT_C_40, XT_R_40, XT_C_21, XT_doLIT, 1, XT__2B, XT_R_3E, XT_doLIT, 1, XT__2B, XT_next, XT_CMOVE + 8, XT_2DROP, XT_EXIT,
+/* 0x64c: FILL */ F_tokenDoList, XT_SWAP, XT__3ER, XT_SWAP, XT_branch, XT_FILL + 0x16, XT_2DUP, XT_C_21, XT_doLIT, 1, XT__2B, XT_next, XT_FILL + 0xc, XT_2DROP, XT_EXIT,
+/* 0x66a: -TRAILING */ F_tokenDoList, XT__3ER, XT_branch, XT__2DTRAILING + 0x22, XT_BL, XT_OVER, XT_R_40, XT__2B, XT_C_40, XT__3C, XT__3Fbranch, XT__2DTRAILING + 0x22, XT_R_3E, XT_doLIT, 1, XT__2B, XT_EXIT, XT_next, XT__2DTRAILING + 8, XT_doLIT, 0, XT_EXIT,
+/* 0x696: PACK$ */ F_tokenDoList, XT_ALIGNED, XT_DUP, XT__3ER, XT_OVER, XT_DUP, XT_doLIT, 0, XT_CELLL, XT_UM_2FMOD, XT_DROP, XT__2D, XT_OVER, XT__2B, XT_doLIT, 0, XT_SWAP, XT__21, XT_2DUP, XT_C_21, XT_doLIT, 1, XT__2B, XT_SWAP, XT_CMOVE, XT_R_3E, XT_EXIT, XT_EXIT, XT_EXIT,
+/* 0x6d0: DIGIT */ F_tokenDoList, XT_doLIT, 9, XT_OVER, XT__3C, XT_doLIT, 7, XT_AND, XT__2B, XT_doLIT, 0x30, XT__2B, XT_EXIT,
+/* 0x6ea: EXTRACT */ F_tokenDoList, XT_doLIT, 0, XT_SWAP, XT_UM_2FMOD, XT_SWAP, XT_DIGIT, XT_EXIT,
+/* 0x6fa: <# */ F_tokenDoList, XT_PAD, XT_HLD, XT__21, XT_EXIT,
+/* 0x704: HOLD */ F_tokenDoList, XT_HLD, XT__40, XT_doLIT, 1, XT__2D, XT_DUP, XT_HLD, XT__21, XT_C_21, XT_EXIT,
+/* 0x71a: # */ F_tokenDoList, XT_BASE, XT__40, XT_EXTRACT, XT_HOLD, XT_EXIT,
+/* 0x726: #S */ F_tokenDoList, XT__23, XT_DUP, XT__3Fbranch, XT__23S + 0xe, XT_branch, XT__23S + 2, XT_EXIT,
+/* 0x736: SIGN */ F_tokenDoList, XT_0_3C, XT__3Fbranch, XT_SIGN + 0xe, XT_doLIT, 0x2d, XT_HOLD, XT_EXIT,
+/* 0x746: #> */ F_tokenDoList, XT_DROP, XT_HLD, XT__40, XT_PAD, XT_OVER, XT__2D, XT_EXIT,
+/* 0x756: EMIT */ F_tokenDoList, XT__27EMIT, XT__40EXECUTE, XT_EXIT,
+/* 0x75e: SPACE */ F_tokenDoList, XT_BL, XT_EMIT, XT_EXIT,
+/* 0x766: CHARS */ F_tokenDoList, XT_SWAP, XT_doLIT, 0, XT_MAX, XT__3ER, XT_branch, XT_CHARS + 0x14, XT_DUP, XT_EMIT, XT_next, XT_CHARS + 0x10, XT_DROP, XT_EXIT,
+/* 0x782: SPACES */ F_tokenDoList, XT_BL, XT_CHARS, XT_EXIT,
+/* 0x78a: TYPE */ F_tokenDoList, XT__3ER, XT_branch, XT_TYPE + 0x14, XT_DUP, XT_C_40, XT_EMIT, XT_doLIT, 1, XT__2B, XT_next, XT_TYPE + 8, XT_DROP, XT_EXIT,
+/* 0x7a6: .$ */ F_tokenDoList, XT_COUNT, XT_TYPE, XT_EXIT,
+/* 0x7ae: str */ F_tokenDoList, XT_DUP, XT__3ER, XT_ABS, XT__3C_23, XT__23S, XT_R_3E, XT_SIGN, XT__23_3E, XT_EXIT,
+/* 0x7c2: HEX */ F_tokenDoList, XT_doLIT, 0x10, XT_BASE, XT__21, XT_EXIT,
+/* 0x7ce: DECIMAL */ F_tokenDoList, XT_doLIT, 0xa, XT_BASE, XT__21, XT_EXIT,
+/* 0x7da: .R */ F_tokenDoList, XT__3ER, XT_str, XT_R_3E, XT_OVER, XT__2D, XT_SPACES, XT_TYPE, XT_EXIT,
+/* 0x7ec: U.R */ F_tokenDoList, XT__3ER, XT__3C_23, XT__23S, XT__23_3E, XT_R_3E, XT_OVER, XT__2D, XT_SPACES, XT_TYPE, XT_EXIT,
+/* 0x802: U. */ F_tokenDoList, XT__3C_23, XT__23S, XT__23_3E, XT_SPACE, XT_TYPE, XT_EXIT,
+/* 0x810: . */ F_tokenDoList, XT_BASE, XT__40, XT_doLIT, 0xa, XT_XOR, XT__3Fbranch, XT__2E + 0x14, XT_U_2E, XT_EXIT, XT_str, XT_SPACE, XT_TYPE, XT_EXIT,
+/* 0x82c: ? */ F_tokenDoList, XT__40, XT__2E, XT_EXIT,
+/* 0x834: DIGIT? */ F_tokenDoList, XT__3ER, XT_doLIT, 0x30, XT__2D, XT_doLIT, 9, XT_OVER, XT__3C, XT__3Fbranch, XT_DIGIT_3F + 0x26, XT_doLIT, 7, XT__2D, XT_DUP, XT_doLIT, 0xa, XT__3C, XT_OR, XT_DUP, XT_R_3E, XT_U_3C, XT_EXIT,
+/* 0x862: NUMBER? */ F_tokenDoList, XT_BASE, XT__40, XT__3ER, XT_doLIT, 0, XT_OVER, XT_COUNT, XT_OVER, XT_C_40, XT_doLIT, 0x24, XT__3D, XT__3Fbranch, XT_NUMBER_3F + 0x30, XT_HEX, XT_SWAP, XT_doLIT, 1, XT__2B, XT_SWAP, XT_doLIT, 1, XT__2D, XT_OVER, XT_C_40, XT_doLIT, 0x2d, XT__3D, XT__3ER, XT_SWAP, XT_R_40, XT__2D, XT_SWAP, XT_R_40, XT__2B, XT__3FDUP, XT__3Fbranch, XT_NUMBER_3F + 0x9a, XT_doLIT, 1, XT__2D, XT__3ER, XT_DUP, XT__3ER, XT_C_40, XT_BASE, XT__40, XT_DIGIT_3F, XT__3Fbranch, XT_NUMBER_3F + 0x8c, XT_SWAP, XT_BASE, XT__40, XT__2A, XT__2B, XT_R_3E, XT_doLIT, 1, XT__2B, XT_next, XT_NUMBER_3F + 0x56, XT_DROP, XT_R_40, XT__3Fbranch, XT_NUMBER_3F + 0x86, XT_NEGATE, XT_SWAP, XT_branch, XT_NUMBER_3F + 0x98, XT_R_3E, XT_R_3E, XT_2DROP, XT_2DROP, XT_doLIT, 0, XT_DUP, XT_R_3E, XT_2DROP, XT_R_3E, XT_BASE, XT__21, XT_EXIT,
+/* 0x908: ?KEY */ F_tokenDoList, XT__27_3FKEY, XT__40EXECUTE, XT_EXIT,
+/* 0x910: KEY */ F_tokenDoList, XT_doLIT, 0, XT_MS, XT_doLIT, XT_BYE, XT__3FKEY, XT__3Fbranch, XT_KEY + 6, XT_NIP, XT_EXIT,
+/* 0x926: NUF? */ F_tokenDoList, XT__3FKEY, XT_DUP, XT__3Fbranch, XT_NUF_3F + 0x14, XT_2DROP, XT_KEY, XT_doLIT, 0xd, XT__3D, XT_EXIT,
+/* 0x93c: PACE */ F_tokenDoList, XT_doLIT, 0xb, XT_EMIT, XT_EXIT,
+/* 0x946: CR */ F_tokenDoList, XT_doLIT, 0xd, XT_EMIT, XT_doLIT, 0xa, XT_EMIT, XT_EXIT,
+/* 0x956: do$ */ F_tokenDoList, XT_R_3E, XT_R_40, XT_R_3E, XT_COUNT, XT__2B, XT_ALIGNED, XT__3ER, XT_SWAP, XT__3ER, XT_EXIT,
+/* 0x96c: $"| */ F_tokenDoList, XT_do_24, XT_EXIT,
+/* 0x972: ."| */ F_tokenDoList, XT_do_24, XT__2E_24, XT_EXIT,
+/* 0x97a: parse */ F_tokenDoList, XT_temp, XT__21, XT_OVER, XT__3ER, XT_DUP, XT__3Fbranch, XT_parse + 0x9a, XT_doLIT, 1, XT__2D, XT_temp, XT__40, XT_BL, XT__3D, XT__3Fbranch, XT_parse + 0x4c, XT__3ER, XT_BL, XT_OVER, XT_C_40, XT__2D, XT_0_3C, XT_INVERT, XT__3Fbranch, XT_parse + 0x4a, XT_doLIT, 1, XT__2B, XT_next, XT_parse + 0x24, XT_R_3E, XT_DROP, XT_doLIT, 0, XT_DUP, XT_EXIT, XT_R_3E, XT_OVER, XT_SWAP, XT__3ER, XT_temp, XT__40, XT_OVER, XT_C_40, XT__2D, XT_temp, XT__40, XT_BL, XT__3D, XT__3Fbranch, XT_parse + 0x6a, XT_0_3C, XT__3Fbranch, XT_parse + 0x80, XT_doLIT, 1, XT__2B, XT_next, XT_parse + 0x52, XT_DUP, XT__3ER, XT_branch, XT_parse + 0x8e, XT_R_3E, XT_DROP, XT_DUP, XT_doLIT, 1, XT__2B, XT__3ER, XT_OVER, XT__2D, XT_R_3E, XT_R_3E, XT__2D, XT_EXIT, XT_OVER, XT_R_3E, XT__2D, XT_EXIT,
+/* 0xa1c: PARSE */ F_tokenDoList, XT__3ER, XT_TIB, XT__3EIN, XT__40, XT__2B, XT__23TIB, XT__40, XT__3EIN, XT__40, XT__2D, XT_R_3E, XT_parse, XT__3EIN, XT__2B_21, XT_EXIT,
+/* 0xa3c: CHAR */ F_tokenDoList, XT_BL, XT_PARSE, XT_DROP, XT_C_40, XT_EXIT,
+/* 0xa48: CTRL */ F_tokenDoList, XT_CHAR, XT_doLIT, 0x1f, XT_AND, XT_EXIT,
+/* 0xa54: .( */ F_tokenDoList, XT_doLIT, 0x29, XT_PARSE, XT_TYPE, XT_EXIT,
+/* 0xa60: TOKEN */ F_tokenDoList, XT_BL, XT_PARSE, XT__3DBYTEMASK, XT_MIN, XT_NP, XT__40, XT_OVER, XT__2D, XT_CELLL, XT__2D, XT_PACK_24, XT_EXIT,
+/* 0xa7a: WORD */ F_tokenDoList, XT_PARSE, XT_HERE, XT_PACK_24, XT_EXIT,
+/* 0xa84: NAME> */ F_tokenDoList, XT_doLIT, 2, XT_CELLS, XT__2D, XT__40, XT_EXIT,
+/* 0xa92: SAME? */ F_tokenDoList, XT__3ER, XT_branch, XT_SAME_3F + 0x2a, XT_OVER, XT_R_40, XT_CELLS, XT__2B, XT__40, XT_OVER, XT_R_40, XT_CELLS, XT__2B, XT__40, XT__2D, XT__3FDUP, XT__3Fbranch, XT_SAME_3F + 0x2a, XT_R_3E, XT_DROP, XT_EXIT, XT_next, XT_SAME_3F + 8, XT_doLIT, 0, XT_EXIT,
+/* 0xac6: FORTHfind */ F_tokenDoList, XT_SWAP, XT_DUP, XT_C_40, XT_CELLL, XT__2F, XT_temp, XT__21, XT_DUP, XT__40, XT__3ER, XT_CELL_2B, XT_SWAP, XT__40, XT_DUP, XT__3Fbranch, XT_FORTHfind + 0x4a, XT_DUP, XT__40, XT_doLIT, 0xff1f, XT_AND, XT_R_40, XT_XOR, XT__3Fbranch, XT_FORTHfind + 0x3e, XT_CELL_2B, XT_doLIT, 0xffff, XT_branch, XT_FORTHfind + 0x46, XT_CELL_2B, XT_temp, XT__40, XT_SAME_3F, XT_branch, XT_FORTHfind + 0x56, XT_R_3E, XT_DROP, XT_SWAP, XT_CELL_2D, XT_SWAP, XT_EXIT, XT__3Fbranch, XT_FORTHfind + 0x62, XT_CELL_2D, XT_CELL_2D, XT_branch, XT_FORTHfind + 0x1a, XT_R_3E, XT_DROP, XT_NIP, XT_CELL_2D, XT_DUP, XT_NAME_3E, XT_SWAP, XT_EXIT,
+/* 0xb38: NAME? */ F_tokenDoList, XT_CONTEXT, XT_DUP, XT_2_40, XT_XOR, XT__3Fbranch, XT_NAME_3F + 0x10, XT_CELL_2D, XT__3ER, XT_R_3E, XT_CELL_2B, XT_DUP, XT__3ER, XT__40, XT__3FDUP, XT__3Fbranch, XT_NAME_3F + 0x30, XT_find, XT__3FDUP, XT__3Fbranch, XT_NAME_3F + 0x12, XT_R_3E, XT_DROP, XT_EXIT, XT_R_3E, XT_DROP, XT_doLIT, 0, XT_EXIT,
+/* 0xb72: ^H */ F_tokenDoList, XT__3ER, XT_OVER, XT_R_40, XT__3C, XT_DUP, XT__3Fbranch, XT__5EH + 0x26, XT_doLIT, 8, XT__27ECHO, XT__40EXECUTE, XT_BL, XT__27ECHO, XT__40EXECUTE, XT_doLIT, 8, XT__27ECHO, XT__40EXECUTE, XT_R_3E, XT__2B, XT_EXIT,
+/* 0xb9e: TAP */ F_tokenDoList, XT_DUP, XT__27ECHO, XT__40EXECUTE, XT_OVER, XT_C_21, XT_doLIT, 1, XT__2B, XT_EXIT,
+/* 0xbb2: kTAP */ F_tokenDoList, XT_DUP, XT_doLIT, 0xd, XT__3D, XT_OVER, XT_doLIT, 0xa, XT__3D, XT_OR, XT_0_3D, XT__3Fbranch, XT_kTAP + 0x3a, XT_doLIT, 8, XT__3D, XT_OVER, XT_doLIT, 0x7f, XT__3D, XT_OR, XT__3Fbranch, XT_kTAP + 0x36, XT_BL, XT_TAP, XT_branch, XT_kTAP + 0x38, XT__5EH, XT_EXIT, XT_DROP, XT_NIP, XT_DUP, XT_EXIT,
+/* 0xbf4: accept */ F_tokenDoList, XT_OVER, XT__2B, XT_OVER, XT_2DUP, XT_XOR, XT__3Fbranch, XT_accept + 0x30, XT_KEY, XT_DUP, XT_BL, XT__2D, XT_doLIT, 0x5f, XT_U_3C, XT__3Fbranch, XT_accept + 0x28, XT_TAP, XT_branch, XT_accept + 0x2c, XT__27TAP, XT__40EXECUTE, XT_branch, XT_accept + 8, XT_DROP, XT_OVER, XT__2D, XT_EXIT,
+/* 0xc2c: EXPECT */ F_tokenDoList, XT__27EXPECT, XT__40EXECUTE, XT_SPAN, XT__21, XT_DROP, XT_EXIT,
+/* 0xc3a: QUERY */ F_tokenDoList, XT_TIB, XT_doLIT, 0x50, XT__27EXPECT, XT__40EXECUTE, XT__23TIB, XT__21, XT_DROP, XT_doLIT, 0, XT__3EIN, XT__21, XT_EXIT,
+/* 0xc56: CATCH */ F_tokenDoList, XT_SP_40, XT__3ER, XT_HANDLER, XT__40, XT__3ER, XT_RP_40, XT_HANDLER, XT__21, XT_EXECUTE, XT_R_3E, XT_HANDLER, XT__21, XT_R_3E, XT_DROP, XT_doLIT, 0, XT_EXIT,
+/* 0xc7a: THROW */ F_tokenDoList, XT_HANDLER, XT__40, XT_RP_21, XT_R_3E, XT_HANDLER, XT__21, XT_R_3E, XT_SWAP, XT__3ER, XT_SP_21, XT_DROP, XT_R_3E, XT_EXIT,
+/* 0xc96: NULL$ */ F_tokenCreate, 0, 0,
+/* 0xc9c: ABORT */ F_tokenDoList, XT_NULL_24, XT_THROW, XT_EXIT,
+/* 0xca4: abort" */ F_tokenDoList, XT__3Fbranch, XT_abort_22 + 0xa, XT_do_24, XT_THROW, XT_do_24, XT_DROP, XT_EXIT,
+/* 0xcb4: $," */ F_tokenDoList, XT_doLIT, 0x22, XT_WORD, XT_COUNT, XT__2B, XT_ALIGNED, XT_CP, XT__21, XT_EXIT,
+/* 0xcc8: ABORT" */ F_tokenDoList, XT_COMPILE, XT_abort_22, XT__24_2C_22, XT_EXIT,
+/* 0xcd2: ." */ F_tokenDoList, XT_COMPILE, XT__2E_22_7C, XT__24_2C_22, XT_EXIT,
+/* 0xcdc: $INTERPRET */ F_tokenDoList, XT_NAME_3F, XT__3FDUP, XT__3Fbranch, XT__24INTERPRET + 0x26, XT_C_40, XT_doLIT, 0x40, XT_AND, XT_abort_22, 0x630c, 0x6d6f, 0x6970, 0x656c, 0x4f20, 0x4c4e, 0x59, XT_EXECUTE, XT_EXIT, XT__27NUMBER, XT__40EXECUTE, XT__3Fbranch, XT__24INTERPRET + 0x30, XT_EXIT, XT_THROW, XT_EXIT,
+/* 0xd10: .OK */ F_tokenDoList, XT_doLIT, XT__24INTERPRET, XT__27EVAL, XT__40, XT__3D, XT__3Fbranch, XT__2EOK + 0x16, XT__2E_22_7C, 0x2003, 0x6b6f, XT_CR, XT_EXIT,
+/* 0xd2a: ?STACK */ F_tokenDoList, XT_DEPTH, XT_0_3C, XT_abort_22, 0x7509, 0x646e, 0x7265, 0x6c66, 0x776f, XT_EXIT,
+/* 0xd3e: EVAL */ F_tokenDoList, XT_TOKEN, XT_DUP, XT_C_40, XT__3Fbranch, XT_EVAL + 0x16, XT__27EVAL, XT__40EXECUTE, XT__3FSTACK, XT_branch, XT_EVAL + 2, XT_DROP, XT__27PROMPT, XT__40EXECUTE, XT_EXIT,
+/* 0xd5c: [ */ F_tokenDoList, XT_doLIT, XT__24INTERPRET, XT__27EVAL, XT__21, XT_EXIT,
+/* 0xd68: PRESET */ F_tokenDoList, XT_SP0, XT__40, XT_SP_21, XT_TIB0, XT__23TIB, XT_CELL_2B, XT__21, XT_EXIT,
+/* 0xd7a: XIO */ F_tokenDoList, XT_doLIT, XT_accept, XT__27EXPECT, XT__21, XT__27TAP, XT__21, XT__27ECHO, XT__21, XT__27PROMPT, XT__21, XT_EXIT,
+/* 0xd92: FILE */ F_tokenDoList, XT_doLIT, XT_PACE, XT_doLIT, XT_DROP, XT_doLIT, XT_kTAP, XT_XIO, XT_EXIT,
+/* 0xda4: HAND */ F_tokenDoList, XT_doLIT, XT__2EOK, XT_doLIT, XT_EMIT, XT_doLIT, XT_kTAP, XT_XIO, XT_EXIT,
+/* 0xdb6: I/O */ F_tokenCreate, 0, XT__3FRX, XT_TX_21,
+/* 0xdbe: CONSOLE */ F_tokenDoList, XT_I_2FO, XT_2_40, XT__27_3FKEY, XT_2_21, XT_HAND, XT_EXIT,
+/* 0xdcc: que */ F_tokenDoList, XT_QUERY, XT_EVAL, XT_EXIT,
+/* 0xdd4: quitError */ F_tokenDoList, XT_NULL_24, XT_OVER, XT_XOR, XT__3Fbranch, XT_quitError + 0x2c, XT_CR, XT_TIB, XT__23TIB, XT__40, XT_TYPE, XT_CR, XT__3EIN, XT__40, XT_doLIT, 0x5e, XT_CHARS, XT_CR, XT__2E_24, XT__2E_22_7C, 0x2003, 0x203f, XT_PRESET, XT_EXIT,
+/* 0xe04: QUIT */ F_tokenDoList, XT_RP0, XT__40, XT_RP_21, XT__5B, XT_doLIT, XT_que, XT_CATCH, XT__3FDUP, XT__3Fbranch, XT_QUIT + 0xa, XT_CONSOLE, XT_quitError, XT_branch, XT_QUIT + 8, XT_EXIT,
+/* 0xe24: quit1 */ F_tokenDoList, XT_doLIT, XT_EVAL, XT_CATCH, XT__3FDUP, XT__3Fbranch, XT_quit1 + 0x12, XT_quitError, XT__5B, XT_EXIT,
+/* 0xe38: ' */ F_tokenDoList, XT_TOKEN, XT_NAME_3F, XT__3Fbranch, XT__27 + 0xc, XT_EXIT, XT_THROW, XT_EXIT,
+/* 0xe48: ALLOT */ F_tokenDoList, XT_CP, XT__2B_21, XT_EXIT,
+/* 0xe50: vALLOT */ F_tokenDoList, XT_VP, XT__40, XT__3Fbranch, XT_vALLOT + 0x12, XT_VP, XT__2B_21, XT_branch, XT_vALLOT + 0x14, XT_ALLOT, XT_EXIT,
+/* 0xe66: [COMPILE] */ F_tokenDoList, XT__27, XT__2C, XT_EXIT,
+/* 0xe6e: RECURSE */ F_tokenDoList, XT_LAST, XT__40, XT_NAME_3E, XT__2C, XT_EXIT,
+/* 0xe7a: $" */ F_tokenDoList, XT_COMPILE, XT__24_22_7C, XT__24_2C_22, XT_EXIT,
+/* 0xe84: ?UNIQUE */ F_tokenDoList, XT_DUP, XT_NAME_3F, XT__3Fbranch, XT__3FUNIQUE + 0x18, XT__2E_22_7C, 0x2007, 0x6572, 0x6544, 0x2066, XT_OVER, XT__2E_24, XT_DROP, XT_EXIT,
+/* 0xea0: $,n */ F_tokenDoList, XT_DUP, XT_C_40, XT__3Fbranch, XT__24_2Cn + 0x30, XT__3FUNIQUE, XT_DUP, XT_LAST, XT__21, XT_HERE, XT_ALIGNED, XT_SWAP, XT_CELL_2D, XT_CURRENT, XT__40, XT__40, XT_OVER, XT__21, XT_CELL_2D, XT_DUP, XT_NP, XT__21, XT__21, XT_EXIT, XT__24_22_7C, 0x6e04, 0x6d61, 0x65, XT_THROW, XT_EXIT,
+/* 0xedc: $COMPILE */ F_tokenDoList, XT_NAME_3F, XT__3FDUP, XT__3Fbranch, XT__24COMPILE + 0x1e, XT_C_40, XT__3DIMED, XT_AND, XT__3Fbranch, XT__24COMPILE + 0x1a, XT_EXECUTE, XT_branch, XT__24COMPILE + 0x1c, XT__2C, XT_EXIT, XT__27NUMBER, XT__40EXECUTE, XT__3Fbranch, XT__24COMPILE + 0x2a, XT_LITERAL, XT_EXIT, XT_THROW, XT_EXIT,
+/* 0xf0a: OVERT */ F_tokenDoList, XT_LAST, XT__40, XT_CURRENT, XT__40, XT__21, XT_EXIT,
+/* 0xf18: ; */ F_tokenDoList, XT_COMPILE, XT_EXIT, XT__5B, XT_OVERT, XT_EXIT,
+/* 0xf24: ] */ F_tokenDoList, XT_doLIT, XT__24COMPILE, XT__27EVAL, XT__21, XT_EXIT,
+/* 0xf30: : */ F_tokenDoList, XT_TOKEN, XT__24_2Cn, XT_tokenDoList, XT__2C, XT__5D, XT_EXIT,
+/* 0xf3e: USER */ F_tokenDoList, XT_TOKEN, XT__24_2Cn, XT_OVERT, XT_tokenUser, XT__2C, XT_EXIT,
+/* 0xf4c: create */ F_tokenDoList, XT_TOKEN, XT__24_2Cn, XT_OVERT, XT__2C, XT_doLIT, 0, XT__2C, XT_EXIT,
+/* 0xf5e: CREATE */ F_tokenDoList, XT_tokenCreate, XT_create, XT_EXIT,
+/* 0xf66: vCREATE */ F_tokenDoList, XT_VP, XT__40, XT__3FDUP, XT_0_3D, XT__3Fbranch, XT_vCREATE + 0x14, XT_CREATE, XT_branch, XT_vCREATE + 0x1a, XT_tokenVar, XT_create, XT__2C, XT_EXIT,
+/* 0xf82: VARIABLE */ F_tokenDoList, XT_vCREATE, XT_doLIT, 0, XT_v_2C, XT_EXIT,
+/* 0xf8e: CONSTANT */ F_tokenDoList, XT_TOKEN, XT__24_2Cn, XT_OVERT, XT_tokenNextVal, XT__2C, XT__2C, XT_EXIT,
+/* 0xf9e: _TYPE */ F_tokenDoList, XT__3ER, XT_branch, XT__5FTYPE + 0x16, XT_DUP, XT_C_40, XT__3ECHAR, XT_EMIT, XT_doLIT, 1, XT__2B, XT_next, XT__5FTYPE + 8, XT_DROP, XT_EXIT,
+/* 0xfbc: dm+ */ F_tokenDoList, XT_OVER, XT_doLIT, 4, XT_U_2ER, XT_SPACE, XT__3ER, XT_branch, XT_dm_2B + 0x22, XT_DUP, XT_C_40, XT_doLIT, 3, XT_U_2ER, XT_doLIT, 1, XT__2B, XT_next, XT_dm_2B + 0x12, XT_EXIT,
+/* 0xfe4: DUMP */ F_tokenDoList, XT_BASE, XT__40, XT__3ER, XT_HEX, XT_doLIT, 0x10, XT__2F, XT__3ER, XT_CR, XT_doLIT, 0x10, XT_2DUP, XT_dm_2B, XT__2DROT, XT_doLIT, 2, XT_SPACES, XT__5FTYPE, XT_NUF_3F, XT_0_3D, XT__3Fbranch, XT_DUMP + 0x36, XT_next, XT_DUMP + 0x12, XT_branch, XT_DUMP + 0x3a, XT_R_3E, XT_DROP, XT_DROP, XT_R_3E, XT_BASE, XT__21, XT_EXIT,
+/* 0x1028: .S */ F_tokenDoList, XT_CR, XT_DEPTH, XT__3ER, XT_branch, XT__2ES + 0x12, XT_R_40, XT_PICK, XT__2E, XT_next, XT__2ES + 0xc, XT__2E_22_7C, 0x2004, 0x733c, 0x70, XT_EXIT,
+/* 0x1048: .BASE */ F_tokenDoList, XT_BASE, XT__40, XT_DECIMAL, XT_DUP, XT__2E, XT_BASE, XT__21, XT_EXIT,
+/* 0x105a: .FREE */ F_tokenDoList, XT_CP, XT_2_40, XT__2D, XT_U_2E, XT_EXIT,
+/* 0x1066: !CSP */ F_tokenDoList, XT_SP_40, XT_CSP, XT__21, XT_EXIT,
+/* 0x1070: ?CSP */ F_tokenDoList, XT_SP_40, XT_CSP, XT__40, XT_XOR, XT_abort_22, 0x730b, 0x6174, 0x6b63, 0x6420, 0x7065, 0x6874, XT_EXIT,
+/* 0x108a: .ID */ F_tokenDoList, XT__3FDUP, XT__3Fbranch, XT__2EID + 0x12, XT_COUNT, XT__3DBYTEMASK, XT_AND, XT__5FTYPE, XT_EXIT, XT__2E_22_7C, 0x7b08, 0x6f6e, 0x614e, 0x656d, 0x7d, XT_EXIT,
+/* 0x10aa: WORDS */ F_tokenDoList, XT_CR, XT_CONTEXT, XT__40, XT__40, XT__3FDUP, XT__3Fbranch, XT_WORDS + 0x20, XT_DUP, XT_SPACE, XT__2EID, XT_CELL_2D, XT_NUF_3F, XT__3Fbranch, XT_WORDS + 8, XT_DROP, XT_EXIT,
+/* 0x10cc: FORTH>NAME */ F_tokenDoList, XT_CURRENT, XT_CELL_2B, XT__40, XT__3FDUP, XT__3Fbranch, XT_FORTH_3ENAME + 0x36, XT_2DUP, XT__40, XT_DUP, XT__3Fbranch, XT_FORTH_3ENAME + 0x28, XT_2DUP, XT_NAME_3E, XT_XOR, XT__3Fbranch, XT_FORTH_3ENAME + 0x28, XT_CELL_2D, XT_branch, XT_FORTH_3ENAME + 0x10, XT_NIP, XT__3FDUP, XT__3Fbranch, XT_FORTH_3ENAME + 4, XT_NIP, XT_NIP, XT_EXIT, XT_DROP, XT_doLIT, 0, XT_EXIT,
+/* 0x110a: SEE */ F_tokenDoList, XT__27, XT_CR, XT_DUP, XT__40, XT_tokenDoList, XT__3D, XT__3Fbranch, XT_SEE + 0x6a, XT__2E_22_7C, 0x3a02, 0x20, XT_DUP, XT__3ENAME, XT__2EID, XT_CELL_2B, XT_DUP, XT__40, XT_DUP, XT__3Fbranch, XT_SEE + 0x2c, XT__3ENAME, XT__3FDUP, XT__3Fbranch, XT_SEE + 0x5a, XT_SPACE, XT__2EID, XT_DUP, XT__40, XT_doLIT, XT_EXIT, XT__3D, XT_OVER, XT_CELL_2B, XT__40, XT_doLIT, 0x14, XT__3C, XT_AND, XT__3Fbranch, XT_SEE + 0x56, XT_DROP, XT_EXIT, XT_branch, XT_SEE + 0x60, XT_DUP, XT__40, XT_U_2E, XT_NUF_3F, XT__3Fbranch, XT_SEE + 0x1e, XT_branch, XT_SEE + 0x82, XT__2E_22_7C, 0x4e14, 0x746f, 0x6320, 0x6c6f, 0x6e6f, 0x6420, 0x6665, 0x6e69, 0x7469, 0x6f69, 0x6e, XT_DROP, XT_EXIT,
+/* 0x1190: VER */ F_tokenNextVal, 0xa,
+/* 0x1194: version */ F_tokenDoList, XT_CR, XT__2E_22_7C, 0x770a, 0x6265, 0x4f46, 0x5452, 0x2048, 0x56, XT_VER, XT__3C_23, XT__23, XT__23, XT_doLIT, 0x2e, XT_HOLD, XT__23, XT__23, XT_doLIT, 0x2e, XT_HOLD, XT__23, XT__23_3E, XT_TYPE, XT_CR, XT_EXIT,
+/* 0x11c8: hi */ F_tokenDoList, XT__21IO, XT_version, XT_EXIT,
+/* 0x11d0: EMPTY */ F_tokenDoList, XT_FORTH, XT_CONTEXT, XT__40, XT_DUP, XT_CURRENT, XT_2_21, XT_EXIT,
+/* 0x11e0: 'BOOT */ F_tokenCreate, 0, XT_hi,
+/* 0x11e6: COLD */ F_tokenDoList, XT_userAreaInit, XT_PRESET, XT_CONSOLE, XT__27BOOT, XT__40EXECUTE, XT_EMPTY, XT_OVERT, XT_QUIT, XT_branch, XT_COLD + 2, XT_EXIT,
+/* 0x11fe: WARM */ F_tokenDoList, XT_CONSOLE, XT__27BOOT, XT__40EXECUTE, XT_QUIT, XT_EXIT,
 /* ==== CURRENT TOP OF CODE DICTIONARY ==== */
-/* 0x120a: */ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 
-/* 0x122a: */ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 
-/* 0x124a: */ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 
-/* 0x126a: */ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 
-/* 0x128a: */ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 
-/* 0x12aa: */ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 
-/* 0x12ca: */ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 
-/* 0x12ea: */ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 
-/* 0x130a: */ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 
-/* 0x132a: */ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 
-/* 0x134a: */ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 
-/* 0x136a: */ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 
-/* 0x138a: */ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 
-/* 0x13aa: */ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 
-/* 0x13ca: */ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 
-/* 0x13ea: */ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 
-/* 0x140a: */ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 
-/* 0x142a: */ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 
-/* 0x144a: */ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 
-/* 0x146a: */ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 
-/* 0x148a: */ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 
-/* 0x14aa: */ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 
-/* 0x14ca: */ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0x750c, 0x6573, 0x4172, 
-/* 0x14ea: */ 0x6572, 0x5361, 0x7661, 0x65, 
+/* 0x120a: */ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+/* 0x122a: */ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+/* 0x124a: */ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+/* 0x126a: */ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+/* 0x128a: */ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+/* 0x12aa: */ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+/* 0x12ca: */ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+/* 0x12ea: */ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+/* 0x130a: */ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+/* 0x132a: */ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+/* 0x134a: */ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+/* 0x136a: */ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+/* 0x138a: */ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+/* 0x13aa: */ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+/* 0x13ca: */ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+/* 0x13ea: */ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+/* 0x140a: */ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+/* 0x142a: */ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+/* 0x144a: */ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+/* 0x146a: */ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+/* 0x148a: */ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+/* 0x14aa: */ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+/* 0x14ca: */ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0x750c, 0x6573, 0x4172,
+/* 0x14ea: */ 0x6572, 0x5361, 0x7661, 0x65,
 /* ==== CURRENT BOTTOM OF NAME DICTIONARY ==== */
 /* 0x14f2 WARM */ XT_WARM, 0x1500, 0x5704, 0x5241, 0x4d,
 /* 0x14fc COLD */ XT_COLD, 0x150a, 0x4304, 0x4c4f, 0x44,
@@ -1091,14 +1091,14 @@ const CELLTYPE rom[ROMCELLS] PROGMEM = {
 /* 0x1fec CELLL */ XT_CELLL, 0x1ffa, 0x4305, 0x4c45, 0x4c4c,
 /* 0x1ff6 FORTH */ XT_FORTH, 0, 0x4605, 0x524f, 0x4854,
 };
-// === End of Arduino source from dictionary === 
+// === End of Arduino source from dictionary ===
 
 //TODO-ARDUINO OPTIMIZATION - check for constant parameters to functions nad mark constant in definition
 
 
 //L.1777
 #if CELLL == 2
-#define CELLTYPE int
+#define CELLTYPE unsigned
 #define CELLSHIFT 1
 #endif
 #if CELLL == 4
@@ -1112,7 +1112,7 @@ const CELLTYPE rom[ROMCELLS] PROGMEM = {
 #define LITTLEENDIAN true // Arduino is little endian
 
 
-// ==== In order, there is a gap (mLissing code) before each Line marker ==== 
+// ==== In order, there is a gap (mLissing code) before each Line marker ====
 //L.113-
 #define COMP 0x40 // bit in first char of name field to indicate 'compile-only'  ERRATA Zen uses this but its not defined
 #define IMED 0x80 // bit in first char of name field to indicate 'immediate' ERRATA Zen uses this but its not defined
@@ -1134,7 +1134,7 @@ const CELLTYPE forthTrue = -1; // Not quite correct, should be masked BUT when p
 #define EVALoffset 19
 #define NUMBERoffset 20
 #define CONTEXToffset 23
-#define CURRENToffset 32 
+#define CURRENToffset 32
 #define CPoffset 34
 #define NPoffset 35
 #define LASToffset 36
@@ -1156,10 +1156,10 @@ static byte testing = 0;
 
 
 
-#define RAMADDR(x) ((x - RAM0) >> CELLSHIFT)
+#define RAMADDR(x) ((x ^ RAM0) >> CELLSHIFT)
 #define ROMADDR(x) (x >> CELLSHIFT)
-#define FROMRAMADDR(x) ((x << CELLSHIFT) + RAM0)
-#define FROMROMADDR(x) (x << CELLSHIFT)
+#define FROMRAMADDR(x) (unsigned(x << CELLSHIFT) | RAM0)
+#define FROMROMADDR(x) unsigned(x << CELLSHIFT)
 
 // Now some cell based pointers into RAM
 #define ramSPP RAMADDR(SPP) // start of data stack - grows down, points at top of stack - 8 word buffer for safety
@@ -1168,7 +1168,7 @@ static byte testing = 0;
 
 //L.1852
 static CELLTYPE ram[RAMCELLS]; // Equivalent of Mem16_16 in webForth
-//L.1853 - jsFunctions[] is now fp[] and has to be after definition of functions in it. 
+//L.1853 - jsFunctions[] is now fp[] and has to be after definition of functions in it.
 
 // Key pointers used - would ideally be registers in a register based system
 static CELLTYPE IP = 0;    // Interpreter Pointer (this is a byte pointer - cannot use CellPointer as could be into Rom or Ram)
@@ -1201,8 +1201,8 @@ void TEST() { //  a1 a2 a3 b1 b2 b3 n -- ; Check n parameters on stack
   } else {
     for (byte i = 0; i < stackDepth; i++) {
       const CELLTYPE onStack = cellRamFetch(ramSP + i);
-      const CELLTYPE expected = SPpop(); // What we expect to see 
-      if (onStack != expected) { 
+      const CELLTYPE expected = SPpop(); // What we expect to see
+      if (onStack != expected) {
         Serial.print(F("Expected")); 
         Serial.print(expected); 
         Serial.print(F("got")); 
@@ -1219,21 +1219,29 @@ void TEST() { //  a1 a2 a3 b1 b2 b3 n -- ; Check n parameters on stack
 #define ROM(cellAddr) rom[cellAddr]
 #else
 #define ROM(cellAddr) pgm_read_word_near(rom + cellAddr)
-#endif 
-CELLTYPE cellRomFetch(CELLTYPE cellAddr) { return ROM(cellAddr); }; 
-CELLTYPE cellRamFetch(CELLTYPE cellAddr) { return ram[cellAddr]; };
-CELLTYPE cellRamStore(CELLTYPE cellAddr, CELLTYPE v) { ram[cellAddr] = v; };
-#ifdef WRITEROM
-CELLTYPE cellRomStore(CELLTYPE cellAddr, CELLTYPE v) { rom[cellAddr] = v; };
 #endif
-CELLTYPE Mfetch(CELLTYPE byteAddr) { return (byteAddr > RAM0) ? cellRamFetch(RAMADDR(byteAddr)) : cellRomFetch(ROMADDR(byteAddr)) ; }
+CELLTYPE cellRomFetch(CELLTYPE cellAddr) { 
+  if (cellAddr >= ROMCELLS) { Serial.print("Attempt to read above top of Rom at "); Serial.println(cellAddr); delay(10000); } // TODO-OPTIMIZE comment out
+  return ROM(cellAddr); };
+CELLTYPE cellRamFetch(CELLTYPE cellAddr) {
+  if (cellAddr >= RAMCELLS) { Serial.print("Attempt to read above top of Ram at "); Serial.println(cellAddr); delay(10000); } // TODO-OPTIMIZE comment out
+  return ram[cellAddr]; };
+void cellRamStore(CELLTYPE cellAddr, CELLTYPE v) { 
+  if (cellAddr >= RAMCELLS) { Serial.print("Attempt to write above top of Ram at "); Serial.println(cellAddr); delay(10000); } // TODO-OPTIMIZE comment out
+  ram[cellAddr] = v; };
 #ifdef WRITEROM
-CELLTYPE Mstore(CELLTYPE byteAddr, CELLTYPE v) { return (byteAddr > RAM0) ? cellRamStore(RAMADDR(byteAddr), v) : cellRomStore(ROMADDR(byteAddr), v) ; }
+void cellRomStore(CELLTYPE cellAddr, CELLTYPE v) { rom[cellAddr] = v; };
+#endif
+CELLTYPE Mfetch(CELLTYPE byteAddr) { return (byteAddr >= RAM0) ? cellRamFetch(RAMADDR(byteAddr)) : cellRomFetch(ROMADDR(byteAddr)) ; }
+#ifdef WRITEROM
+void Mstore(CELLTYPE byteAddr, CELLTYPE v) {  if (byteAddr >= RAM0) { cellRamStore(RAMADDR(byteAddr), v) } else { cellRomStore(ROMADDR(byteAddr), v) } }
 #else
-CELLTYPE Mstore(CELLTYPE byteAddr, CELLTYPE v) { cellRamStore(RAMADDR(byteAddr), v); }
+void Mstore(CELLTYPE byteAddr, CELLTYPE v) { 
+  if (byteAddr < RAM0) { Serial.print("Attempt to write to Rom at "); Serial.print(byteAddr); Serial.print(" v="); Serial.println(v); delay(10000); } // TODO-OPTIMIZE comment out
+  cellRamStore(RAMADDR(byteAddr), v); }
 #endif
 // 8 bit equivalents
-byte Mfetch8(CELLTYPE byteAddr) { 
+byte Mfetch8(CELLTYPE byteAddr) {
   const bool offset = byteAddr & 0x01;
   const CELLTYPE cell = Mfetch(byteAddr); // Does not have to be aligned
 #ifdef LITTLEENDIAN
@@ -1241,9 +1249,9 @@ byte Mfetch8(CELLTYPE byteAddr) {
 #else
   return offset ? (cell & 0xFF) : (cell >> 8);
 #endif
-}; // Returns byte at a 
+}; // Returns byte at a
 
-void Mstore8(CELLTYPE byteAddr, byte v) { 
+void Mstore8(CELLTYPE byteAddr, byte v) {
   const bool offset = byteAddr & 0x01;
   const CELLTYPE cell = Mfetch(byteAddr);
 #ifdef LITTLEENDIAN
@@ -1251,17 +1259,17 @@ void Mstore8(CELLTYPE byteAddr, byte v) {
       Mstore(byteAddr, (cell & 0x00FF) | (v << 8));
     } else {
       Mstore(byteAddr, (cell & 0xFF00) | v);
-    }  
+    }
 #else
     if (offset) {
       Mstore(cellAddr, (cell & 0xFF00) | v);
     } else {
       Mstore(cellAddr, (cell & 0x00FF) | (v << 8));
-    }  
+    }
 #endif
 }
 
-// TODO-MEM this is really dependent on MEM not CELLL 
+// TODO-MEM this is really dependent on MEM not CELLL
 CELLTYPE align(CELLTYPE byteAddr) { return (((byteAddr - 1) >> CELLSHIFT) + 1) << CELLSHIFT; }
 // Only used in token - which is bytes and never aligned
 void copyWithin(CELLTYPE byteDestn, CELLTYPE byteSource, CELLTYPE byteEnd) {
@@ -1277,7 +1285,10 @@ void SPpush(CELLTYPE v) { ram[--ramSP] = v; }
 CELLTYPE RPfetch() { return ram[ramRP]; }
 CELLTYPE RPpop() { return ram[ramRP++]; }
 void RPpush(CELLTYPE v) { ram[--ramRP] = v; }
-CELLTYPE IPnext() { const CELLTYPE v = Mfetch(IP); IP += CELLL; return v; }
+CELLTYPE IPnext() {
+  const CELLTYPE v = Mfetch(IP);
+  IP += CELLL;
+  return v; }
 CELLTYPE Ufetch(byte userindex) { return ram[ramUP + userindex]; } // userindex is a cell index, not a byte index
 void Ustore(byte userindex, CELLTYPE w) { ram[ramUP + userindex] = w; } // userindex is a cell index not a byte index
 // === Access to the USER variables before they are defined
@@ -1356,13 +1367,17 @@ void jsFind() { // a va -- ca na | a 0
 // Traverse dictionary to convert xt back to a na (for decompiler or debugging)
 CELLTYPE xt2na(CELLTYPE xt) {
   CELLTYPE p = currentFetch(); // vocabulary
+  if (!Mfetch(p)) { p = lastFetch() - CELLL; } // Note this is not quite correct, it will miss the first definition (WARM)
+  //Serial.print("xt2na: p="); Serial.println(p);
   while (p = Mfetch(p)) {
-    //console.log('_find: comparing:', countedToJS(p)) // comment out except when debugging find
+    //Serial.print("xt2na comparing"); Serial.print(na2xt(p)),Serial.print(" "); Serial.println(xt);
     if (na2xt(p) == xt) {
+      //Serial.println("xt2na: Got it");
       return p;
     }
     p -= CELLL; // point at link address and loop for next word
   }
+  //Serial.println("xt2na: Drop through");
   // Drop through not found
   return 0;
 }
@@ -1454,12 +1469,17 @@ void tokenNextVal() {
 
 // This is the most important token function - used for a Colon word to iterate over the list.
 void tokenDoList() {
+  if (testing) {
+      Serial.println(":");
+  }
   RPpush(IP);
   IP = PAYLOAD; // Point at first word in the definition
 }
 // Leaves an address in the user area, note it doesnt compile the actual address since UP will change when multi-tasking
 void tokenUser() {
+  //Serial.print("tokenUser payload="); Serial.print(PAYLOAD); Serial.print(" @payload="); Serial.print(Mfetch(PAYLOAD));
   SPpush(FROMRAMADDR((Mfetch(PAYLOAD) + ramUP)));
+  //Serial.print(" result="); Serial.print(SPfetch()); Serial.print(" @="); Serial.println(Mfetch(SPfetch()));
 }
 // Put the address of the payload onto Stack - used for CREATE which is used by VARIABLE
 void _tokenDoes() {
@@ -1492,7 +1512,18 @@ void threadtoken(CELLTYPE xt) {
   const CELLTYPE tok = Mfetch(xt);
   PAYLOAD = xt + CELLL;
   // console.assert(tok < jsFunctions.length); // commented out for efficiency, a fail will just break in the next line anyway.
-  f[tok](); // Run the token function - like tokenDoList or tokenVar - doesnt return - (JS returns null or a Promise)
+  if ((tok < 61) && f[tok]) {
+    if (testing) {
+        Serial.print(IP-CELLL); Serial.print(":");
+        if (CELLTYPE p = xt2na(xt)) { byte count = Mfetch8(p++) & 0x1F; while (count--) { Serial.write(Mfetch8(p++)); } } else { Serial.print(xt); }
+        //Serial.print(xt);
+        Serial.print(":"); Serial.print(tok); Serial.print("  ");
+    }
+    f[tok](); // Run the token function - like tokenDoList or tokenVar - doesnt return - (JS returns null or a Promise)
+  } else {
+    Serial.print("XXX bad tok =");
+    Serial.print(IP-CELLL); Serial.print(":"); Serial.print(xt); Serial.print(":"); Serial.print(tok); Serial.println("  "); delay(10000);
+  }
 }
 
 // This is not re-entrant, normally its threadtoken you want ....
@@ -1520,7 +1551,9 @@ void MS() { delay(SPpop()); } // ms --; delay for a period of time.
 void BYE() {  IP = 0; } // Should exit all the way out
 
 // Unwind the effect of tokenDoList restoring IP to the next definition out.
-void EXIT() { IP = RPpop(); }
+void EXIT() {
+  if (testing) Serial.println(";");
+  IP = RPpop(); }
 
 // EXECUTE runs the word on the stack,
 // and because there is nothing after the return from threadtoken which would get executed out of order
@@ -1546,8 +1579,15 @@ void EXECUTE() { threadtoken(SPpop()); }
 
 // Call chain is ?RX < '?KEY  < ?KEY < KEY < accept < 'EXPECT < QUERY < que < QUIT
 // -- char T | F
+static byte watched[10];
+void watch(byte n) {
+  if (!watched[n]) {
+    //Serial.println('watched',n);
+    watched[n] = 1;
+  }
+}
 void QRX() { // ?RX
-  if (Serial.available() > 0) {
+   if (Serial.available() > 0) {
     SPpush(Serial.read());
     SPpush(forthTrue);
   } else {
@@ -1556,9 +1596,18 @@ void QRX() { // ?RX
 }
 // Low level TX!, output one character to stdout, inefficient, but not likely to be bottleneck.
 
-void TXbang() { Serial.write(SPpop()); } // TX!
-void bangIO() { Serial.begin(57600); } // !IO: Initialize IO port
-void TXbangS(CELLTYPE byteaddr, byte len) { for (byte i=len; i > 0; i--) Serial.write(byteaddr++); }
+void TXbang() { //watch(3); return;
+  Serial.write(SPpop());
+} // TX!
+void bangIO() { //watch(2); return;
+//Serial.begin(57600); // DONE IN SETUP
+} // !IO: Initialize IO port
+void TXbangS(CELLTYPE byteaddr, byte len) {
+  //watch(1); return;
+  for (byte i=len; i > 0; i--) {
+  Serial.write(Mfetch8(byteaddr++));
+  }
+ }
 
 // === Literals and Branches - using next value in dictionary === eForthAndZen#37
 
@@ -1601,7 +1650,10 @@ void qBranch() {
 void branch() { IP = IPnext(); }
 
 // Memory access eForthAndZen#39
-void store() { Mstore(SPpop(), SPpop()); } //!  w a -- , Store
+void store() { 
+  CELLTYPE a = SPpop();
+  CELLTYPE v = SPpop();
+  Mstore(a, v); } //!  w a -- , Store
 void fetch() { SPpush(Mfetch(SPpop())); } //@ a -- w, fetch
 void cStore() { Mstore8(SPpop(), SPpop()); } //C! c a -- , Store character
 void cFetch() { SPpush(Mfetch8(SPpop())); } //C@ a -- c, Fetch character
@@ -1668,6 +1720,7 @@ void userAreaInit() {
   for (byte a = 0; a < _USER; a++) {
     Ustore(a, cellRomFetch(UZERO + a));
   }
+  //testing3();
 }
 
   // The opposite of userAreaInit - save values for restoration at COLD
@@ -1722,15 +1775,15 @@ void TOKEN() { // -- a; <string>; copy blank delimited string to name buffer, im
 */
 
 /* REPLACED BY FORTH DEFINITION
-// Same footprint as NUMBER?, this will be stored vectored from 'NUMBER and then replaced by FORTH version. 
-void NUMBERQ() { 
+// Same footprint as NUMBER?, this will be stored vectored from 'NUMBER and then replaced by FORTH version.
+void NUMBERQ() {
   CELLTYPE a = SPpop();
   const CELLTYPE aa = a;
   const byte radix = Ufetch(BASEoffset); //TODO-ANDROID handle base other than 10 BUT maybe not needed as switch to Forth version before ever use non-decimal
   bool neg = false;
   CELLTYPE acc = 0;
   for (byte i = Mfetch8(a++); i > 0; i--) {
-    byte c = Mfetch8(a++); 
+    byte c = Mfetch8(a++);
     if (c == '-') {
        neg = true;
     } else if ((c > '9') || (c < '0')) {
@@ -1878,7 +1931,7 @@ void colon() {
   TOKEN();  // a; (counted string in named space)
   cpAlign(); // Before dollarCommaN so code field in Name dictionary correct
   dollarCommaN();
-  DW(tokenDoList); // Must be after creating the name and links etc TODO-ARDUINO tokenDoList is token and function
+  DW(F_tokenDoList); // Must be after creating the name and links etc
   closeBracket();
 }
 */
@@ -1913,25 +1966,28 @@ void console() {
 
 
 
-// ==== NEXT GROUP - HAVE TO BE MOVED DOWN BECAUSE OF USE === 
+// ==== NEXT GROUP - HAVE TO BE MOVED DOWN BECAUSE OF USE ===
 // L.1853 jsFunctions[]=
 
 void setup() {
   // put your setup code here, to run once:
   Serial.begin(57600); // Initialize IO port TODO move to somewhere Forth wants it
-  //(*f[0])(); // TEST function pointer 
-  Serial.print(F("Starting: Space for, ")); Serial.print(NAMEE - CODEE), Serial.print(F("bytes for code and names"));
+  //(*f[0])(); // TEST function pointer
+  Serial.print(F("Starting: Space for, ")); Serial.print(NAMEE - CODEE), Serial.println(F("bytes for code and names"));
+  delay(10000);
   //L.1898
   //TODO I think most of these will be in the Usersave area with values setup by the call useRam() run in the XC before saving.
-  // Importantly - CPoffset won't be CODEE, it will be at least 2 cells higher as 'FORTH's data area is underneath it. 
+  // Importantly - CPoffset won't be CODEE, it will be at least 2 cells higher as 'FORTH's data area is underneath it.
   //Ustore(CPoffset, CODEE); //TODO-ARDUINO set from user variables
   //Ustore(NPoffset, NAMEE);  //TODO-ARDUINO set from user variables
   //Ustore(VPoffset, 0); // Bottom of RAM - Note that this is set to 0 t make it use CP (which by now is in RAM) for variables
   //Ustore(RP0offset, RP0);
   //Ustore(SP0offset, cellSPP << CELLSHIFT); // Shouldnt be needed as should be in ROM
-  IP = XT_COLD; // This has a tight interaction with loop - which will look at next value and threadToken on it. (So this only works on a colon definition)
+  IP = XT_COLD+CELLL; // This has a tight interaction with loop - which will look at next value and threadToken on it. (So this only works on a colon definition)
+  Serial.println("XXX end setup");
+  delay(1000);
 }
 
 void loop() {
   threadtoken(IPnext());
-} 
+}
