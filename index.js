@@ -74,8 +74,8 @@
 // it is used to build the dictionary in each instance.
 const jsFunctionAttributes = [
   0, // 0 is not a valid token
-  { n: 'tokenVocabulary', token: true }, // Token used for Vocabularies must be first 0
-  { n: 'tokenNextVal', token: true }, // Token used for Constants must be next (1)
+  { n: 'tokenVocabulary', token: true }, // Token used for Vocabularies must be first 1
+  { n: 'tokenNextVal', token: true }, // Token used for Constants must be next (2)
   { n: 'tokenDoList', token: true },
   { n: 'tokenUser', token: true },
   { n: 'tokenVar', token: true },
@@ -112,17 +112,17 @@ const tokenUser = 4;
 const tokenVar = 5;
 const tokenCreate = 6;
 
-// TODO ported to Arduino below to L.123-
+// TODO ported to Arduino below to L.115
 // === Memory Map - Zen pg26
 const l = {}; // Constants that will get compiled into the dictionary
-l['=COMP'] = 0x40; // bit in first char of name field to indicate 'compile-only'  ERRATA Zen uses this but its not defined
-l['=IMED'] = 0x80; // bit in first char of name field to indicate 'immediate' ERRATA Zen uses this but its not defined
+l['COMP'] = 0x40; // bit in first char of name field to indicate 'compile-only'  ERRATA Zen uses this but its not defined
+l['IMED'] = 0x80; // bit in first char of name field to indicate 'immediate' ERRATA Zen uses this but its not defined
 const bitsSPARE = 0x20; // Unused spare bit in names
-l['=BYTEMASK'] = 0xFF - l['=COMP'] - l['=IMED'] - bitsSPARE; // bits to mask out of a call with count and first char. ERRATA Zen uses this but its not defined
+l['BYTEMASK'] = 0xFF - l['COMP'] - l['IMED'] - bitsSPARE; // bits to mask out of a call with count and first char. ERRATA Zen uses this but its not defined
 //const forthTrue = (2 ** (l.CELLL * 8)) - 1; // Also used to mask numbers
 const forthTrue = -1; // Not quite correct, should be masked BUT when pushed that it is done underneath
 const nameMaxLength = 31; // Max number of characters in a name, length needs to be representable after BitMask (we have one spare bit here)
-console.assert(nameMaxLength === l['=BYTEMASK']); // If this isn't true then check each of the usages below
+console.assert(nameMaxLength === l['BYTEMASK']); // If this isn't true then check each of the usages below
 l.BL = 32;
 
 // === Data table used to build users.
@@ -180,8 +180,8 @@ const forthInForth = `
 1 2 2DROP 0 TEST
 
 : setHeaderBits LAST @ C@ OR LAST @ C! ;
-: COMPILE-ONLY =COMP setHeaderBits ;
-: IMMEDIATE =IMED setHeaderBits ;
+: COMPILE-ONLY COMP setHeaderBits ;
+: IMMEDIATE IMED setHeaderBits ;
 
 : ( 41 PARSE 2DROP ; IMMEDIATE ( from Zen pg74, note dont have LITERAL so cant do [ CHAR ( ] LITERAL instead of 41 )
 : \\ ( -- ; Ignore following text till the end of line.)
@@ -852,7 +852,7 @@ const forthInForth = `
 ( Note there is this.TOKEN which does same thing )
 : TOKEN ( -- a ; <string> ; Parse a word from input stream and copy it to name dictionary.)
   BL PARSE            ( parse out next space delimited string )
-  =BYTEMASK MIN              ( truncate it to 31 characters = nameMaxLength )
+  BYTEMASK MIN              ( truncate it to 31 characters = nameMaxLength )
   NP @                ( word buffer below name dictionary )
   OVER - CELLL - PACK$ ;  ( copy parsed string to word buffer )
 
@@ -1106,7 +1106,7 @@ CREATE NULL$ 0 , ( EFORTH-ZEN-ERRATA inserts a string "coyote" after this, no id
   NAME?                   ( search dictionary for word just parsed )
     ?DUP                    ( is it a defined word? )
   IF C@                    ( yes. examine the lexicon ) ( EFORTH-ZEN-ERRATA it should be C@ not @)
-  [ =COMP ] LITERAL AND ( is it a compile-only word? )
+  [ COMP ] LITERAL AND ( is it a compile-only word? )
   ABORT" compile ONLY"  ( if so, abort with the proper message )
   EXECUTE EXIT          ( not compile-only, execute it and exit )
   THEN                    ( not defined in the dictionary )
@@ -1306,7 +1306,7 @@ CREATE I/O  ' ?RX , ' TX! , ( Array to store default I/O vectors. )
   NAME?         ( parse the next word out )
   ?DUP          ( successful? )
   IF C@         ( yes, get the lexicon )
-    =IMED AND   ( is it an immediate word? ) ( ERRATA V5 has @ - Staapl,Zen correct)
+    IMED AND   ( is it an immediate word? ) ( ERRATA V5 has @ - Staapl,Zen correct)
     IF EXECUTE  ( yes.  execute it )
     ELSE ,      ( no.  compile it )
     THEN
@@ -1446,7 +1446,7 @@ CREATE I/O  ' ?RX , ' TX! , ( Array to store default I/O vectors. )
   ( Display the name at address.)
   ?DUP                ( not valid name if na=0 )
   IF COUNT            ( get length by mask lexicon bits )
-    =BYTEMASK AND         ( limit length to 31 characters )
+    BYTEMASK AND         ( limit length to 31 characters )
     _TYPE ( print the name string )
     EXIT
   THEN ." {noName}" ; ( error if na is not valid)
@@ -1884,9 +1884,9 @@ class Forth {
 
     // Needs to be after the call to create this.m, its endian dependent as lowest address byte is always the countr
     if (this.m.littleEndian) {
-      this.CELLMASK = forthTrue ^ (0xFF ^ l['=BYTEMASK']);
+      this.CELLMASK = forthTrue ^ (0xFF ^ l['BYTEMASK']);
     } else {
-      this.CELLMASK = forthTrue ^ ((0xFF ^ l['=BYTEMASK']) << (this.CELLbits - 8));
+      this.CELLMASK = forthTrue ^ ((0xFF ^ l['BYTEMASK']) << (this.CELLbits - 8));
     }
 
     // === Standard pointers used - Zen pg22
@@ -2002,7 +2002,7 @@ class Forth {
     this.DW(tok);  // The entire definition is the token for the JS function
     this.OVERT();                          // Make the name usable
     if (attribs.immediate) {
-      this.setHeaderBits(l['=IMED']);
+      this.setHeaderBits(l['IMED']);
     }
     return xt;
   }
@@ -2135,7 +2135,7 @@ class Forth {
   // it assumes a maximum of nameMaxLength (31) characters.
   // Mostly used for debugging but also in number conversion.
   countedToJS(a) {
-    return this.m.decodeString(a + 1, a + (this.Mfetch8(a) & l['=BYTEMASK']) + 1);
+    return this.m.decodeString(a + 1, a + (this.Mfetch8(a) & l['BYTEMASK']) + 1);
   }
   // Convert a name address to the code dictionary definition.
   na2xt(na) {
@@ -2160,7 +2160,7 @@ class Forth {
   }
 
   _find(va, na) { // return na that matches or 0
-    const cellCount = ((this.Mfetch8(na) & l["=BYTEMASK"])  / this.CELLL) >>0; // Count of cells after first one
+    const cellCount = ((this.Mfetch8(na) & l["BYTEMASK"])  / this.CELLL) >>0; // Count of cells after first one
     const cell1 = this.Mfetch(na);  // Could be little or big-endian
     let p = va;
     while (p = this.Mfetch(p)) {
@@ -2331,7 +2331,7 @@ class Forth {
     this.dollarCommaN(); // Build the headers that precede the name
   }
 
-  // ERRATA ZEN IMMEDIATE COMPILE-ONLY =COMP =IMED is not defined, in EFORTHv5 its defined as 0x80
+  // ERRATA ZEN IMMEDIATE COMPILE-ONLY COMP IMED is not defined, in EFORTHv5 its defined as 0x80
   setHeaderBits(b) {
     const lastNA = this.lastFetch(); // LAST points at the name field of the last defined word
     this.Mstore8(lastNA, this.Mfetch8(lastNA) | b);
@@ -2687,7 +2687,7 @@ class Forth {
       const xt = this.SPpop();
       const ch = this.Mfetch8(na);
       // noinspection JSBitwiseOperatorUsage
-      if (ch & l['=IMED']) {
+      if (ch & l['IMED']) {
         await this.runXT(xt); // This will work as long as this $INTERPRET never called from Forth as cant nest 'run' even indirectly
       } else {
         this.checkNotCompilingReplaceable(xt, na);
