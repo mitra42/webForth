@@ -2179,6 +2179,7 @@ class Forth {
 
   // Search a single vocabulary for a string
   // This has same footprint as eForth's 'find' but we do not replace it since this is approx 8x faster
+  // Note the string must be aligned to CELLL boundary even if using a non-aligned mem (e.g. celll=2 mem=8)
   jsFind() { // a va -- ca na | a 0
     const va = this.SPpop();
     const a = this.SPpop();
@@ -2230,7 +2231,13 @@ class Forth {
   JStoCounted(s) {
     const tempBuf = this.vpFetch() + 52; // Above Data or Code below HLD which builds numbers down from PAD which is vpFetch + 80
     // copy string to TIB, and return length in bytes (which may not be same as s.length if UTF8;
-    this.Mstore8(tempBuf, this.m.encodeString(tempBuf + 1, s));
+    const count = this.m.encodeString(tempBuf + 1, s);
+    this.Mstore8(tempBuf, count);
+    let p = tempBuf + count + 1;
+    const aligned = this.m.align(p+1);
+    while (p < aligned) {
+      this.Mstore8(p++, 0); // Always writes at least one, since aligned is done on p+1 (to handle case of cell=2 mem=8 unaligned)
+    }
     this.SPpush(tempBuf);
   }
 
