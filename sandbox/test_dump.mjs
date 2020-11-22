@@ -37,7 +37,9 @@ class ForthDumper extends Forth {
       const val = this[k];
       this.xcLine(`\n#define ${k} ${val}`);
     });
-    this.xcLine(`\n#define CELLTYPE ${this.CELLL === 2 ? 'int' : 'long'}`);
+    this.xcLine(`\n#define CELLTYPE ${this.CELLL === 2 ? 'unsigned' : 'long'}`);
+    this.xcLine(`\n#define CELLSHIFT ${this.CELLL === 2 ? 1 : 2}`);
+    this.xcLine('\n#define LITTLEENDIAN true');
     this.xcLine(`\n#define ROMCELLS ${ROMSIZE / this.CELLL}`);
     this.xcLine(`\n#define RAMCELLS ${RAMSIZE / this.CELLL}`);
     this.xcLine(`\n#define SPP ${this.cellSPP * this.CELLL}`);
