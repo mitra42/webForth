@@ -1432,7 +1432,6 @@ CREATE I/O  ' ?RX , ' TX! , ( Array to store default I/O vectors. )
   BASE @ DECIMAL DUP . BASE  ! ;
 : .FREE ( -- ; report free memory)
   CP 2@ - U. ;
-( TODO-15-EPROM may need .vFREE)
 : !CSP ( -- ; Save stack pointer for error checking )
   SP@ CSP ! ;
 : ?CSP ( -- ; Check stack pointer matches saved stack pointer )

@@ -1966,8 +1966,7 @@ void setup() {
   // put your setup code here, to run once:
   Serial.begin(57600); // Initialize IO port TODO move to somewhere Forth wants it
   //(*f[0])(); // TEST function pointer
-  Serial.print(F("Starting: Space for, ")); Serial.print(NAMEE - CODEE), Serial.println(F("bytes for code and names"));
-  delay(1000);
+  //Serial.print(F("Starting: Space for, ")); Serial.print(NAMEE - CODEE), Serial.println(F("bytes for code and names"));
   //L.1898
   //TODO I think most of these will be in the Usersave area with values setup by the call useRam() run in the XC before saving.
   // Importantly - CPoffset won't be CODEE, it will be at least 2 cells higher as 'FORTH's data area is underneath it.

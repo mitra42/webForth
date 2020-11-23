@@ -96,6 +96,17 @@ There are two useful Forth words you can insert in either a definition or the co
     Changing debugDepth can be useful to get more or less of it. (look for the variable)
 * `break`: Just calls a short routine that generates a console log, when working in my IDE 
     I set a breakpoint here. 
+## Arduino Support
+
+Support for Arduino is just starting, so this might change!
+
+The repo should ship with a working .ino, but to rebuild it:
+* `node --experimental-modules sandbox/example_dump.mjs`
+* Cut and paste from the output - look for the section commented at top and bottom as Arduino output
+* Cut and paste into .ino - replacing the same section, which is currently the top of the file.
+
+This will change to use an include file [issue#59](https://github.com/mitra42/webForth/issues/59)
+and then to be output by the Web UI [issue#61](https://github.com/mitra42/webForth/issues/61).
 
 ## Contributing
 
