@@ -1,3 +1,26 @@
+* 2020-11-23: v0.0.11
+  * Rework extension mechanism to be similar to `jsFunctionAttributes`
+  * Remove obsolete sandbox command files
+  * Change base of tokens from 0 to 1, so that indirecting through 0 fails.
+  * Add this.CELLMASK (endian compliant)
+  * Fix some bugs with division by CELLL leaving floating point numbers
+  * Find etc
+    * Optimize _sameq to use cells rather than bytes
+    * Seperate out xt2na from _find
+    * Handle some bugs with not padding strings we are searching for
+  * Support port to Arduino
+    * Change names of a few functions (`find` `jsFind`; `$INTERPRET` `dINTERPRET`; `$COMPILE` `dCOMPILE`; 
+      `break` `Fbreak`; `=COMP` `COMP`; `=IMED` `IMED`; `=BYTEMASK` `BYTEMASK`; `run` `runXT`)
+    * Add an arduino sketch and support for functions it needs
+    * Move some `const` (`UPP` `RP0` `NAMEE` `CODEE` as instance variables so accessible from cross-compiler 
+  * Support separation of Ram from Rom - includes
+    * New `VP` user variable as pointer into variable area when defining in Rom, 
+    * add `vHERE`, `v,`, `vALLOT`, `vALIGN`, `vCREATE` to use it,
+    * Add `tokenCreate`
+    * `VARIABLE` and `FORTH` to use Ram area
+    * Change API to take ROMSIZE and RAMSIZE instead of EM
+    * Changing User variables to have an offset in cells rather than bytes
+    * Pad is in Ram area
 * 2020-11-10: v0.0.10
   * Significant memory refactoring to make it quicker - involves SP and RP being in cells rather than bytes
 * 2020-11-09: v0.0.9
