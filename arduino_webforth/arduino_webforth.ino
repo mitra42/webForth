@@ -1965,19 +1965,8 @@ void console() {
 void setup() {
   // put your setup code here, to run once:
   Serial.begin(57600); // Initialize IO port TODO move to somewhere Forth wants it
-  //(*f[0])(); // TEST function pointer
   //Serial.print(F("Starting: Space for, ")); Serial.print(NAMEE - CODEE), Serial.println(F("bytes for code and names"));
-  //L.1898
-  //TODO I think most of these will be in the Usersave area with values setup by the call useRam() run in the XC before saving.
-  // Importantly - CPoffset won't be CODEE, it will be at least 2 cells higher as 'FORTH's data area is underneath it.
-  //Ustore(CPoffset, CODEE); //TODO-ARDUINO set from user variables
-  //Ustore(NPoffset, NAMEE);  //TODO-ARDUINO set from user variables
-  //Ustore(VPoffset, 0); // Bottom of RAM - Note that this is set to 0 t make it use CP (which by now is in RAM) for variables
-  //Ustore(RP0offset, RP0);
-  //Ustore(SP0offset, cellSPP << CELLSHIFT); // Shouldnt be needed as should be in ROM
   IP = XT_COLD+CELLL; // This has a tight interaction with loop - which will look at next value and threadToken on it. (So this only works on a colon definition)
-  //Serial.println(F("End setup"));
-  delay(1000);
 }
 
 void loop() {
