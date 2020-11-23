@@ -1,15 +1,20 @@
-import { Forth, ForthNodeExtensions, jsFunctionAttributes, RP0offset} from '../index.js';
+import { Forth, ForthNodeExtensions, RP0offset, jsFunctionAttributes, Romable16_16 } from '../index.js';
 
 /*
- * This is a first cut at a dictionary dumper for Arduino
+ * This is a first cut at a dictionary dumper aka cross-compiler for Arduino
  * Its written in Javascript - it could be written in Forth, but there is some significant string handling going on.
  */
 
+// Valid choices for CELL:MEM are 2:8 2:16 2:32 3:8 4:8 4:16 4:32 - Arduino is 2:16 and memClass = ROmable16_16
 const CELLL = 2; // Must use 2 for Arduino
 const MEM = 16; // Must use 16 for Arduino
-const ROMSIZE = 0x2000;
-const RAMSIZE = 0x400;
+// Specify areas for ROM and RAM, currently they have to be specified separately as there is a bug with setting ROMSIZE = 0;
+// ROM: Used for UserVariable save area and Dictionary (code and names) until useRam() is called
+const ROMSIZE = 0x1000 * CELLL; // Set to 0x2000 should cover the standard dict plus a few extensions.
+// RAM: Used for UserVariables, stacks, TIB, PAD etc and Dictionary (code and names) after useRam() is called
+const RAMSIZE = 0x200 * CELLL; // 400 is about the maximum Ram you can use currently on e.g. an Arduino Uno
 const extensions = ForthNodeExtensions;
+const memClass = Romable16_16; // Separate Rom and Ram (like an Arduino).
 
 class ForthDumper extends Forth {
   xcLine(s) { this.TXbangS(s); }
@@ -44,7 +49,7 @@ class ForthDumper extends Forth {
     this.xcLine('\n#define LITTLEENDIAN true');
     this.xcLine(`\n#define ROMCELLS ${ROMSIZE / this.CELLL}`);
     this.xcLine(`\n#define RAMCELLS ${RAMSIZE / this.CELLL}`);
-    this.xcLine(`\n#define SPP ${this.cellSPP * this.CELLL}`);
+    this.xcLine(`\n#define SPP ${this.SPP}`);
     this.xcLine(`\n#define RP0 ${this.Ufetch(RP0offset)}`);
     this.xcLine(`\n#define NAMEE ${this.NAMEE}`);
     this.xcLine(`\n#define CODEE ${this.CODEE}`);
@@ -174,7 +179,7 @@ class ForthDumper extends Forth {
     this.xcLine('\n// === End of Arduino source from dictionary === \n');
   }
 }
-const forth = new ForthDumper({CELLL, ROMSIZE, RAMSIZE, MEM, extensions});
+const forth = new ForthDumper({CELLL, ROMSIZE, RAMSIZE, MEM, memClass, extensions});
 forth.compileForthInForth()
   .then(() => console.log('===forthInForth compiled'))
   //.then(() => forth.cleanupBootstrap()).then(() => console.log('===forthInForth cleaned up'))

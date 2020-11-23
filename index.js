@@ -115,14 +115,14 @@ const tokenCreate = 6;
 // ported to Arduino below to L.115
 // === Memory Map - Zen pg26
 const l = {}; // Constants that will get compiled into the dictionary
-l['COMP'] = 0x40; // bit in first char of name field to indicate 'compile-only'  ERRATA Zen uses this but its not defined
-l['IMED'] = 0x80; // bit in first char of name field to indicate 'immediate' ERRATA Zen uses this but its not defined
+l.COMP = 0x40; // bit in first char of name field to indicate 'compile-only'  ERRATA Zen uses this but its not defined
+l.IMED = 0x80; // bit in first char of name field to indicate 'immediate' ERRATA Zen uses this but its not defined
 const bitsSPARE = 0x20; // Unused spare bit in names
-l['BYTEMASK'] = 0xFF - l['COMP'] - l['IMED'] - bitsSPARE; // bits to mask out of a call with count and first char. ERRATA Zen uses this but its not defined
+l.BYTEMASK = 0xFF - l.COMP - l.IMED - bitsSPARE; // bits to mask out of a call with count and first char. ERRATA Zen uses this but its not defined
 //const forthTrue = (2 ** (l.CELLL * 8)) - 1; // Also used to mask numbers
 const forthTrue = -1; // Not quite correct, should be masked BUT when pushed that it is done underneath
 const nameMaxLength = 31; // Max number of characters in a name, length needs to be representable after BitMask (we have one spare bit here)
-console.assert(nameMaxLength === l['BYTEMASK']); // If this isn't true then check each of the usages below
+console.assert(nameMaxLength === l.BYTEMASK); // If this isn't true then check each of the usages below
 l.BL = 32;
 
 // === Data table used to build users.
@@ -1551,14 +1551,20 @@ let stdinBuffer = null; // Local to ?RX do not access directly - but there can b
  */
 // Mem8 assumes bigEndian
 // TODO-27-MEMORY could easily built a version of Mem8 that just used a raw Buffer or possibly Array Buffer (underlying buffer at Uint8Array.buffer )
+function align8(byteaddr) { return byteaddr} // 8
+function align16(byteAddr) { return (((byteAddr - 1) >> 1) + 1) << 1; }
+function align24(byteAddr) { return ((((byteAddr - 1) / 3) >>0) + 1) * 3; }
+function align32(byteAddr) { return (((byteAddr - 1) >> 2) + 1) << 2; } // 32
+
 class Mem8 extends Uint8Array {
   constructor(...args) {
     if (args[0] instanceof ArrayBuffer) { // Its a call to subarray,
       // noinspection JSCheckFunctionSignatures
       super(...args);
     } else {
-      const { length } = args[0]; // length in BYTES, and size of each CELL
+      const { length, ram0 } = args[0]; // length in BYTES, and size of each CELL
       super(length);
+      this.ram0 = ram0;
     }
   } // Pointless constructor
 
@@ -1570,8 +1576,7 @@ class Mem8 extends Uint8Array {
   store24(a, v) { this.store8(a++, v >>> 16); this.store16(a, v); }
   store32(a, v) { this.store16(a, v >> 16); this.store16(a + 2, v); }
 
-  align(byteaddr) { return byteaddr; }
-  assertAlign() { }
+  memAlign(byteaddr) { return align8(byteaddr); }
 
   // Write a Javascript string into the memory, note that string length is in characters,
   // while it returns the amount of bytes written, which could be different given UTF8 encoding
@@ -1582,45 +1587,37 @@ class Mem8 extends Uint8Array {
   decodeString(a, end) {
     return new TextDecoder().decode(this.subarray(a, end));
   }
+  cellRamFetch(ramAddr) { return this.fetchCell(this.fromRamAddr(ramAddr)); }
+  cellRomFetch(romAddr) { return this.fetchCell(this.fromRomAddr(romAddr)); }
+  cellRamStore(ramAddr, v) { this.storeCell(this.fromRamAddr(ramAddr), v); }
+  cellRomStore(romAddr, v) { this.storeCell(this.fromRomAddr(romAddr), v); }
 }
 class Mem8_16 extends Mem8 {
+  ramAddr(byteAddr) { return (byteAddr - this.ram0) >> 1; } // Note doesnt check the address is actually in ram
+  romAddr(byteAddr) { return byteAddr >> 1; } // Note doesnt check the address is actually in rom
+  fromRamAddr(ramAddr) { return (ramAddr << 1) + this.ram0; }
+  fromRomAddr(romAddr) { return (romAddr << 1); }
   storeCell(a, v) { this.store16(a, v); }
   fetchCell(a) { return (this[a++] << 8) | this[a]; }
-  cellFetchCell(cellAddr) { return (this.fetchCell(cellAddr << 1)); }
-  cellStoreCell(cellAddr, v) { this.storeCell(cellAddr << 1, v); }
-  debug(start, end) {
-    if (end < start) return 'UNDERFLOW';
-    const res = [];
-    let i = start;
-    while (i < end) res.push(((this[i++] << 8) | this[i++]) >> 0);
-    return res;
-  }
+  cellAlign(byteaddr) { return align16(byteaddr); }
 }
 class Mem8_24 extends Mem8 {
+  ramAddr(byteAddr) { return ((byteAddr - this.ram0) / 3) >> 0; } // Note doesnt check the address is actually in ram
+  romAddr(byteAddr) { return (byteAddr / 3) >> 0; } // Note doesnt check the address is actually in rom
+  fromRamAddr(ramAddr) { return (ramAddr * 3) + this.ram0; }
+  fromRomAddr(romAddr) { return (romAddr * 3); }
   storeCell(a, v) { this.store24(a, v); }
   fetchCell(a) { return (((this[a++] << 8) | this[a++]) << 8) | this[a]; }
-  cellFetchCell(cellAddr) { return (this.fetchCell(cellAddr * 3)); }
-  cellStoreCell(cellAddr, v) { this.storeCell(cellAddr * 3, v); }
-  debug(start, end) {
-    if (end < start) return 'UNDERFLOW';
-    const res = [];
-    let i = start;
-    while (i < end) res.push((this[i++] << 16 + this[i++] << 8 + this[i++]) >> 0);
-    return res;
-  }
+  cellAlign(byteaddr) { return align24(byteaddr); }
 }
 class Mem8_32 extends Mem8 {
+  ramAddr(byteAddr) { return (byteAddr - this.ram0) >> 2; } // Note doesnt check the address is actually in ram
+  romAddr(byteAddr) { return byteAddr >> 2; } // Note doesnt check the address is actually in rom
+  fromRamAddr(ramAddr) { return (ramAddr << 2) + this.ram0; }
+  fromRomAddr(romAddr) { return (romAddr << 2); }
   storeCell(a, v) { this.store32(a, v); }
   fetchCell(a) { return  (((((this[a++] << 8) | this[a++]) << 8) | this[a++]) << 8) | this[a]; }
-  cellFetchCell(cellAddr) { return (this.fetchCell(cellAddr << 2)); }
-  cellStoreCell(cellAddr, v) { this.storeCell(cellAddr << 2, v); }
-  debug(start, end) {
-    if (end < start) return 'UNDERFLOW';
-    const res = [];
-    let a = start;
-    while (a < end) res.push((((((this[a++] << 8) | this[a++]) << 8) | this[a++]) << 8) | this[a]);
-    return res;
-  }
+  cellAlign(byteaddr) { return align32(byteaddr); }
 }
 
 // noinspection JSBitwiseOperatorUsage,JSBitwiseOperatorUsage
@@ -1631,18 +1628,19 @@ class Mem16 extends Uint16Array {
       // noinspection JSCheckFunctionSignatures
       super(...args);
     } else {
-      const { length } = args[0]; // length in BYTES, and size of each CELL
+      const { length, ram0 } = args[0]; // length in BYTES, and size of each CELL
       super(length);
+      this.ram0 = ram0;
+      this.memRam0 = ram0 >> 1; // Offset to Ram0 in mem units (i.e. 16 bits)
       this.littleEndian = true;
     }
   } // Pointless constructor
 
-  align(byteAddr) {
-    return (((byteAddr - 1) >> 1) + 1) << 1;
-  }
+  memAlign(byteAddr) { return align16(byteAddr); }
+
   assertAlign(byteAddr) {
     // Check expectation already aligned, can comment out for speed
-    console.assert(!(byteAddr & 0x01));
+    // console.assert(!(byteAddr & 0x01));
   }
 
   fetch8(byteAddr) {
@@ -1685,10 +1683,18 @@ class Mem16 extends Uint16Array {
 class Mem16_16 extends Mem16 {
   storeCell(a, v) { this[a >> 1] = v; }
   fetchCell(byteAddr) { return this[byteAddr >> 1]; }
-  cellFetchCell(cellAddr) { return this[cellAddr]; }
-  cellStoreCell(cellAddr, v) { this[cellAddr] = v; }
-  debug(start, end) { return (end < start) ? 'UNDERFLOW' : new Uint16Array(this.buffer, start, (end - start) >> 1).toString(); }
+  ramAddr(byteAddr) { return (byteAddr - this.ram0) >> 1; } // Note doesnt check the address is actually in ram
+  romAddr(byteAddr) { return byteAddr >> 1; } // Note doesnt check the address is actually in rom
+  fromRamAddr(ramAddr) { return (ramAddr << 1) + this.ram0; }
+  fromRomAddr(romAddr) { return (romAddr << 1); }
+
+  cellRamFetch(cellAddr) { return this[cellAddr + this.memRam0]; }
+  cellRomFetch(cellAddr) { return this[cellAddr]; }
+  cellRamStore(cellAddr, v) { this[cellAddr + this.memRam0] = v; }
+  cellRomStore(cellAddr, v) { this[cellAddr] = v; }
+  cellAlign(byteaddr) { return align16(byteaddr); }
 }
+
 class Mem16_32 extends Mem16 {
   memStoreCell(memAddr, v) {
     if (this.littleEndian) {
@@ -1700,7 +1706,6 @@ class Mem16_32 extends Mem16 {
     }
   }
   storeCell(byteAddr, v) { this.memStoreCell(byteAddr >> 1, v); }
-  cellStoreCell(cellAddr, v) { this.memStoreCell(cellAddr << 1, v); }
 
   memFetchCell(memAddr) {
     return this.littleEndian
@@ -1708,8 +1713,15 @@ class Mem16_32 extends Mem16 {
       : ((this[memAddr++] << 16) | this[memAddr]);
   }
   fetchCell(byteAddr) { return this.memFetchCell(byteAddr >> 1); }
-  cellFetchCell(cellAddr) { return this.memFetchCell(cellAddr << 1); }
-  debug(start, end) { return (end < start) ? 'UNDERFLOW' : new Uint32Array(this.buffer, start, (end - start) >> 2).toString(); }
+  ramAddr(byteAddr) { return (byteAddr - this.ram0) >> 2; } // Note doesnt check the address is actually in ram
+  romAddr(byteAddr) { return byteAddr >> 2; } // Note doesnt check the address is actually in rom
+  fromRamAddr(ramAddr) { return (ramAddr << 2) + this.ram0; }
+  fromRomAddr(romAddr) { return (romAddr << 2); }
+  cellRamFetch(cellAddr) { return this.memFetchCell((cellAddr << 1) + this.memRam0); }
+  cellRomFetch(cellAddr) { return this.memFetchCell(cellAddr << 1); }
+  cellRamStore(cellAddr, v) { this.memStoreCell((cellAddr << 1) + this.memRam0, v); }
+  cellRomStore(cellAddr, v) { this.memStoreCell(cellAddr << 1, v); }
+  cellAlign(byteaddr) { return align32(byteaddr); }
 }
 
 // noinspection JSBitwiseOperatorUsage,JSBitwiseOperatorUsage,JSBitwiseOperatorUsage
@@ -1720,8 +1732,10 @@ class Mem32 extends Uint32Array {
       // noinspection JSCheckFunctionSignatures
       super(...args);
     } else {
-      const { length } = args[0]; // length in BYTES, and size of each CELL
+      const { length, ram0 } = args[0]; // length in BYTES, and size of each CELL
       super(length);
+      this.ram0 = ram0;
+      this.memRam0 = ram0 >> 2; // Offset to Ram0 in mem units (i.e. 16 bits)
       this.littleEndian = true;
     }
   } // Pointless constructor
@@ -1760,10 +1774,15 @@ class Mem32 extends Uint32Array {
     const U8onM = new Uint8Array(this.buffer); // Whole thing as dont know how used necessarily
     U8onM.copyWithin(byteDestn, byteSource, byteEnd);
   }
+  memAlign(byteAddr) { return align32(byteAddr); }
 }
 
 // noinspection JSBitwiseOperatorUsage
 class Mem32_16 extends Mem32 {
+  constructor(...args) {
+    super(...args);
+    if (this.ram0) { this.cellRam0 = this.ram0 >> 1; }
+  }
   cellStoreCell(cellAddr, v) {
     v &= 0xFFFF;
     const memAddr = cellAddr >> 1; // A points at cell (in all cases
@@ -1786,21 +1805,164 @@ class Mem32_16 extends Mem32 {
     console.assert(!(byteAddr & 0x01)); // Has to be aligned 16 bit but not 32 bit
     return this.cellFetchCell(byteAddr >> 1);
   }
-  // Alignment is to the smaller of cell length or memory size, in this case 16 bit
-  align(byteAddr) { return (((byteAddr - 1) >> 1) + 1) << 1; }
+
   assertAlign(byteAddr) { console.assert(!(byteAddr & 0x01)); }
-  debug(start, end) { return (end < start) ? 'UNDERFLOW' : new Uint16Array(this.buffer, start, (end - start) >> 1).toString(); }
+
+  ramAddr(byteAddr) { return (byteAddr - this.ram0) >> 1; } // Note doesnt check the address is actually in ram
+  romAddr(byteAddr) { return byteAddr >> 1; } // Note doesnt check the address is actually in rom
+  fromRamAddr(ramAddr) { return (ramAddr << 1) + this.ram0; }
+  fromRomAddr(romAddr) { return (romAddr << 1); }
+  cellRamFetch(cellAddr) { return this.cellFetchCell(cellAddr + this.cellRam0); }
+  cellRomFetch(cellAddr) { return this.cellFetchCell(cellAddr); }
+  cellRamStore(cellAddr, v) { this.cellStoreCell(cellAddr + this.cellRam0, v); }
+  cellRomStore(cellAddr, v) { this.cellStoreCell(cellAddr, v); }
+  // Alignment maybe should be to the smaller of cell length or memory size, in this case 16 bit
+  cellAlign(byteaddr) { return align16(byteaddr); }
 }
 // noinspection JSBitwiseOperatorUsage
 class Mem32_32 extends Mem32 {
+  constructor(...args) {
+    super(...args);
+    if (this.ram0) { this.cellRam0 = this.ram0 >> 2; }
+  }
   storeCell(byteAddr, v) { this[byteAddr >> 2] = v; }
-  cellStoreCell(cellAddr, v) { this[cellAddr] = v; }
   fetchCell(byteAddr) { return this[byteAddr >> 2]; }
-  // Alignment is to the smaller of cell length or memory size in this case 32
-  cellFetchCell(cellAddr) { return this[cellAddr]; }
-  align(byteAddr) { return (((byteAddr - 1) >> 2) + 1) << 2; }
   assertAlign(byteAddr) { console.assert(!(byteAddr & 0x03)); }
-  debug(start, end) { return (end < start) ? 'UNDERFLOW' : new Uint32Array(this.buffer, start, (end - start) >> 2).toString(); }
+  ramAddr(byteAddr) { return (byteAddr - this.ram0) >> 2; } // Note doesnt check the address is actually in ram
+  romAddr(byteAddr) { return byteAddr >> 2; } // Note doesnt check the address is actually in rom
+  fromRamAddr(ramAddr) { return (ramAddr << 2) + this.ram0; }
+  fromRomAddr(romAddr) { return (romAddr << 2); }
+  cellRamFetch(cellAddr) { return this[cellAddr + this.cellRam0]; }
+  cellRomFetch(cellAddr) { return this[cellAddr]; }
+  cellRamStore(cellAddr, v) { this[cellAddr + this.cellRam0] = v; }
+  cellRomStore(cellAddr, v) { this[cellAddr] = v; }
+  // Alignment is to the smaller of cell length or memory size in this case 32
+  cellAlign(byteaddr) { return align32(byteaddr); }
+}
+
+// noinspection JSBitwiseOperatorUsage
+class Romable16_16 {
+  constructor({ romSize, ramSize, ram0 }) { // length =EM,  celll
+    this.romSize = romSize;
+    this.ramSize = ramSize;
+    this.ram0 = ram0;
+    this.romCells = romSize >> 1;
+    this.ramCells = ramSize >> 1;
+    this.ram = new Uint16Array(ramSize);
+    this.rom = new Uint16Array(romSize);
+    this.romWritable = true; // Set to false after defined
+    this.littleEndian = true;
+  }
+
+  cellRomFetch(cellAddr) {
+    if (cellAddr >= this.romCells) {
+      console.log('Attempt to read above top of Rom at', cellAddr);
+    } // TODO-OPTIMIZE comment out
+    return this.rom[cellAddr];
+  }
+
+  cellRamFetch(cellAddr) {
+    if (cellAddr >= this.ramCells) {
+      console.log('Attempt to read above top of Ram at', cellAddr);
+    } // TODO-OPTIMIZE comment out
+    return this.ram[cellAddr];
+  }
+
+  cellRamStore(cellAddr, v) {
+    if (cellAddr >= this.ramCells) {
+      console.log('Attempt to write above top of Ram at');
+    } // TODO-OPTIMIZE comment out
+    this.ram[cellAddr] = v;
+  }
+
+  cellRomStore(cellAddr, v) {
+    if (!this.romWritable) {
+      console.log('Attempt to write to Rom after closed at', cellAddr);
+    } // TODO-OPTIMIZE comment out
+    this.rom[cellAddr] = v;
+  }
+
+  ramAddr(byteAddr) { return ((byteAddr ^ this.ram0) >> 1); }
+  romAddr(byteAddr) { return (byteAddr >> 1); }
+  fromRamAddr(ramAddr) { return (ramAddr << 1) | this.ram0; }
+  fromRomAddr(romAddr) { return (romAddr << 1); }
+
+  fetchCell(byteAddr) {
+    return (byteAddr >= this.ram0) ? this.cellRamFetch(this.ramAddr(byteAddr)) : this.cellRomFetch(this.romAddr(byteAddr));
+  }
+
+  storeCell(byteAddr, v) {
+    if (byteAddr >= this.ram0) {
+      this.cellRamStore(this.ramAddr(byteAddr), v);
+    } else {
+      this.cellRomStore(this.romAddr(byteAddr), v);
+    }
+  }
+
+  fetch8(byteAddr) {
+    const offset = byteAddr & 0x01;
+    const cell = this.fetchCell(byteAddr); // Does not have to be aligned
+    return (this.littleEndian
+      ? (offset
+        ? (cell >> 8)
+        : (cell & 0xFF))
+      : (offset
+        ? (cell & 0xFF)
+        : (cell >> 8))
+    );
+  }
+
+  store8(byteAddr, v) {
+    const offset = byteAddr & 0x01;
+    const cell = this.fetchCell(byteAddr);
+    if (this.littleEndian) {
+      if (offset) {
+        this.storeCell(byteAddr, (cell & 0x00FF) | (v << 8));
+      } else {
+        this.storeCell(byteAddr, (cell & 0xFF00) | v);
+      }
+    } else if (offset) {
+      this.storeCell(byteAddr, (cell & 0xFF00) | v);
+    } else {
+      this.storeCell(byteAddr, (cell & 0x00FF) | (v << 8));
+    }
+  }
+  cellAlign(byteaddr) { return align16(byteaddr); }
+  memAlign(byteaddr) { return align16(byteaddr); }
+  assertAlign(byteAddr) {
+    // Check expectation already aligned, can comment out for speed
+    console.assert(!(byteAddr & 0x01));
+  }
+  // Encode a string into an address and return the number of bytes written
+  // Does not check the start address, which will most often NOT be a cell boundary as will have length first
+  encodeString(byteAddr, s) {
+    const isRam = byteAddr >= this.ram0;
+    const startWriteInBuffer = isRam ? (byteAddr ^ this.ram0) : byteAddr;
+    const ramOrRom = isRam ? this.ram : this.rom;
+    const U8onM = new Uint8Array(ramOrRom.buffer, startWriteInBuffer, ramOrRom.byteLength - startWriteInBuffer);
+    return new TextEncoder().encodeInto(s, U8onM).written; // Uint8Array
+  }
+  decodeString(byteStart, byteEnd) {
+    const isRam = byteStart >= this.ram0;
+    const buf = isRam ? this.ram.buffer : this.rom.buffer;
+    const len = byteEnd - byteStart;
+    const start = isRam ? (byteStart ^ this.ram0) : byteStart;
+    const U8onM = new Uint8Array(buf, start, len);
+    return new TextDecoder().decode(U8onM);
+  }
+  // Only used in token - which is bytes and never aligned
+  copyWithin(byteDestn, byteSource, byteEnd) {
+    const dIsRam = byteDestn >= this.ram0;
+    const sIsRam = byteSource >= this.ram0;
+    let dStart = dIsRam ? byteDestn - this.ram0 : byteDestn; // in Cells
+    let sStart = sIsRam ? byteSource - this.ram0 : byteSource; // in Cells
+    const bytes = byteEnd - byteSource;
+    const dBuf = new Uint8Array(dIsRam ? this.ram.buffer : this.rom.buffer, dStart, bytes);
+    const sBuf = new Uint8Array(sIsRam ? this.ram.buffer : this.rom.buffer, sStart, bytes);
+    for (let i = 0; i < bytes; i++) {
+      dBuf[i] = sBuf[i];
+    }
+  }
 }
 
 // Default memory class for different combinations of MEM and CELL
@@ -1843,7 +2005,7 @@ class Forth {
     // Memory may be aligned to a boundary depending on underlying mem store (which may or may not match CELLL), this assumption should be confined to ALIGNED
     // Now the memory map itself, starting at the top of memory.
     // ERRATA In Zen the definitions on Zen pg26 dont come close to matching the addresses given as the example below. In particular UPP and RPP(RP0) overlap !
-    this.RAM0 = ROMSIZE ? 0x8000 : 0; // Arbitrary address to use for RAM
+    this.RAM0 = ROMSIZE ? 0x8000 : 0; // Arbitrary address to use for RAM - but must be power of 2
     const EM = this.RAM0 + RAMSIZE; // top of memory default to 4K cells
     const US = 0x40 * this.CELLL;  // user area size in cells i.e. 64 variables - standard usage below is using about 37
     this.UPP = EM - US; // start of user area // TODO-28-MULTI UP should be a variable, and used in most places UPP is
@@ -1852,12 +2014,11 @@ class Forth {
     const RTS = 0x80 * this.CELLL; // return stack/TIB size // eFORTH-DIFF was 64 which is tiny for any kind of string handling
     this.TIB0 = RP0 - RTS; // Terminal input buffer - shares space with Return stack //TODO-28-MULTITASK will move
     // 8 cell buffer between Stack and TIB
-    const SPP = this.TIB0 - 8 * this.CELLL; // top of data stack SP0
-    this.cellSPP = (SPP / this.CELLL) >> 0; // start of data stack - grows down, points at top of stack - 8 word buffer for safety
+    this.SPP = this.TIB0 - 8 * this.CELLL; // top of data stack SP0
     const SPS = 0x80 * this.CELLL; // Size of data stack 256 bytes for now
     // Start of Ram (Below here should only be changed during compilation),
     // PAD is 80 bytes above the current top of Data space or Code directory, and HLD (where numbers are build for output) is a few bytes growing down from PAD.
-    this.NAMEE = SPP - SPS; // name dictionary in Ram (there may be another in Rom)
+    this.NAMEE = this.SPP - SPS; // name dictionary in Ram (there may be another in Rom)
     // And then building from the bottom up. The gap in middle is code directory
     // cold start vector - its unclear if these bottom 0x100 are useful outside of the DOS context and for DOS it would need code at this address I think?
     // const COLDD = 0x100;
@@ -1866,7 +2027,7 @@ class Forth {
     // Above UZERO is a store of initial values for User variables
     // cold start vector - its unclear if these bottom 0x100 are useful outside of the DOS context and for DOS it would need code at this address I think?
     // const COLDD = 0x100;
-    this.CODEE = ROMSIZE ?  this.RAM0 : (this.UZERO + US) ; // code dictionary grows up from here towards NAME dictionary.
+    this.CODEE = ROMSIZE ?  this.RAM0 : (this.UZERO + US); // code dictionary grows up from here towards NAME dictionary.
     // PAD is 80 bytes above the current top of Data space or Code directory, and HLD (where numbers are build for output) is a few bytes growing down from PAD.
     console.log('Space for', this.NAMEE - this.CODEE, 'bytes for code and names');
 
@@ -1877,22 +2038,23 @@ class Forth {
     }
 
     // Get a instance of a class to store in
-    this.m = new (memClass || MemClasses[`${MEM}_${this.CELLbits}`])({ length: EM, celll: this.CELLL });
+    this.m = new (memClass || MemClasses[`${MEM}_${this.CELLbits}`])({ length: EM, celll: this.CELLL, ramSize: RAMSIZE, romSize: ROMSIZE, ram0: this.RAM0 });
     this.jsFunctions = [];  // Maps tokens to executable functions - first is zero as a invalid token
 
-    // Needs to be after the call to create this.m, its endian dependent as lowest address byte is always the countr
+    // Needs to be after the call to create this.m, its endian dependent as lowest address byte is always the count
     if (this.m.littleEndian) {
-      this.CELLMASK = forthTrue ^ (0xFF ^ l['BYTEMASK']);
+      this.CELLMASK = forthTrue ^ (0xFF ^ l.BYTEMASK);
     } else {
-      this.CELLMASK = forthTrue ^ ((0xFF ^ l['BYTEMASK']) << (this.CELLbits - 8));
+      this.CELLMASK = forthTrue ^ ((0xFF ^ l.BYTEMASK) << (this.CELLbits - 8));
     }
 
     // === Standard pointers used - Zen pg22
     // TODO-28-MULTI think about how these may need to be Task specific
+    this.ramSPP = this.m.ramAddr(this.SPP); // start of data stack - grows down, points at top of stack - 8 word buffer for safety
     this.IP = 0;    // Interpreter Pointer
-    this.cellSP = this.cellSPP;  // Data Stack Pointer but in MEM units rather than bytes
-    this.cellRP = (RP0 / this.CELLL)>>0;  // Return Stack Pointer (aka BP in 8086)
-    this.cellUP = (this.UPP / this.CELLL)>>0;  // User Area Pointer // TODO-28-MULTI will move this around
+    this.ramSP = this.ramSPP;  // Data Stack Pointer but in MEM units rather than bytes
+    this.ramRP = this.m.ramAddr(RP0);  // Return Stack Pointer (aka BP in 8086)
+    this.ramUP = this.m.ramAddr(this.UPP);  // User Area Pointer // TODO-28-MULTI will move this around
     this._USER = 0; // Incremented by this.CELLL as define USER's
     // ported to Arduino above
 
@@ -1904,7 +2066,7 @@ class Forth {
     this.Ustore(VPoffset, this.ROMCODEE ? this.CODEE : 0); // Pointer to start of writing variables, might be 0 if using code space like eForth does
     //console.assert(this.npFetch() > 0); // Quick test that above worked - should be commented out
     this.Ustore(RP0offset, RP0);
-    this.Ustore(SP0offset, this.cellSPP * this.CELLL);
+    this.Ustore(SP0offset, this.m.fromRamAddr(this.ramSPP));
     // Allow extensions of functions by caller - used for example to vector console I/O
     // Order is significant, as buildDictionary will define a jsFunction that points to the function as defined then.
     extensions.forEach((e) => {
@@ -1919,11 +2081,11 @@ class Forth {
       }
       if (e.n) { // Have a forth name for this
         // Add to or replace jsFunctionAttributes for dictionary building.
-        const i = jsFunctionAttributes.findIndex(j => j.n === e.n);
+        const i = jsFunctionAttributes.findIndex((j) => j.n === e.n);
         if (i === -1) { // Not found and have a name (forth name) for it.
           jsFunctionAttributes.push(e);
         } else {
-          Object.keys(e).forEach(k => jsFunctionAttributes[i].k = e.k); // Copy over attributes as may not define all of the options
+          Object.keys(e).forEach((k) => jsFunctionAttributes[i][k] = e[k]); // Copy over attributes as may not define all of the options
         }
       }
     });
@@ -1939,7 +2101,7 @@ class Forth {
     this.DW(tokenVocabulary); // Uses assumption that tokenVocabulary is first in jsFunctionAttributes
     const vp = this.vpFetch();
     this.DW(this.vpFetch()); // Point to first cell in VP (data area in RAM)
-    this.Ustore(VPoffset, vp + 2 * this.CELLL ); // ALLOT 2 spaces (should default to zero)
+    this.Ustore(VPoffset, vp + 2 * this.CELLL); // ALLOT 2 spaces (should default to zero)
     this.Ustore(CURRENToffset, vp); // Initialize Current. Context & Current+CELLL initialized in USER process Zen pg46
     this.Ustore(CURRENToffset + 1, vp); // Initialize Current. Context & Current+CELLL initialized in USER process Zen pg46
     this.Ustore(CONTEXToffset, vp); // Initialize Current. Context & Current+CELLL initialized in USER process Zen pg46
@@ -1957,13 +2119,14 @@ class Forth {
         this.jsFunctions.push(attribs); // Intentionally invalid pointer in slot 0
       } else {
         // Shortcut
-        if (this.testing & 0x01) console.log(">> ", attribs);
+        if (this.testing & 0x01) console.log('>> ', attribs);
         if (typeof attribs === 'string') {
-          attribs = {n: attribs};
+          attribs = { n: attribs };
         }
         const n = attribs.n;
         // noinspection JSUnresolvedVariable
-        const f = this[attribs.f || n];
+        const f = typeof attribs.f === 'function' ? attribs.f : this[attribs.f || n];
+        console.assert(typeof f === 'function');
         const tok = this.jsFunctions.length; // Where function will be pushed
         // special case: token Functions that need constants
         this.jsFunctions.push(f);
@@ -2000,12 +2163,12 @@ class Forth {
     this.DW(tok);  // The entire definition is the token for the JS function
     this.OVERT();                          // Make the name usable
     if (attribs.immediate) {
-      this.setHeaderBits(l['IMED']);
+      this.setHeaderBits(l.IMED);
     }
     return xt;
   }
   buildUser(name, init) {
-    if (this.testing & 0x01) console.log("USER>>",name,init);
+    if (this.testing & 0x01) console.log('USER>>', name, init);
     init = typeof init === 'string'
       ? (typeof this[init] !== 'undefined' ? this[init] : this.JStoXT(init)) // Either field of this, or function
       : typeof init === 'undefined'
@@ -2043,21 +2206,24 @@ class Forth {
   debugPop() { this.debugExcecutionStack.pop(); } // in EXIT
 
   // Return an array of stack entries
-  debugCells(start, end) {
-    return this.m.debug(start * this.CELLL, end * this.CELLL);
+  debugRam(start, end) {
+    if (end < start) return 'UNDERFLOW';
+    const res = [];
+    for (let i = start; i < end; i++) { res.push(this.m.cellRamFetch(i)); }
+    return res;
   }
   debugStack() {
-    return this.debugCells(this.cellSP, this.cellSPP);
+    return this.debugRam(this.ramSP, this.ramSPP);
   }
   debugReturnStack() {
-    return this.m.debugCells(this.cellRP, this.Ufetch(RP0offset) / this.CELLL);
+    return this.debugRam(this.ramRP, this.m.ramAddr(this.Ufetch(RP0offset)));
   }
   debugThread(xt) {
     if (this.testing & 0x02) {
       this.debugName = this.xt2name(xt); // Expensive so only done when testing
       if (this.testingDepth > this.debugExcecutionStack.length) {
         //TODO-28-MULTITASK RPP(RP0) and SPP will move
-        console.log('R:', (this.Ufetch(RP0offset) === (this.cellRP * this.CELLL)) ? '' : this.debugReturnStack(), this.debugExcecutionStack, this.xt2name(xt), 'S:', this.cellSPP === this.cellSP ? '' : this.debugStack(),
+        console.log('R:', this.debugReturnStack(), this.debugExcecutionStack, this.xt2name(xt), 'S:', this.ramSPP === this.ramSP ? '' : this.debugStack(),
           this.padTestLength ? ('pad: ' + (this.padTestLength > 0 ? this.m.decodeString(this.padPtr(), this.padPtr() + this.padTestLength) : this.m.decodeString(this.padPtr() + this.padTestLength, this.padPtr()))) : '');
       }
     }
@@ -2089,7 +2255,7 @@ class Forth {
       b.unshift(this.SPpop());
     }
     // Check stack depth matches
-    console.assert((this.cellSPP - this.cellSP) === stackDepth);
+    console.assert((this.ramSPP - this.ramSP) === stackDepth);
     // Compare stacks
     for (let i = 0; i < stackDepth; i++) {
       console.assert(this.SPpop() === b.pop());
@@ -2104,25 +2270,25 @@ class Forth {
   // 8 bit equivalents
   Mfetch8(a) { return this.m.fetch8(a); } // Returns byte at a
   Mstore8(a, v) { this.m.store8(a, v); }
-  ALIGNED() { this.SPpush(this.m.align(this.SPpop())); }
-  SPfetch() { return this.m.cellFetchCell(this.cellSP); }
-  SPpop() { return this.m.cellFetchCell(this.cellSP++); }
-  SPpush(v) { this.m.cellStoreCell(--this.cellSP, v); }
-  RPfetch() { return this.m.cellFetchCell(this.cellRP); }
-  RPpop() { return this.m.cellFetchCell(this.cellRP++); }
-  RPpush(v) { this.m.cellStoreCell(--this.cellRP, v); }
+  ALIGNED() { this.SPpush(this.m.cellAlign(this.SPpop())); }
+  SPfetch() { return this.m.cellRamFetch(this.ramSP); }
+  SPpop() { return this.m.cellRamFetch(this.ramSP++); }
+  SPpush(v) { this.m.cellRamStore(--this.ramSP, v); }
+  RPfetch() { return this.m.cellRamFetch(this.ramRP); }
+  RPpop() { return this.m.cellRamFetch(this.ramRP++); }
+  RPpush(v) { this.m.cellRamStore(--this.ramRP, v); }
   IPnext() { const v = this.Mfetch(this.IP); this.IP += this.CELLL; return v; }
   Ufetch(userindex) {
-    return this.m.cellFetchCell(this.cellUP + userindex); }
+    return this.m.cellRamFetch(this.ramUP + userindex); }
   Ustore(userindex, w) {
-    this.m.cellStoreCell(this.cellUP + userindex, w); }
+    this.m.cellRamStore(this.ramUP + userindex, w); }
 
   // === Access to the USER variables before they are defined
   currentFetch() { return this.Ufetch(CURRENToffset); }
   cpFetch() { return this.Ufetch(CPoffset); }
   vpFetch() { return this.Ufetch(VPoffset) || this.Ufetch(CPoffset); }
-  cpAlign() { this.Ustore(CPoffset, this.m.align(this.cpFetch())); }
-  vpAlign() { this.Ustore(VPoffset, this.m.align(this.vpFetch())); }
+  cpAlign() { this.Ustore(CPoffset, this.m.cellAlign(this.cpFetch())); }
+  vpAlign() { this.Ustore(VPoffset, this.m.cellAlign(this.vpFetch())); }
   npFetch() { return this.Ufetch(NPoffset); }
   lastFetch() { return this.Ufetch(LASToffset); }
   padPtr() { return this.vpFetch() + 80; } // Sometimes JS needs the pad pointer
@@ -2133,7 +2299,7 @@ class Forth {
   // it assumes a maximum of nameMaxLength (31) characters.
   // Mostly used for debugging but also in number conversion.
   countedToJS(a) {
-    return this.m.decodeString(a + 1, a + (this.Mfetch8(a) & l['BYTEMASK']) + 1);
+    return this.m.decodeString(a + 1, a + (this.Mfetch8(a) & l.BYTEMASK) + 1);
   }
   // Convert a name address to the code dictionary definition.
   na2xt(na) {
@@ -2158,7 +2324,7 @@ class Forth {
   }
 
   _find(va, na) { // return na that matches or 0
-    const cellCount = ((this.Mfetch8(na) & l["BYTEMASK"])  / this.CELLL) >>0; // Count of cells after first one
+    const cellCount = ((this.Mfetch8(na) & l.BYTEMASK)  / this.CELLL) >> 0; // Count of cells after first one
     const cell1 = this.Mfetch(na);  // Could be little or big-endian
     let p = va;
     while (p = this.Mfetch(p)) {
@@ -2181,7 +2347,7 @@ class Forth {
   jsFind() { // a va -- ca na | a 0
     const va = this.SPpop();
     const a = this.SPpop();
-    this.m.assertAlign(a);
+    //this.m.assertAlign(a);
     //console.log('find: Looking for', name) // comment out except when debugging find
     const na = this._find(va, a);  // return matching na or 0
     if (na) {
@@ -2232,9 +2398,9 @@ class Forth {
     const count = this.m.encodeString(tempBuf + 1, s);
     this.Mstore8(tempBuf, count);
     let p = tempBuf + count + 1;
-    const aligned = this.m.align(p+1);
+    const aligned = this.m.cellAlign(p);
     while (p < aligned) {
-      this.Mstore8(p++, 0); // Always writes at least one, since aligned is done on p+1 (to handle case of cell=2 mem=8 unaligned)
+      this.Mstore8(p++, 0);
     }
     this.SPpush(tempBuf);
   }
@@ -2243,13 +2409,14 @@ class Forth {
   JStoXT(s, save = false) {
     let xt = this.js2xt[s];
     if (xt) return xt; // Quick check for cached
-    this.JStoCounted(s);
+    this.JStoCounted(s); // a;
     this.findName(); // xt na | a F
     if (this.SPpop()) {
       xt = this.SPpop();
       if (save) this.js2xt[s] = xt;
       return xt;
     } else {
+      this.SPpop(); // Lose the address
       return undefined;
     }
   }
@@ -2303,6 +2470,7 @@ class Forth {
       this.Mstore(a, this.cpFetch()); // ca=CP ;
       this.Ustore(NPoffset, a); // ca=CP ;
     } else {                    // THEN $" name" THROW ;
+      this.ramSP++;// DROP
       console.log('name error'); // This is an error - in FORTH equivalent its a THROW
     }
   }
@@ -2358,7 +2526,7 @@ class Forth {
   }
 
   // Leaves an address in the user area, note it doesnt compile the actual address since UP will change when multi-tasking
-  tokenUser(payload) { this.SPpush((this.Mfetch(payload) + this.cellUP) * this.CELLL); }
+  tokenUser(payload) { this.SPpush(this.m.fromRamAddr(this.Mfetch(payload) + this.ramUP)); }
 
   // Put the address of the payload onto Stack - used for CREATE which is used by VARIABLE
   _tokenDoes(payload) {
@@ -2399,7 +2567,7 @@ class Forth {
   // Cant use R or S for it as words use that across calls to the 'EVAL
   async runXT(xt) {
     let waitFrequency = 0;
-    console.assert(this.IP === 0); // Cant nest runXT()
+    //console.assert(xt && this.IP === 0); // Cant nest runXT()
     await this.threadtoken(xt);
     // If this returns without changing program Counter, it will exit
     while (this.IP) {
@@ -2522,18 +2690,18 @@ class Forth {
   cFetch() { this.SPpush(this.Mfetch8(this.SPpop())); } //C@ a -- c, Fetch character
 
   // Return stack words eForthAndZen#40
-  RPat() { this.SPpush(this.cellRP * this.CELLL); } //RP@
-  RPbang() { this.cellRP = this.SPpop() / this.CELLL; } // RP! must be aligned
+  RPat() { this.SPpush(this.m.fromRamAddr(this.ramRP)); } //RP@
+  RPbang() { this.ramRP = this.m.ramAddr(this.SPpop()); } // RP! must be aligned
   Rfrom() { this.SPpush(this.RPpop()); } // R>
   Rat() { this.SPpush(this.RPfetch()); } // R@
   toR() { this.RPpush(this.SPpop()); } // >R
 
   // Data stack initialization eForthAndZen#41
-  SPat() { this.SPpush(this.cellSP * this.CELLL); } //SP@
-  SPbang() { this.cellSP = this.SPpop() / this.CELLL; } //SP! must be aligned
+  SPat() { this.SPpush(this.m.fromRamAddr(this.ramSP)); } //SP@
+  SPbang() { this.ramSP = this.m.ramAddr(this.SPpop()); } //SP! must be aligned
 
   // Classic Data stack words eForthAndZen#42
-  DROP() { this.cellSP++; }
+  DROP() { this.ramSP++; }
   DUP() { this.SPpush(this.SPfetch()); }
   SWAP() {
     const x = this.SPpop();
@@ -2579,7 +2747,7 @@ class Forth {
   userAreaInit() {
     for (let a = 0; a < this._USER; a++) {
       //console.log(a, this.Ufetch(a), this.Mfetch(this.UZERO + a * this.CELLL));
-      this.Ustore(a, this.m.cellFetchCell(this.UZERO / this.CELLL + a));
+      this.Ustore(a, this.m.cellRomFetch(this.UZERO / this.CELLL + a));
     }
   }
   // The opposite of userAreaInit - save values for restoration at COLD
@@ -2587,7 +2755,7 @@ class Forth {
   userAreaSave() {
     this.useRam(); // If were using ROM then switch
     for (let a = 0; a < this._USER; a++) {
-      this.m.cellStoreCell(this.UZERO / this.CELLL + a, this.Ufetch(a));
+      this.m.cellRomStore(this.UZERO / this.CELLL + a, this.Ufetch(a));
     }
   }
 
@@ -2619,9 +2787,9 @@ class Forth {
     this.PARSE();   // b u (counted string, adjusts >IN)
     const u = Math.min(this.SPpop(), nameMaxLength); // length of string
     const b = this.SPpop(); // start of string
-    const np = this.m.align(this.npFetch() - u - this.CELLL); // Enough space in Name Directory to copy string optionally with one zero after
+    const np = this.m.cellAlign(this.npFetch() - u - this.CELLL); // Enough space in Name Directory to copy string optionally with one zero after
     // Careful if edit next formula, m.align doesnt change if mem=8, AND in this case np may not be on a cell boundary
-    this.Mstore(np + ((u / this.CELLL)>>0) * this.CELLL, 0); // Write a zero in the last cell where the last letter of word will be written
+    this.Mstore(np + ((u / this.CELLL) >> 0) * this.CELLL, 0); // Write a zero in the last cell where the last letter of word will be written
     this.m.copyWithin(np + 1, b, b + u);
     this.Mstore8(np, u);  // 1 byte count
     this.SPpush(np); // Note that NP is not updated, the same buffer will be used for each word until hit ':'
@@ -2684,7 +2852,7 @@ class Forth {
       const xt = this.SPpop();
       const ch = this.Mfetch8(na);
       // noinspection JSBitwiseOperatorUsage
-      if (ch & l['IMED']) {
+      if (ch & l.IMED) {
         await this.runXT(xt); // This will work as long as this $INTERPRET never called from Forth as cant nest 'run' even indirectly
       } else {
         this.checkNotCompilingReplaceable(xt, na);
@@ -2725,14 +2893,15 @@ class Forth {
         this.SPpop();
       } else {
         // This is currently OK since its calling JS routines that may call Forth, there is no Forth-in-Forth
-        await this.runXT(this.Ufetch(EVALoffset));
+        await this.runXT(
+          this.Ufetch(EVALoffset));
       }
       // TODO-28-MULTITASK RP0 will move
-      console.assert(this.cellSP <= this.cellSPP && (this.cellRP * this.CELLL) <= this.Ufetch(RP0offset)); // Side effect of making SP and SPP available to debugger.
+      console.assert(this.ramSP <= this.ramSPP && (this.m.fromRamAddr(this.ramRP) <= this.Ufetch(RP0offset))); // Side effect of making SP and SPP available to debugger.
     }
     const prompt = this.Ufetch(PROMPToffset);
     if (prompt) {
-      await this.run(prompt); //TODO-BACKPORT changed line
+      await this.runXT(prompt); //TODO-BACKPORT changed line
     }
   }
 
@@ -2752,7 +2921,7 @@ class Forth {
       // noinspection JSUnfilteredForInLoop
       const inputline = inputs[i];
       if (this.testing & 0x01) {
-        console.log(this.debugCells(this.cellSP, this.cellSPP), ' >>', inputline);
+        console.log(this.debugStack(), ' >>', inputline);
       }
       this.JStoTIB(inputline);
       await this.EVAL();
@@ -2767,13 +2936,13 @@ class Forth {
   // : [  doLIT $INTERPRET 'EVAL ! ; IMMEDIATE
   //Zen pg84 and Zen pg88  redefined below to use FORTH $INTERPRET
   openBracket() {
-    this.Ustore(EVALoffset, this.js2xt.$INTERPRET); // uses JS $INTERPRET
+    this.Ustore(EVALoffset, this.js2xt.$INTERPRET); // uses JS dINTERPRET
   }
 
   // : ] doLIT $COMPILE 'EVAL ! ;
   //Zen pg84 and Zen pg95  redefined below to use FORTH $COMPILE
   closeBracket() {
-    this.Ustore(EVALoffset, this.js2xt.$COMPILE);
+    this.Ustore(EVALoffset, this.js2xt.$COMPILE); // Uses JS dCOMPILE
   }
 
   // : : TOKEN $,n [ ' doLIST ] LITERAL ] ; see Zen pg96
@@ -2843,7 +3012,7 @@ const ForthNodeExtensions = [
       }
       process.stdin.setEncoding('utf8');
       process.stdout.setEncoding('utf8');
-    }},
+    } },
   // Call chain is ?RX < '?KEY  < ?KEY < KEY < accept < 'EXPECT < QUERY < que < QUIT
   { // Note - replacing qrx() not QRX() so there is no forth name for this
     f: function qrx() {
@@ -2861,10 +3030,10 @@ const ForthNodeExtensions = [
         // If there is nothing (old or new) return False
         return [false];
       }
-    }},
+    } },
 ];
 export { Forth,
   ForthNodeExtensions,  // Needed by example_node_api.js and test_dump.mjs (XC Cross compiler)
-  Mem8_16, Mem8_24, Mem8_32, Mem16_16, Mem16_32, Mem32_16, Mem32_32, // Needed by console.js
+  Mem8_16, Mem8_24, Mem8_32, Mem16_16, Mem16_32, Mem32_16, Mem32_32, Romable16_16, // Needed by console.js
   jsFunctionAttributes, RP0offset, // Needed by test_dump.mjs (XC Cross compiler)
 };
