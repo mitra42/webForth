@@ -174,7 +174,12 @@ One challenge with eForth is that it puts data and code in the same space,
 meaning that to Eprom it requires copying the Eprom to Ram, 
 and given that small chips have limited Ram that isn't smart.
 
-webForth will allow for their separation - see [issue#15](https://www.github.com/mitra42/webforth/issues/15)
+webFORTH allows for separation between the two. The dictionary is built in an area to be flashed,
+and then pointers are switched to a Ram area where further words can be built. The word `FORTH` and
+anything built with vCREATE will use memory in the Ram area, as do anything built with `VARIABLE`.
+
+This is visible currently in arduino_webforth.ino, but is not yet fully backported to the main branch.
+- see [issue#15](https://www.github.com/mitra42/webforth/issues/15). 
 
 ## Earlier version - pretty much everything below here was for a version now deleted
 Mitra Ardron <mitra@mitra.biz> 8 Aug 2020
