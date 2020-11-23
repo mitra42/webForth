@@ -1,7 +1,3 @@
-/*
- * NOTES
- * See https://www.arduino.cc/reference/en/language/variables/utilities/progmem/ for reading program memory (where dictionary will be)
- */
 
 // === Dumping Arduino source from dictionary === 
 #define RAM0 32768
@@ -11,6 +7,8 @@
 #define UPP 33664
 #define UZERO 0
 #define CELLTYPE unsigned
+#define SIGNEDCELLTYPE int
+#define DOUBLECELLTYPE unsigned long
 #define CELLSHIFT 1
 #define LITTLEENDIAN true
 #define ROMCELLS 4096
@@ -240,16 +238,6 @@
 #define XT_Fbreak 0x122 /* Fbreak*/
 #define XT_testing3 0x120 /* testing3*/
 #define XT_debugNA 0x11e /* debugNA*/
-#define XT__27 0x11c /* '*/
-#define XT__3B 0x11a /* ;*/
-#define XT__3A 0x118 /* :*/
-#define XT__5D 0x116 /* ]*/
-#define XT__5B 0x114 /* [*/
-#define XT__24INTERPRET 0x112 /* $INTERPRET*/
-#define XT__24COMPILE 0x110 /* $COMPILE*/
-#define XT_NUMBER_3F 0x10e /* NUMBER?*/
-#define XT_TOKEN 0x10c /* TOKEN*/
-#define XT_PARSE 0x10a /* PARSE*/
 #define XT_userAreaSave 0x108 /* userAreaSave*/
 #define XT_userAreaInit 0x106 /* userAreaInit*/
 #define XT_UM_2B 0x104 /* UM+*/
@@ -285,8 +273,6 @@
 #define XT_BYE 0xc8 /* BYE*/
 #define XT_MS 0xc6 /* MS*/
 #define XT__3ENAME 0xc4 /* >NAME*/
-#define XT__24_2Cn 0xc2 /* $,n*/
-#define XT_OVERT 0xc0 /* OVERT*/
 #define XT_find 0xbe /* find*/
 #define XT_ALIGNED 0xbc /* ALIGNED*/
 #define XT_tokenCreate 0xb8 /* tokenCreate*/
@@ -1093,7 +1079,13 @@ const CELLTYPE rom[ROMCELLS] PROGMEM = {
 /* 0x1fec CELLL */ XT_CELLL, 0x1ffa, 0x4305, 0x4c45, 0x4c4c,
 /* 0x1ff6 FORTH */ XT_FORTH, 0, 0x4605, 0x524f, 0x4854,
 };
-// === End of Arduino source from dictionary ===  
+// === End of Arduino source from dictionary === 
+
+/*
+ * NOTES
+ * See https://www.arduino.cc/reference/en/language/variables/utilities/progmem/ for reading program memory (where dictionary will be)
+ */
+
 
 //TODO-ARDUINO OPTIMIZATION - check for constant parameters to functions nad mark constant in definition
 
@@ -1131,7 +1123,12 @@ const CELLTYPE forthTrue = -1; // Not quite correct, should be masked BUT when p
 //L.1823
 #define CELLbits CELLL * 8 // Number of bits in a cell - used for loops and shifts
 // mask used when masking cells in fast search for name ERRATA Zen uses this but its not defined e.g. 0x1FFFFF if CELLL = 3
-const CELLTYPE CELLMASK = forthTrue ^ ((0xFF ^ BYTEMASK) << (CELLbits - 8)); // TODO-15-EPROM will be endian dependent could #def ENDIAN and provide alternatives
+// Note - this will fail if master that dumped dictionary above is the opposite Endian. (Currently only Mem8 is little-endian; and Arduino is using Mem16).
+#ifdef LITTLEENDIAN
+const CELLTYPE CELLMASK = forthTrue ^ (0xFF ^ BYTEMASK); 
+#else
+const CELLTYPE CELLMASK = forthTrue ^ ((0xFF ^ BYTEMASK) << (CELLbits - 8));
+#endif
 
 //L.1831
 static byte testing = 0;
@@ -1163,13 +1160,31 @@ static CELLTYPE ramRP = ramRP0;  // Return Stack Pointer (aka BP in 8086) (this 
 static CELLTYPE ramUP = ramUP0;  // User Area Pointer // TODO-28-MULTI will move this around
 
 //L.2023
+void debugStack() {  // TODO - can comment out and remove from Fbreak when .S working, useful for debugging early 
+  Serial.print(F(" S:"));
+  for (CELLTYPE i = ramSP; i < ramSPP; i++) {
+    Serial.print(cellRamFetch(i));
+    Serial.print(F(" "));
+  }
+  Serial.print(F(" R:"));
+  for (CELLTYPE i = ramRP; i < ramRP0; i++) {
+    Serial.print(cellRamFetch(i));
+    Serial.print(F(" "));
+  }
+  Serial.print(F("IP-:"));
+  Serial.print(IP-CELLL);
+  Serial.print(F(" XT:"));
+  Serial.print(PAYLOAD-CELLL);
+  Serial.println();
+}
 void debugNA() { Serial.print(F("NAME=")); printCounted(SPfetch()); } // Print the NA on console
 // Put testing3 in a definition to start outputing stack trace on console.
 void testing3() { testing |= 3; };
 
 // Put break in a definition.
 void Fbreak() {
-  Serial.println(F("\nbreak in a FORTH word"));
+  debugStack();
+  //Serial.println(F("\nbreak in a FORTH word"));
 } // Put a breakpoint in your IDE at this line
 
 // debugPrintTIB will print the current TIB.
@@ -1206,13 +1221,13 @@ void TEST() { //  a1 a2 a3 b1 b2 b3 n -- ; Check n parameters on stack
 #define ROM(cellAddr) pgm_read_word_near(rom + cellAddr)
 #endif
 CELLTYPE cellRomFetch(const CELLTYPE cellAddr) {
-  if (cellAddr >= ROMCELLS) { Serial.print("Attempt to read above top of Rom at "); Serial.println(cellAddr); delay(10000); } // TODO-OPTIMIZE comment out
+  if (cellAddr >= ROMCELLS) { Serial.print(F("Attempt to read above top of Rom at ")); Serial.println(cellAddr); debugStack(); delay(10000); } // TODO-OPTIMIZE comment out
   return ROM(cellAddr); };
 CELLTYPE cellRamFetch(const CELLTYPE cellAddr) {
-  if (cellAddr >= RAMCELLS) { Serial.print("Attempt to read above top of Ram at "); Serial.println(cellAddr); delay(10000); } // TODO-OPTIMIZE comment out
+  if (cellAddr >= RAMCELLS) { Serial.print(F("Attempt to read above top of Ram at ")); Serial.println(cellAddr); debugStack(); delay(10000); } // TODO-OPTIMIZE comment out
   return ram[cellAddr]; };
 void cellRamStore(const CELLTYPE cellAddr, const CELLTYPE v) {
-  if (cellAddr >= RAMCELLS) { Serial.print("Attempt to write above top of Ram at "); Serial.println(cellAddr); delay(10000); } // TODO-OPTIMIZE comment out
+  if (cellAddr >= RAMCELLS) { Serial.print(F("Attempt to write above top of Ram at ")); Serial.println(cellAddr); debugStack(); delay(10000); } // TODO-OPTIMIZE comment out
   ram[cellAddr] = v; };
 #ifdef WRITEROM
 void cellRomStore(cont CELLTYPE cellAddr, constCELLTYPE v) { rom[cellAddr] = v; };
@@ -1222,7 +1237,7 @@ CELLTYPE Mfetch(const CELLTYPE byteAddr) { return (byteAddr >= RAM0) ? cellRamFe
 void Mstore(const CELLTYPE byteAddr, const CELLTYPE v) {  if (byteAddr >= RAM0) { cellRamStore(RAMADDR(byteAddr), v) } else { cellRomStore(ROMADDR(byteAddr), v) } }
 #else
 void Mstore(const CELLTYPE byteAddr, const CELLTYPE v) {
-  if (byteAddr < RAM0) { Serial.print("Attempt to write to Rom at "); Serial.print(byteAddr); Serial.print(" v="); Serial.println(v); delay(10000); } // TODO-OPTIMIZE comment out
+  if (byteAddr < RAM0) { Serial.print(F("Attempt to write to Rom at ")); Serial.print(byteAddr); Serial.print(F(" v=")); Serial.println(v); debugStack(); delay(10000); } // TODO-OPTIMIZE comment out
   cellRamStore(RAMADDR(byteAddr), v); }
 #endif
 // 8 bit equivalents
@@ -1237,6 +1252,7 @@ byte Mfetch8(const CELLTYPE byteAddr) {
 }; // Returns byte at a
 
 void Mstore8(const CELLTYPE byteAddr, byte v) {
+  //Serial.print("Mstore8 a="); Serial.print(byteAddr); Serial.print(" v="); Serial.println(v);
   const bool offset = byteAddr & 0x01;
   const CELLTYPE cell = Mfetch(byteAddr);
 #ifdef LITTLEENDIAN
@@ -1247,9 +1263,9 @@ void Mstore8(const CELLTYPE byteAddr, byte v) {
     }
 #else
     if (offset) {
-      Mstore(cellAddr, (cell & 0xFF00) | v);
+      Mstore(byteAddr, (cell & 0xFF00) | v);
     } else {
-      Mstore(cellAddr, (cell & 0x00FF) | (v << 8));
+      Mstore(byteAddr, (cell & 0x00FF) | (v << 8));
     }
 #endif
 }
@@ -1291,7 +1307,7 @@ CELLTYPE padPtr() { return vpFetch() + 80; } // Sometimes JS needs the pad point
 // Convert a string made up of a count and that many bytes to a Javascript string.
 // it assumes a maximum of nameMaxLength (31) characters.
 // Mostly used for debugging but also in number conversion.
-void printCounted(CELLTYPE a) { const byte c = Mfetch8(a++); TXbangS(a, c); }  // TODO-backport maybe use this in TYPE
+void printCounted(CELLTYPE a) { const byte c = Mfetch8(a++) & BYTEMASK; TXbangS(a, c); }  // TODO-backport maybe use this in TYPE
 //countedToJS(a) {
 //  return this.m.decodeString(a + 1, a + (this.Mfetch8(a) & l['BYTEMASK']) + 1);
 //}
@@ -1319,10 +1335,12 @@ bool _sameq(const CELLTYPE na1, const CELLTYPE na2, const byte cells) {
     return true;
 }
 CELLTYPE _find(const CELLTYPE va, const CELLTYPE na) { // return na that matches or 0
+  //Serial.print(F("XXX _find looking for:")); printCounted(na);
   const byte cellCount = (Mfetch8(na) & BYTEMASK)  >> CELLSHIFT; // Count of cells after first one (formula is not as obvious as you think)
   const CELLTYPE cell1 = Mfetch(na);  // Could be little or big-endian
   CELLTYPE p = va;
   while (p = Mfetch(p)) {
+    //Serial.print(F(" - ")); printCounted(p);
     const CELLTYPE c1 = Mfetch(p) & CELLMASK; // count
     if (cell1 == c1) { // first cell matches (if cell1 not passed then does slow compare
       if (_sameq(p + CELLL, na + CELLL, cellCount)) {
@@ -1444,7 +1462,7 @@ void OVERT() {
 
 //L.2278-
 void tokenVocabulary() {
-  Ustore(CONTEXToffset, PAYLOAD);
+  Ustore(CONTEXToffset, Mfetch(PAYLOAD));
 };
 // Put the contents of the payload (1 word) onto Stack, used for CONSTANT
 void tokenNextVal() {
@@ -1455,7 +1473,7 @@ void tokenNextVal() {
 // This is the most important token function - used for a Colon word to iterate over the list.
 void tokenDoList() {
   if (testing) {
-      Serial.println(":");
+      Serial.println(F(":"));
   }
   RPpush(IP);
   IP = PAYLOAD; // Point at first word in the definition
@@ -1490,6 +1508,17 @@ void tokenVar() {
 // === INNER INTERPRETER YES THIS IS IT ! ==================== eForthAndZen#36
 // This is quite different from eForth as its token-threaded rather than direct threaded
 
+void debugThreadToken(const CELLTYPE tok) {
+  const CELLTYPE xt = PAYLOAD-CELLL; 
+  Serial.print(IP-CELLL); Serial.print(F(":"));
+  if (CELLTYPE p = xt2na(xt)) { 
+    printCounted(p);
+  } else { 
+    Serial.print(xt); 
+  }
+  Serial.print(F(":")); Serial.print(tok); Serial.print(F("  "));
+}        
+
 void threadtoken(const CELLTYPE xt) {
   // console.assert(xt >= CODEE && xt < NAMEE); // Uncomment to catch bizarre xt values earlier
   // This next section is only done while testing, and outputs a trace, so set it on (with testing3) immediately before a likely error.
@@ -1498,16 +1527,10 @@ void threadtoken(const CELLTYPE xt) {
   PAYLOAD = xt + CELLL;
   // console.assert(tok < jsFunctions.length); // commented out for efficiency, a fail will just break in the next line anyway.
   if ((tok < 61) && f[tok]) {
-    if (testing) {
-        Serial.print(IP-CELLL); Serial.print(":");
-        if (CELLTYPE p = xt2na(xt)) { byte count = Mfetch8(p++) & 0x1F; while (count--) { Serial.write(Mfetch8(p++)); } } else { Serial.print(xt); }
-        //Serial.print(xt);
-        Serial.print(":"); Serial.print(tok); Serial.print("  ");
-    }
+    if (testing) { debugThreadToken(tok); }
     f[tok](); // Run the token function - like tokenDoList or tokenVar - doesnt return - (JS returns null or a Promise)
   } else {
-    Serial.print(F("XXX bad tok ="));
-    Serial.print(IP-CELLL); Serial.print(":"); Serial.print(xt); Serial.print(":"); Serial.print(tok); Serial.println("  "); delay(10000);
+    Serial.print(F("Bad token:")); debugThreadToken(tok); delay(10000);
   }
 }
 
@@ -1537,7 +1560,7 @@ void BYE() {  IP = 0; } // Should exit all the way out
 
 // Unwind the effect of tokenDoList restoring IP to the next definition out.
 void EXIT() {
-  if (testing) Serial.println(";");
+  if (testing) Serial.println(F(";"));
   IP = RPpop(); }
 
 // EXECUTE runs the word on the stack,
@@ -1607,7 +1630,7 @@ void DOES() {
 // decrement count on Return stack, and branch if not decremented past zero (FOR..NEXT)
 // noinspection JSUnusedGlobalSymbols
 void next() {
-  CELLTYPE x = RPpop();
+  SIGNEDCELLTYPE x = RPpop();
   const CELLTYPE destn = IPnext(); // Increments over it
   if (--x >= 0) {
     RPpush(x);
@@ -1668,7 +1691,7 @@ void OR() { SPpush(SPpop() | SPpop()); }
 void XOR() { SPpush(SPpop() ^ SPpop()); }
 
   // Primitive Arithmetic Word eForthAndZen44
-void UMplus() {
+void UMplus() { /* UM+ */
   const CELLTYPE a = SPpop();
   const CELLTYPE b = SPpop();
   /*
@@ -1680,7 +1703,8 @@ void UMplus() {
   } else {
   */
     // Note there is what I believe is a JS bug where x >> 32 is a noop so do th double shift
-    const CELLTYPE x = a + b;
+    const DOUBLECELLTYPE x = (DOUBLECELLTYPE)a + (DOUBLECELLTYPE)b;
+    //Serial.print(F("UMplus: a=")); Serial.print(a); Serial.print(F(" b=")); Serial.print(b); Serial.print(F(" x=")); Serial.print(x); Serial.print(F(" x>>=")); Serial.println(x >> CELLbits);
     SPpush(x); // This should only push the bottom cell.
     SPpush(x >> CELLbits);
   //}
@@ -1943,7 +1967,7 @@ void setup() {
   Serial.begin(57600); // Initialize IO port TODO move to somewhere Forth wants it
   //(*f[0])(); // TEST function pointer
   Serial.print(F("Starting: Space for, ")); Serial.print(NAMEE - CODEE), Serial.println(F("bytes for code and names"));
-  delay(10000);
+  delay(1000);
   //L.1898
   //TODO I think most of these will be in the Usersave area with values setup by the call useRam() run in the XC before saving.
   // Importantly - CPoffset won't be CODEE, it will be at least 2 cells higher as 'FORTH's data area is underneath it.
@@ -1953,7 +1977,7 @@ void setup() {
   //Ustore(RP0offset, RP0);
   //Ustore(SP0offset, cellSPP << CELLSHIFT); // Shouldnt be needed as should be in ROM
   IP = XT_COLD+CELLL; // This has a tight interaction with loop - which will look at next value and threadToken on it. (So this only works on a colon definition)
-  Serial.println("XXX end setup");
+  //Serial.println(F("End setup"));
   delay(1000);
 }
 

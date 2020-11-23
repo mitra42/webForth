@@ -622,7 +622,7 @@ const forthInForth = `
 : SPACES ( n -- ; Send n spaces to the output device. Zen pg70) ( ERRATA Zen has bad initial SWAP)
   BL CHARS ;
 : TYPE ( b u -- ; Output u characters from b)
-  FOR AFT DUP C@ EMIT 1 + THEN NEXT DROP ;
+  FOR AFT DUP C@ EMIT 1 + THEN  NEXT DROP ;
 : .$ ( a -- ) COUNT TYPE ; ( from Staapl, not in eForth)
 
 \\T 60 EMIT SPACE 2 SPACES 61 EMIT 0 TEST

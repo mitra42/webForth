@@ -37,7 +37,9 @@ class ForthDumper extends Forth {
       const val = this[k];
       this.xcLine(`\n#define ${k} ${val}`);
     });
-    this.xcLine(`\n#define CELLTYPE ${this.CELLL === 2 ? 'unsigned' : 'long'}`);
+    this.xcLine(`\n#define CELLTYPE ${this.CELLL === 2 ? 'unsigned' : 'unsigned long'}`);
+    this.xcLine(`\n#define SIGNEDCELLTYPE ${this.CELLL === 2 ? 'int' : 'long'}`);
+    this.xcLine(`\n#define DOUBLECELLTYPE ${this.CELLL === 2 ? 'unsigned long' : 'XXXbroken'}`); // TODO-ARDUINO-32
     this.xcLine(`\n#define CELLSHIFT ${this.CELLL === 2 ? 1 : 2}`);
     this.xcLine('\n#define LITTLEENDIAN true');
     this.xcLine(`\n#define ROMCELLS ${ROMSIZE / this.CELLL}`);
@@ -54,7 +56,11 @@ class ForthDumper extends Forth {
     let p = this.currentFetch(); // vocabulary
     while (p = this.Mfetch(p)) {
       const name = this.countedToJS(p);
-      this.xcLine(`\n#define ${this.xcXTIdentifier(name)} ${this.xcNum(this.na2xt(p))} /* ${name.replace('*/', '* /')}*/`);
+      const xt = this.na2xt(p);
+      const funcNumber = this.Mfetch(xt); // Typically 3 for colon words
+      if (!jsFunctionAttributes[funcNumber].replaced) {
+        this.xcLine(`\n#define ${this.xcXTIdentifier(name)} ${this.xcNum(xt)} /* ${name.replace('*/', '* /')}*/`);
+      }
       p -= this.CELLL; // point at link address and loop for next word
     }
   }
