@@ -112,7 +112,7 @@ const tokenUser = 4;
 const tokenVar = 5;
 const tokenCreate = 6;
 
-// TODO ported to Arduino below to L.115
+// ported to Arduino below to L.115
 // === Memory Map - Zen pg26
 const l = {}; // Constants that will get compiled into the dictionary
 l['COMP'] = 0x40; // bit in first char of name field to indicate 'compile-only'  ERRATA Zen uses this but its not defined
@@ -172,7 +172,7 @@ const CPoffset = USER('CP', undefined);  // eForth initializes to CTOP but we ha
 const NPoffset = USER('NP', undefined);  // normally set on Zen pg106 but we are using it live. Its the bottom of what compiled in name space.
 const LASToffset = USER('LAST', undefined); // normally set on Zen pg106 but using live
 const VPoffset = USER('VP', undefined);  // not part of eForth, pointer into Data space for EPROMability
-// TODO ported to Arduino above
+// ported to Arduino above
 
 const forthInForth = `
 0 TEST
@@ -622,7 +622,7 @@ const forthInForth = `
 : SPACES ( n -- ; Send n spaces to the output device. Zen pg70) ( ERRATA Zen has bad initial SWAP)
   BL CHARS ;
 : TYPE ( b u -- ; Output u characters from b)
-  FOR AFT DUP C@ EMIT 1 + THEN  NEXT DROP ;
+  FOR AFT DUP C@ EMIT 1 + THEN NEXT DROP ;
 : .$ ( a -- ) COUNT TYPE ; ( from Staapl, not in eForth)
 
 \\T 60 EMIT SPACE 2 SPACES 61 EMIT 0 TEST
@@ -1818,27 +1818,27 @@ const MemClasses = {
 // noinspection JSBitwiseOperatorUsage,JSUnusedGlobalSymbols
 class Forth {
   // Build and return an initialized Forth memory obj
-  constructor({ CELLL = 2, MEM = 8, memClass = undefined, DATAS = 0, ROMSIZE = undefined, RAMSIZE = undefined, extensions = [] }) {
+  constructor({ CELLL = 2, MEM = 8, memClass = undefined, ROMSIZE = undefined, RAMSIZE = undefined, extensions = [] }) {
     // ERRATA Zen doesnt define CELLL (and presumes is 2 in multiple places)
     this.CELLL = CELLL;  // 2,3 or 4. Needs to be big enough for an address
-    // TODO ported from here to L.1823
+    // ported to Arduino below here to L.1823
     this.CELLbits = CELLL * 8; // Number of bits in a cell - used for loops and shifts
     // mask used when masking cells in fast search for name ERRATA Zen uses this but its not defined e.g. 0x1FFFFF if CELLL = 3
     // Support parameters for TODO-27-MEMORY TODO-28-MULTI
-    // TODO ported above
+    // ported to Arduino above
 
     // === Support for Debugging ============
 
     this.debugExcecutionStack = []; // Maintains a position, like a stack trace, don't manipulate directly use functions below
     this.debugName = '?'; // Set in threadtoken()
-    // TODO ported from here to L.1831
+    // ported to Arduino below here to L.1831
     this.testing = 0x0; // 0x01 display words passed to interpreters; 0x02 each word in tokenthread - typically set by 'testing3'
-    // TODO ported above
+    // ported to Arduino above
     this.testingDepth = 1;
     this.padTestLength = 0; // Display pad length
     // === Javascript structures - implement the memory map and record the full state.
 
-    // TODO ported below to L.1840 - but most things output by XC
+    // ported below to L.1840 - but most things output by XC
     // === Memory layout
     // Memory may be aligned to a boundary depending on underlying mem store (which may or may not match CELLL), this assumption should be confined to ALIGNED
     // Now the memory map itself, starting at the top of memory.
@@ -1855,7 +1855,6 @@ class Forth {
     const SPP = this.TIB0 - 8 * this.CELLL; // top of data stack SP0
     this.cellSPP = (SPP / this.CELLL) >> 0; // start of data stack - grows down, points at top of stack - 8 word buffer for safety
     const SPS = 0x80 * this.CELLL; // Size of data stack 256 bytes for now
-    //DATAS defined as argument defaults to 0 to not use
     // Start of Ram (Below here should only be changed during compilation),
     // PAD is 80 bytes above the current top of Data space or Code directory, and HLD (where numbers are build for output) is a few bytes growing down from PAD.
     this.NAMEE = SPP - SPS; // name dictionary in Ram (there may be another in Rom)
@@ -1895,7 +1894,7 @@ class Forth {
     this.cellRP = (RP0 / this.CELLL)>>0;  // Return Stack Pointer (aka BP in 8086)
     this.cellUP = (this.UPP / this.CELLL)>>0;  // User Area Pointer // TODO-28-MULTI will move this around
     this._USER = 0; // Incremented by this.CELLL as define USER's
-    // TODO ported above
+    // ported to Arduino above
 
     // Ported to Android below to L.1898
     // create data structures
@@ -2064,7 +2063,7 @@ class Forth {
     }
   }
 
-  // TODO-ported below L.2023
+  // ported to Arduino below L.2023
 
   // === Code words to support debugging on the console
   // Put debugNA in a definition to print a counted string on the console
@@ -2207,7 +2206,7 @@ class Forth {
     // Drop through not found
     return 0;
   }
-  // TODO-ported above L.2177-
+  // ported to Arduino above L.2177-
 
   // Convert xt to a Javascript string of its name or 'undefined' (only used for debugging).
   xt2name(xt) {
@@ -2215,7 +2214,7 @@ class Forth {
     return na ? this.countedToJS(na) : 'undefined';
   }
 
-  // TODO-ported below L.2180-
+  // ported below L.2180-
   ToNAME() { this.SPpush(this.xt2na(this.SPpop())); }  // Fast version of >NAME see Forth definition below
 
   // TODO-29-VOCABULARY This just looks up a in the Context vocabulary, it makes no attempt to use multiple vocabularies
@@ -2224,7 +2223,7 @@ class Forth {
     this.SPpush(this.Ufetch(CONTEXToffset));  // a va
     this.jsFind();                           // xt na | a F
   }
-  // TODO-ported above L.2180-
+  // ported to Arduino above L.2180-
 
   // -- a; Push a Javascript string to a temporary location as a counted string, and put its address on the stack
   JStoCounted(s) {
@@ -2255,7 +2254,7 @@ class Forth {
     }
   }
 
-  // TODO ported to Arduino below to L.2214-
+  // ported to Arduino below to L.2214-
   // === JS Functions to be able to define words ==== in Zen pg30 these are Macros.
 
   // Compile one or more words into the next consecutive code cells.
@@ -2312,7 +2311,7 @@ class Forth {
   OVERT() {
     this.Mstore(this.currentFetch(), this.lastFetch()); // LAST @ CURRENT @ !
   }
-  // TODO ported to Arduino above here
+  // ported to Arduino above here
 
   //  Build a new definition - part of all defining words.
   CODE(name) {
@@ -2336,13 +2335,13 @@ class Forth {
     this.Mstore8(lastNA, this.Mfetch8(lastNA) | b);
   }
 
-  // TODO-ported below L.2278-
+  // ported below L.2278-
   // === Define this tokens used for each kind of defining word
   // Zen pg31
   // Tokens are just JS functions with an entry in jsFunctions with token:true
   // Words that will use a Javascript function for its action are just JS functions with an entry in jsFunctionAttributes
 
-  //TODO-29 define VOCABULARY as CREATE DOES> word then come back and replace this note on EPROM can't store a pointer to code space
+  //TODO-29 maybe define VOCABULARY as CREATE DOES> word then come back
   tokenVocabulary(payload) {
     // : doVOC R> CONTEXT ! ;
     this.Ustore(CONTEXToffset, this.Mfetch(payload));
@@ -2439,7 +2438,6 @@ class Forth {
   // Note that it has a return which could be a promise, which the 'run' will await on.
   // This pattern may or may not work in other situations.
   EXECUTE() { this.threadtoken(this.SPpop()); }
-
 
   // === Basic low level key I/O and links to OS - Zen pg 35
   // This section will need editing for other systems.
@@ -2643,7 +2641,7 @@ class Forth {
       this.SPpush(forthTrue);
     }
     /*
-      // ALTERNATIVE without using parseInt and countedToJS (backported from Arduino
+      // ALTERNATIVE without using parseInt and countedToJS (backported fromArduino TODO - port and test
       const a = this.SPpop();
       const aa = a;
       const radix = this.Ufetch(BASEoffset); //TODO handle base other than 10 BUT maybe not needed as switch to Forth version before ever use non-decimal
@@ -2822,7 +2820,7 @@ class Forth {
   console() {
     return this.runXT(this.JStoXT('WARM'));
   }
-  // TODO-ported above L.2382-
+  // ported to Arduino above L.2382-
 
   // TODO-29-DOES define DOES> for CREATE-DOES> and tokenDoes - this is not part of eForth, THEN defined Vocabulary as CREATE-DOES word
   //tokenDoes = Forth.tokenFunction(payload => { this.RPpush(this.IP); this.IP = (this.Mfetch8(payload++)<<8)+this.Mfetch8(payload++); this.SPpush(payload++); ); // Almost same as tokenDoList
