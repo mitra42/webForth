@@ -1,3 +1,5 @@
+* 2020-11-28: v0.0.12
+  * Rommable memory storage class (backports concept from Arduino to JS)
 * 2020-11-23: v0.0.11
   * Rework extension mechanism to be similar to `jsFunctionAttributes`
   * Remove obsolete sandbox command files
