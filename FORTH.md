@@ -14,7 +14,7 @@ the same as the final version.
 Errata: There are quite a few bugs in eForthAndZen, 
 * some are fixed in [eForthOverviewv5.pdf](http://www.exemark.com/FORTH/eForthOverviewv5.pdf)
 * others in [staapl](http://planet.racket-lang.org/package-source/zwizwa/staapl.plt/1/9/mcf/eforth/eforth.f)
-* in the code these are flagged as EFORTH-ZEN-ERRATA
+* in the code in index.js these are flagged as EFORTH-ZEN-ERRATA
 
 And some links I have still to research.
 
@@ -30,3 +30,12 @@ Some github projects (maybe) of note
 * One of the other git - search for forth - look for javascript tag repos had javascript interoperability code
 * https://github.com/marianoguerra/ricardo-forth compiles to wasm, but via C so probably loses efficiency
 * https://github.com/drom/wast-forth wast > Forth 
+
+Some other browser based forths
+* http://nhiro.org/learn_language/FORTH-on-browser.html
+JEforth [source](https://github.com/yapcheahshen/jeforth/)
+Nick Morgan's EasyForth as a [notebook](https://skilldrick.github.io/easyforth/)
+* [FB comment about them](https://www.facebook.com/groups/273924826349346/permalink/885462278528928/)
+
+There are also some that are just a remote terminal to for example WinForth
+that I haven't listed here as they do not "run in the browser".

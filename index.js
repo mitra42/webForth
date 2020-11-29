@@ -1031,8 +1031,6 @@ const forthInForth = `
 
 ( === Error Handling Zen pg80-82 CATCH THROW NULL$ ABORT abort" ?STACK )
 
-( ====== TODO COMPARE VERSIONS ZEN STAAPL V5 BELOW HERE )
-
 : CATCH ( ca -- err#/0 )
   ( Execute word at ca and set up an error frame for it.)
   SP@ >R          ( save current stack pointer on return stack )
@@ -1071,7 +1069,7 @@ CREATE NULL$ 0 , ( EFORTH-ZEN-ERRATA inserts a string "coyote" after this, no id
 
 
 ( Staapl has alternate definition: : $," [ CHAR " ] LITERAL PARSE HERE PACK$ C@ 1 + ALLOT ;)
-( ERRATA v5 has obvious errata missing the + after COUNT
+( ERRATA v5 has obvious errata missing the + after COUNT; Zen ok; Staapl different )
 : $," ( --) ( Moved earlier from Zen pg90)
   ( Compile a literal string up to next " .)
   34 WORD ( move string to code dictionary)
@@ -1105,7 +1103,7 @@ CREATE NULL$ 0 , ( EFORTH-ZEN-ERRATA inserts a string "coyote" after this, no id
                                                            ( Interpret a word. If failed, try to convert it to an integer.)
   NAME?                   ( search dictionary for word just parsed )
     ?DUP                    ( is it a defined word? )
-  IF C@                    ( yes. examine the lexicon ) ( EFORTH-ZEN-ERRATA it should be C@ not @)
+  IF C@                    ( yes. examine the lexicon ) ( ERRATA Zen, V5 and Staapl use @, it should be C@)
   [ COMP ] LITERAL AND ( is it a compile-only word? )
   ABORT" compile ONLY"  ( if so, abort with the proper message )
   EXECUTE EXIT          ( not compile-only, execute it and exit )
@@ -1151,8 +1149,6 @@ CREATE NULL$ 0 , ( EFORTH-ZEN-ERRATA inserts a string "coyote" after this, no id
   ; IMMEDIATE               ( must be done even while compiling )
 
 \\T [ 1 2 3 ROT 2 3 1 3 TEST
-
-( TODO-ZEN-V5-STAAPL - COMPARE ABOVE HERE)
 
 ( === Operating System Zen pg85-86 PRESET XIO FILE HAND I/O CONSOLE QUIT)
 
@@ -1239,8 +1235,6 @@ CREATE I/O  ' ?RX , ' TX! , ( Array to store default I/O vectors. )
 
 ( TODO-IO test PRESET HAND CONSOLE QUIT )
 
-( TODO-ZEN-V5-STAAPL - COMPARE BELOW HERE )
-
 ( === eForth Compiler Zen pg 87 ====== )
 
 ( === Interpreter and Compiler Zen pg 88-90: [ ] ' ALLOT , [COMPILE] COMPILE LITERAL $," RECURSE )
@@ -1299,8 +1293,6 @@ CREATE I/O  ' ?RX , ' TX! , ( Array to store default I/O vectors. )
   THEN                        ( here if null input )
   $" name" THROW ;            ( this is an error return )
 
-( TODO-ZEN-V5-STAAPL - COMPARE ABOVE HERE )
-
 : $COMPILE ( a -- ) ( Redefining code word js $COMPILE in Forth)
   ( Compile next word to code dictionary as a token or literal.)
   NAME?         ( parse the next word out )
@@ -1318,8 +1310,6 @@ CREATE I/O  ' ?RX , ' TX! , ( Array to store default I/O vectors. )
   THEN          ( not a number either )
   THROW ;       ( generate an error condition )
 
-( TODO-ZEN-V5-STAAPL - COMPARE BELOW HERE )
-  
 : OVERT ( -- ) ( Redefining code word in Forth)
   ( Link a successfully defined word into the current vocabulary. )
   LAST @        ( name field address of last word )
@@ -1374,7 +1364,6 @@ CREATE I/O  ' ?RX , ' TX! , ( Array to store default I/O vectors. )
 ( === Utilities Zen pg98 )
 ( === Memory Dump Zen pg99 _TYPE do+ DUMP )
 
-( ERRATA Staapl & Zen - uses -ROT which is not defined (its ROT ROT)
 ( ERRATA Staapl - uses COUNT which is technically correct but poor typing )
 
 : _TYPE ( b u -- )
@@ -1394,6 +1383,7 @@ CREATE I/O  ' ?RX , ' TX! , ( Array to store default I/O vectors. )
   DUP C@ 3 U.R      ( display bytes in 3 columns )
   1 + THEN NEXT ;   ( repeat u times )
 
+( ERRATA Staapl & Zen - uses -ROT which is not defined (its ROT ROT)
 : DUMP ( b u -- )
   ( Dump u bytes from a, in a formatted manner.)
   BASE @ >R             ( save current radix )
@@ -1446,6 +1436,7 @@ CREATE I/O  ' ?RX , ' TX! , ( Array to store default I/O vectors. )
   ?DUP                ( not valid name if na=0 )
   IF COUNT            ( get length by mask lexicon bits )
     BYTEMASK AND         ( limit length to 31 characters )
+    ( ERRATA? Zen uses TYPE which presumes name is all printable chars (V5 correct )
     _TYPE ( print the name string )
     EXIT
   THEN ." {noName}" ; ( error if na is not valid)
@@ -1510,14 +1501,16 @@ CREATE I/O  ' ?RX , ' TX! , ( Array to store default I/O vectors. )
 
 12 CONSTANT VER ( Return the version number of this implementation.)
 
-: version CR ." webFORTH V" VER <# # # 46 HOLD # # 46 HOLD # #> TYPE ( display sign-on text and version )  CR ;
-( ERRATA v5 'hi' doesnt restore BASE )
+: version CR ." webFORTH V" BASE @ DECIMAL VER <# # # 46 HOLD # # 46 HOLD # #> TYPE ( display sign-on text and version )  BASE ! CR ;
 
+( ERRATA v5 'hi' doesnt restore BASE )
+( ERRATA ZEN uses !XIO when it means !IO)
 : hi ( -- )
   !IO           ( initialize terminal I/O )
   version ; COMPILE-ONLY
 
 ( === Hardware Reset Zen pg106 COLD )
+( ERRATA v5 adds "6 CP 3 MOVE OVERT" without defining MOVE, and unclear what it does, Zen & Staapl dont have EMPTY)
 : EMPTY ( -- )
   ( Empty out any definitions)
   FORTH CONTEXT @ DUP CURRENT 2! ;
