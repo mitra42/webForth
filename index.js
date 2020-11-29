@@ -200,7 +200,6 @@ const forthInForth = `
 ( EXIT & EXECUTE tested with ' )
 ( doLIT implicitly tested by all literals )
 ( next, ?branch, branch implicitly tested by control structures )
-( CELLL 2 1 TEST ( Assuming small cell, otherwise it should be 2 )
 \\T 123 HLD ! HLD @ 123 1 TEST ( Also tests user variables )
 \\T 222 HLD C! HLD C@ 222 1 TEST
 ( R> >R R@ SP@ SP! tested after arithmetic operators )
@@ -239,7 +238,6 @@ const forthInForth = `
 
 ( Note eForth has +, but that isn't defined till Zen pg50 )
 : CELL+ CELLL UM+ DROP ;
-( 1 CELL+ 3 1 TEST ) ( Only valid if CELLL=2)
 
 ( ERRATA - Zen pg57 presumes CELLL==2 and need to align, not case with JS and byte Buffer, moved to code )
 
@@ -508,7 +506,7 @@ const forthInForth = `
 \\T HLD @ 2 HLD +! HLD @ SWAP - 2 1 TEST
 \\T 1 2 3 SP@ 4 5 ROT 2! 1 4 5 3 TEST
 \\T 1 2 3 SP@ 2@ 1 2 3 2 3 5 TEST
-\\T TIB >R BL PARSE XXX SWAP R> - 3 19 2 .S TEST
+\\T TIB >R BL PARSE XXX SWAP R> - 3 19 2 TEST
 
 ( === Memory Array and String Zen pg61-62: COUNT CMOVE FILL -TRAILING PACK$ )
 
@@ -560,10 +558,9 @@ const forthInForth = `
 
 \\T NP @ CELL+ CELL+ COUNT NIP 5 1 TEST
   ( TODO-11-CELLL - need these tests)
-  ( TODO rework this  test('NP @ 4 + COUNT PAD SWAP CMOVE', [], {pad: 'PACK$'});
-  ( TODO rework this  test('PAD 3 + 5 BL FILL', [], {pad: 'PAC     '});
-  ( TODO rework this test('PAD 8 -TRAILING >R PAD - R>', [0, 3], {pad: 'PAC'})
-  ( TODO rework this test NP @ 4 + COUNT PAD 1 - PACK$', [this.padPtr(] - 1], {pad: 'PACK$'})
+\\T NP @ 4 + COUNT OVER PAD ROT CMOVE C@ PAD C@ 1 TEST ( Check first character copied - expact pad="PACK$"
+\\T PAD 3 + 5 BL FILL PAD 7 + C@ BL 1 TEST
+\\T PAD 8 -TRAILING PAD 3 2 TEST
 
 ( === TEXT INTERPRETER ===  Zen pg63 )
 
@@ -608,8 +605,8 @@ const forthInForth = `
   HLD @         ( address of last digit)
   PAD OVER - ;  ( return address of 1st digit and length)
 
-( TODO rework this test('123 <# DUP SIGN #S #>', [this.padPtr(] - 3, 3], {hold: '123'} )
-( TODO rework this  test('-123 DUP ABS <# #S SWAP SIGN #>', [this.padPtr(] - 4, 4], {hold: '-123'})
+\\T 123 <# DUP SIGN #S #> SWAP COUNT SWAP COUNT SWAP COUNT NIP 3 49 50 51 4 TEST ( hold="123" )
+\\T -123 DUP ABS <# #S SWAP SIGN #> SWAP COUNT SWAP COUNT SWAP COUNT SWAP COUNT NIP 4 45 49 50 51 5 TEST ( hold="-123" )
 
 ( === More definitions moved up )
 
@@ -750,7 +747,7 @@ const forthInForth = `
   IF 2DROP KEY
     13 = ( return true if key is CR)
   THEN ;
-( TODO-TEST TODO-INPUT then test ?KEY KEY NUF? )
+( TODO-TEST test ?KEY KEY NUF? )
 
 : PACE ( --) ( Send a pace character for the file downloading process.)
   11 EMIT ; ( 11 is the pace character)
@@ -758,7 +755,7 @@ const forthInForth = `
 ( ERRATA Zen has 15 instead of 13 and 11 instead of 10)
 : CR ( --) ( Output carriage return line feed)
   13 EMIT 10 EMIT ;
-( TODO-TEST TODO-INPUT then test PACE, CR )
+( CR tested after .( )
 
 ( === String Literal Zen pg71 do$ $"| ."| )
 
@@ -848,6 +845,7 @@ const forthInForth = `
   [ CHAR ) ] LITERAL PARSE
    ( parse the string until next )
   TYPE ; IMMEDIATE         ( type the string to terminal )
+\\T .( on consecutive ) CR .( lines )
 
 ( Note there is this.TOKEN which does same thing )
 : TOKEN ( -- a ; <string> ; Parse a word from input stream and copy it to name dictionary.)
@@ -867,10 +865,6 @@ const forthInForth = `
 \\T : foo .( output at compile time) ; 0 TEST
 
 ( === Dictionary Search Zen pg75-77 NAME> SAME? find NAME? )
-
-( TODO Reconstruct this test with the use of testFind below )
-( 'BL WORD TOKEN CONTEXT @ find SWAP' )
-( const testFind = [this.SPpop(, this.SPpop(]; // Get results from old find )
 
 : NAME> ( na -- ca )
   ( Return a code address given a name address.)
@@ -955,8 +949,9 @@ const forthInForth = `
 \\T BL WORD xxx DUP C@ 1 + PAD SWAP CMOVE PAD BL WORD xxx 4 SAME? >R 2DROP R> 0 1 TEST
 \\T BL WORD xxx DUP C@ 1 + PAD SWAP CMOVE PAD BL WORD xzx 4 SAME? >R 2DROP R> 0= 0 1 TEST
 \\T FORTH 0 TEST
-( TODO convert test now dont have testFind ; BL WORD TOKEN CONTEXT @ FORTHfind', testFind.map(k => k ; (Compare with results from old version of find )
-( TODO convert this test - now dont have testFind - BL WORD TOKEN NAME?', testFind ; // Name searches all vocabs )
+
+\\T BL WORD TOKEN CONTEXT @ find BL WORD TOKEN CONTEXT @ FORTHfind 2 TEST
+\\T BL WORD TOKEN CONTEXT @ find BL WORD TOKEN NAME? 2 TEST ( Name searches all vocabs )
 
 ( === Text input from terminal Zen pg 78: ^H TAP kTAP accept EXPECT QUERY )
 ( EFORTH-ZEN-ERRATA CTRL used here but not defined. )
@@ -1027,7 +1022,6 @@ const forthInForth = `
   0 >IN !         ( initialized parsing pointer )
   ( debugPrintTIB )
   ;
-( TODO-TEST TODO-IO input handling needs EXPECT etc )
 
 ( === Error Handling Zen pg80-82 CATCH THROW NULL$ ABORT abort" ?STACK )
 
@@ -1494,7 +1488,7 @@ CREATE I/O  ' ?RX , ' TX! , ( Array to store default I/O vectors. )
   THEN
   DROP ;
 
-\\T SEE FORTH>NAME 0 TEST ( Commented out as expensive TODO seems to crash out)
+\\T SEE FORTH>NAME 0 TEST
 
 ( ERRATA Zen uses CONSTANT but doesnt define it )
 ( === Signon Message Zen pg105 VER hi )

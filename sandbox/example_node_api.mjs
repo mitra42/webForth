@@ -8,7 +8,7 @@ const MEM = 16; // Use 16 bit memory
 // ROM: Used for UserVariable save area and Dictionary (code and names) until useRam() is called
 const ROMSIZE = 0x2000 * CELLL;
 // RAM: Used for UserVariables, stacks, TIB, PAD etc and Dictionary (code and names) after useRam() is called
-const RAMSIZE = 0x400 * CELLL; /
+const RAMSIZE = 0x400 * CELLL;
 const extensions = ForthNodeExtensions;
 let memClass = undefined;
 //memClass = Romable16_16; // Uncomment this to simulate a chip with separate Rom and Ram (like an Arduino).
