@@ -1,9 +1,9 @@
 # Forth for Javascript - Design criteria
-Mitra Ardron <mitra@mitra.biz> 17 Sept 2020
+Mitra Ardron <mitra@mitra.biz> 1 December 2020
 
 Welcome to my basic design document for WebForth.  
 
-Currently its not in a particularly useful order, in part because I haven't found an easy way to 
+Currently it is not in a particularly useful order, in part because I haven't found an easy way to 
 provide a linear reading order without needing to look ahead.  
 Also at the end are some remnants of an earlier design doc that need updating. 
 
@@ -18,7 +18,11 @@ TODO update this contents table
 * I/O
 * Async
 * Token threaded
+* Integrating Javascript into Forth
 * Orthogonality and likely changes
+* CREATE DOES>
+* Epromability
+* Earlier version notes
 
 #### Based on eForth but not quite same
 This system is based on C.H. Ting's eForth, 
@@ -45,12 +49,15 @@ As an alternative this system bootstraps in Javascript,
 * at some point in the compilation process the interpreter switches so it is itself running in FORTH.  
 
 ### Memory Handling
-The memory map follows the eForth model as defined on page 27 of eForth,
-Note this doesn't quite match the supplied code on page 26! 
+The memory map almost follows the eForth model as defined on page 27 of eForth,
+Note that page 27 doesn't quite match the supplied code on page 26!
 The code that defines these is well commented inline.
+Also there is some separation done to allow the lower parts 
+(User Save; Code Dictionary; Name dictionary) to be Rom-able.
 
 #### Memory map to Javascript
 The primary memory, is a large area of (at least conceptually) contiguous memory.
+This area is conceptually split into a Rommable portion, and a Ram portion. 
 
 There are two choices as to how that is used. 
 Whatever the choices, Forth addresses are always in Bytes.
@@ -60,22 +67,24 @@ This is the size of each item on a stack, each field in the definition, each Use
 This defaults to `2` bytes, i.e. 16 bits. 
 
 Secondly is `MEM` which specifies the width of memory slots.
-Addresses are translated on the fly from Forth's byte addresses, to the addresses in the MEM-width buffer.
+Addresses are translated on the fly from Forth's byte addresses, to the addresses in the MEM-width buffer, 
+and the top bit is tested to see if the address is in the Ram or Rom area.
+
 If CELLL and MEM are different, then cells have to be packed into memory slots, 
 for example if CELLL=2 and MEM = 32 then two 16 bit cells fit in each memory slot. 
 Usually an alignment is done, so that if CELLL is 2 then it always starts on an even border,
-but this depends on memory efficiency and is not done if MEM=8.
+but this depends on memory efficiency and (may) not be done if MEM=8.
 The actual packing and unpacking are done by a class that can be passed to the Forth constructor.
 
 For example Mem16_32 is a 8 bit wide memory array for holding 32 bit cells which uses a `Uint16array`.
 
+Rommable16_16 is a newer way of handling, for now just supporting CELLL = MEM = 16, it separates
+memory into two areas, so that one can be flashed on a device, and the other is fully initialized
+at start up.
+
 There may be future experimentation to experiment with different ways of handling memory,
-for example handling read-only memory different from variable memory, 
 or managing a large virtual memory space on a smaller device.
 This would be mediated by the memory class.
-
-See [issue-15](https://www.github.com/mitra42/issues/15) 
-and [issue-11](https://www.github.com/mitra42/issues/11) 
 
 ### Colon, Code and other words
 ### I/O
@@ -104,8 +113,8 @@ Code words are defined as methods on the Forth class,
 and then hooked to Forth names via the jsFunctionAttributes table at the top,
 That table is read during dictionary building.
 
-There is currently no way to extend Forth with more Javascript 
-See [Issue#39](https://github.com/mitra42/webForth/issues/39)
+To extend with more JS, a similar table of functions can be passed in as an extension, 
+or a caller can subclass "Forth"
 
 ### Orthogonality and likely changes
 
@@ -178,8 +187,11 @@ webFORTH allows for separation between the two. The dictionary is built in an ar
 and then pointers are switched to a Ram area where further words can be built. The word `FORTH` and
 anything built with vCREATE will use memory in the Ram area, as do anything built with `VARIABLE`.
 
-This is visible currently in arduino_webforth.ino, but is not yet fully backported to the main branch.
-- see [issue#15](https://www.github.com/mitra42/webforth/issues/15). 
+This is visible currently in arduino_webforth.ino and in the Rommable16_16 class.
+
+#### Portability
+The intention is to make this available for different situations, 
+to date there is a Javascript and a C (for Arduino) version.
 
 ## Earlier version - pretty much everything below here was for a version now deleted
 Mitra Ardron <mitra@mitra.biz> 8 Aug 2020
@@ -187,14 +199,6 @@ Mitra Ardron <mitra@mitra.biz> 8 Aug 2020
 This doc may or may not match the code, 
 and is being randomly written as I come up with ideas,
 (mostly) newer ideas at the bottom.
-
-### Random ideas to incorporate
-
-#### Portability
-* Avoid JS specific stuff where possible 
-* This probably means avoiding classes, but maybe not
-* Try to avoid expensive constructs (even possibly dict)
-
 
 ### Threaded Interpreter - v1
 

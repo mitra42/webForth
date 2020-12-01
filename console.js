@@ -33,6 +33,7 @@ async function ForthLoad({ extensions = [] } = {}) {
 }
 
 // A simple (adaptable) utility to make it easier to write nested elements in JS
+//usage:  EL("a",{href: "https:...", target: "_blank"}, [EL("img"...)])
 function EL(tag, attributes = {}, children) {
   const el = document.createElement(tag);
   Object.entries(attributes)
@@ -161,7 +162,7 @@ class ForthInput extends HTMLElement {
       forth.interpret1(inp)            // Async interpretation of text
         // Attempt to debug a race condition - commented out as condition disappeared
         //.then((res) => forth.debug1 = forth.m.debug(forth.SP,forth.SPP))
-      .then((res) => this.stack.render(res));     // Then reprint stack
+        .then((res) => this.stack.render(res));     // Then reprint stack
     }
   }
 }
