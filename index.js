@@ -2056,26 +2056,7 @@ class Forth {
     this.Ustore(SP0offset, this.m.fromRamAddr(this.ramSPP));
     // Allow extensions of functions by caller - used for example to vector console I/O
     // Order is significant, as buildDictionary will define a jsFunction that points to the function as defined then.
-    extensions.forEach((e) => {
-      // Replace any of Forth's functions, or add new ones
-      if (typeof e.f === 'function') {
-        let fname = e.f.name; // Might be 'f' if undefined
-        if (fname.startsWith('bound ')) { fname = fname.slice(6); } // name gets changed if bind it.
-        if (fname === 'f') fname = undefined; // an anonymous function will be called 'f' since assigned to a field f.
-        if (fname) {
-          this[fname] = e.f;
-        }
-      }
-      if (e.n) { // Have a forth name for this
-        // Add to or replace jsFunctionAttributes for dictionary building.
-        const i = jsFunctionAttributes.findIndex((j) => j.n === e.n);
-        if (i === -1) { // Not found and have a name (forth name) for it.
-          jsFunctionAttributes.push(e);
-        } else {
-          Object.keys(e).forEach((k) => jsFunctionAttributes[i][k] = e[k]); // Copy over attributes as may not define all of the options
-        }
-      }
-    });
+    extensions.forEach((e) => this.extensionAdd(e));
     this.buildDictionary();
     // compiling forthInForth is done outside this as it is async. TODO-23-NODEAPI may change
   }
@@ -2101,34 +2082,7 @@ class Forth {
     this.js2xt = {};
 
     // Make some functions available as Forth words
-    jsFunctionAttributes.forEach((attribs) => {
-      if (attribs === 0) {
-        this.jsFunctions.push(attribs); // Intentionally invalid pointer in slot 0
-      } else {
-        // Shortcut
-        if (this.testing & 0x01) console.log('>> ', attribs);
-        if (typeof attribs === 'string') {
-          attribs = { n: attribs };
-        }
-        const n = attribs.n;
-        // noinspection JSUnresolvedVariable
-        const f = typeof attribs.f === 'function' ? attribs.f : this[attribs.f || n];
-        console.assert(typeof f === 'function');
-        const tok = this.jsFunctions.length; // Where function will be pushed
-        // special case: token Functions that need constants
-        this.jsFunctions.push(f);
-        if (attribs.token) {
-          this.buildConstant(n, tok);
-          // regular code functions that just need a pointer.
-        } else {
-          const xt = this.buildCode(n, tok, attribs);
-          //console.assert(xt === this.JStoXT(n));
-          if (attribs.jsNeeds) {
-            this.js2xt[n] = xt;
-          }
-        }
-      }
-    });
+    jsFunctionAttributes.forEach((e) => this.extensionAddToJSFunctions(e));
 
     // Build user variables
     // Bracket with a sanity check - also initializes TIB0 from this.TIB0
@@ -2173,10 +2127,83 @@ class Forth {
     this._USER++; // Need to skip to next _USER
   }
 
+  // Add an extension
+  extensionAdd(e) {
+    this.extensionAddFunction(e);
+    if (e.n) { // Have a forth name for this
+      // Add to or replace jsFunctionAttributes for dictionary building.
+      const i = jsFunctionAttributes.findIndex((j) => j.n === e.n);
+      if (i === -1) { // Not found and have a name (forth name) for it.
+        jsFunctionAttributes.push(e);
+        if (this.jsFunctions.length) { // Have we built it already
+          this.extensionAddToJSFunctions(e);
+        }
+      } else {
+        Object.keys(e).forEach((k) => jsFunctionAttributes[i][k] = e[k]); // Copy over attributes as may not define all of the options
+        if (this.jsFunctions.length) { // Have we built it already
+          this.extensionReplaceInJSFunctions(e, i);
+        }
+      }
+    }
+  }
+
+  // if an extension includes a function, add (or replace) this to the instance
+  // This allows replacing any of Forth's functions, or adding new ones
+  extensionAddFunction(e) {
+    if (typeof e.f === 'function') {
+      let fname = e.f.name; // Might be 'f' if undefined
+      if (fname.startsWith('bound ')) { fname = fname.slice(6); } // name gets changed if bind it.
+      if (fname === 'f') fname = undefined; // an anonymous function will be called 'f' since assigned to a field f.
+      if (fname) {
+        this[fname] = e.f;
+      }
+    }
+  }
+  extensionAddToJSFunctions(e) {
+    if (e === 0) {
+      this.jsFunctions.push(e); // Intentionally invalid pointer in slot 0
+    } else {
+      // Shortcut
+      if (this.testing & 0x01) console.log('>> ', e);
+      if (typeof e === 'string') {
+        e = { n: e };
+      }
+      // for the function - first choice is a supplied, function otherwise look up either string supplied or n as a method of the forth instance.
+      // noinspection JSUnresolvedVariable
+      const f = this.extensionFindFunction(e);
+      const tok = this.jsFunctions.length; // Where function will be pushed
+      // special case: token Functions that need constants
+      this.jsFunctions.push(f);
+      if (e.token) {
+        this.buildConstant(e.n, tok);
+      } else {
+        // regular code functions that just need a pointer.
+        const xt = this.buildCode(e.n, tok, e);
+        //console.assert(xt === this.JStoXT(e.n));
+        if (e.jsNeeds) {
+          this.js2xt[e.n] = xt;
+        }
+      }
+    }
+  }
+
+  extensionReplaceInJSFunctions(e, i) {
+    this.jsFunctions[i] = this.extensionFindFunction(e);
+  }
+
+  extensionFindFunction(e) {
+    // for the function - first choice is a supplied, function otherwise look up either string supplied or n as a method of the forth instance.
+    // noinspection JSUnresolvedVariable
+    const f = typeof e.f === 'function' ? e.f : this[e.f || e.n];
+    console.assert(typeof f === 'function');
+    return f;
+  }
+
   compileForthInForth() {
     this.openBracket(); // Start off interpreting
     return this.interpret(forthInForth); // return a Promise
   }
+
   cleanupBootstrap() {
     // Cleanup - remove routines that shouldnt be being used
     jsFunctionAttributes.forEach((attribs, i) => {
