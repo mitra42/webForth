@@ -2599,8 +2599,8 @@ class Forth {
     }
   }
 
-  async MS() { // ms --; delay for a period of time.
-    await new Promise((resolve) => setTimeout(resolve, this.SPpop()));
+  MS() { // ms --; delay for a period of time  (async but just returns a promise)
+    return new Promise((resolve) => setTimeout(resolve, this.SPpop()));
   }
 
   BYE() { // Should exit all the way out
@@ -2619,7 +2619,7 @@ class Forth {
   // and because there is nothing after the return from threadtoken which would get executed out of order
   // Note that it has a return which could be a promise, which the 'run' will await on.
   // This pattern may or may not work in other situations.
-  EXECUTE() { this.threadtoken(this.SPpop()); }
+  EXECUTE() { return this.threadtoken(this.SPpop()); }
 
   // === Basic low level key I/O and links to OS - Zen pg 35
   // This section will need editing for other systems.
@@ -2941,9 +2941,9 @@ class Forth {
       await this.EVAL();
     }
   }
-  async interpret1(inp) {
+  interpret1(inp) { /* async by return a promise*/
     this.JStoTIB(inp);
-    await this.runXT(this.JStoXT('quit1', true));
+    return this.runXT(this.JStoXT('quit1', true)); // async
   }
   // === A group of words required for the JS interpreter redefined later
 
@@ -3000,8 +3000,8 @@ class Forth {
       this.Ustore(VPoffset, 0);
     }
   }
-  console() {
-    return this.runXT(this.JStoXT('WARM'));
+  console() { /* async via returning a promise from runXT */
+    return this.runXT(this.JStoXT('WARM')); // Async returns a promise
   }
   // ported to Arduino above L.2382-
 
