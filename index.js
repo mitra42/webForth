@@ -2056,6 +2056,7 @@ class Forth {
     this.Ustore(SP0offset, this.m.fromRamAddr(this.ramSPP));
     // Allow extensions of functions by caller - used for example to vector console I/O
     // Order is significant, as buildDictionary will define a jsFunction that points to the function as defined then.
+    jsFunctionAttributes.forEach((e) => this.extensionExpandDefaults(e)); // Expand things like "name"
     extensions.forEach((e) => this.extensionAdd(e));
     this.buildDictionary();
     // compiling forthInForth is done outside this as it is async. TODO-23-NODEAPI may change
@@ -2090,7 +2091,15 @@ class Forth {
     jsUsers.forEach((nv) => this.buildUser(nv[0], nv[1]));
     console.assert(this.Ufetch(NPoffset) > 0);
   }
-
+  extensionAddConstant(e) {
+    if (e.constant) {
+      if (this.lastFetch()) {
+        this.buildConstant(e.name, e.constant)
+      } else {
+        l[e.name] = e.constant; // Will be added later
+      }
+    }
+  }
   buildConstant(name, val) {
     // Defining function for constants, Replaced by CONSTANT in FORTH
     this.CODE(name);
@@ -2127,16 +2136,21 @@ class Forth {
     this._USER++; // Need to skip to next _USER
   }
 
-  // Add an extension
+  // Add an extension, there are two cases of this
+  // a: right at the start before building the dictionary, overrideing any prior definition but not adding to jsFunctions
+  // b: after dictionary is built, when need to add to, or replace, in jsFunctions
   extensionAdd(e) {
-    this.extensionAddFunction(e);
-    if (e.n) { // Have a forth name for this
+    extensionExpandDefaults(e); // Expand "foo" to {n: "foo"}
+    this.extensionAddFunction(e); // If its a function, add it to the instance
+    this.extensionAddConstant(e); // If its a constant add to dictionary (or to "l" if not yet build dictionary
+    if (e.constant) this.buildConstant(e.name, e.constant); // Will either build the constant, or queue for later
+    if (e.n && this.extensionFindFunction(e)) { // Have a forth name for this and its a function
       // Add to or replace jsFunctionAttributes for dictionary building.
       const i = jsFunctionAttributes.findIndex((j) => j.n === e.n);
       if (i === -1) { // Not found and have a name (forth name) for it.
         jsFunctionAttributes.push(e);
         if (this.jsFunctions.length) { // Have we built it already
-          this.extensionAddToJSFunctions(e);
+          this.extensionAddToJSFunctions(e); // Add into JSFunctions
         }
       } else {
         Object.keys(e).forEach((k) => jsFunctionAttributes[i][k] = e[k]); // Copy over attributes as may not define all of the options
@@ -2147,10 +2161,16 @@ class Forth {
     }
   }
 
+  extensionExpandDefaults(e) {
+    if (typeof e === 'string') {
+      e = { n: e };
+    }
+  }
   // if an extension includes a function, add (or replace) this to the instance
   // This allows replacing any of Forth's functions, or adding new ones
+  // Called when parsing extensions, or in extensionAdd()
   extensionAddFunction(e) {
-    if (typeof e.f === 'function') {
+    if (typeof e.f === 'function') { // It could be a string, refering to an existing function, or not a function at all
       let fname = e.f.name; // Might be 'f' if undefined
       if (fname.startsWith('bound ')) { fname = fname.slice(6); } // name gets changed if bind it.
       if (fname === 'f') fname = undefined; // an anonymous function will be called 'f' since assigned to a field f.
@@ -2159,15 +2179,14 @@ class Forth {
       }
     }
   }
+  // Add a JS function (or token?) to make it available to the dictionary (see extensionAddFunction for where its added to the instance)
+  // It is an error to call this if don't have a function (unless e is 0)
   extensionAddToJSFunctions(e) {
     if (e === 0) {
       this.jsFunctions.push(e); // Intentionally invalid pointer in slot 0
     } else {
       // Shortcut
       if (this.testing & 0x01) console.log('>> ', e);
-      if (typeof e === 'string') {
-        e = { n: e };
-      }
       // for the function - first choice is a supplied, function otherwise look up either string supplied or n as a method of the forth instance.
       // noinspection JSUnresolvedVariable
       const f = this.extensionFindFunction(e);
@@ -2177,7 +2196,7 @@ class Forth {
       if (e.token) {
         this.buildConstant(e.n, tok);
       } else {
-        // regular code functions that just need a pointer.
+        // regular code functions that just need a pointer in the dictionary.
         const xt = this.buildCode(e.n, tok, e);
         //console.assert(xt === this.JStoXT(e.n));
         if (e.jsNeeds) {
@@ -2195,7 +2214,6 @@ class Forth {
     // for the function - first choice is a supplied, function otherwise look up either string supplied or n as a method of the forth instance.
     // noinspection JSUnresolvedVariable
     const f = typeof e.f === 'function' ? e.f : this[e.f || e.n];
-    console.assert(typeof f === 'function');
     return f;
   }
 
