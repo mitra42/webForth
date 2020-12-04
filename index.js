@@ -2335,13 +2335,12 @@ class Forth {
   // Convert a string made up of a count and that many bytes to a Javascript string.
   // it assumes a maximum of nameMaxLength (31) characters.
   // Mostly used for debugging but also in number conversion.
-  countedToJS(a) {
-    return this.m.decodeString(a + 1, a + (this.Mfetch8(a) & l.BYTEMASK) + 1);
-  }
+  stringToJS(caddr, u ) {  // Convert string specified by address and count
+    return this.m.decodeString(caddr, caddr + u); }
+  countedToJS(a) { // Convert string specified by address which holds a count - possibly with a bytemask to JS
+    return this.stringToJS(a + 1, this.Mfetch8(a) & l.BYTEMASK); }
   // Convert a name address to the code dictionary definition.
-  na2xt(na) {
-    return this.Mfetch(na - (2 * this.CELLL));
-  }
+  na2xt(na) { return this.Mfetch(na - (2 * this.CELLL)); }
 
   // Inner function of find, traverses a linked list Name dictionary.
   // name   javascript string looking for
@@ -2834,7 +2833,7 @@ class Forth {
   NUMBERQ() { // Same footprint as NUMBER?, this will be stored vectored from 'NUMBER
     // TODO-backport simple number conversion from Arduino
     const a = this.SPpop();
-    const w = this.countedToJS(a); // I believe this is the only place we use this.countedToJS to make JS strings outside of debugging
+    const w = this.countedToJS(a);
     const base = this.Ufetch(BASEoffset);
     const n = parseInt(w, base); // TODO-32-ERRORS handle parsing errors // Needs forth to convert word
     if (isNaN(n)) {
