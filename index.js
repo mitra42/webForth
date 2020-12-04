@@ -2314,6 +2314,11 @@ class Forth {
     return this.m.cellRamFetch(this.ramUP + userindex); }
   Ustore(userindex, w) {
     this.m.cellRamStore(this.ramUP + userindex, w); }
+  SPpushD(x) {
+    this.SPpush(x); // This should only push the bottom cell.
+    this.SPpush(x >> (this.CELLL * 4) >> (this.CELLL * 4));
+  }
+
 
   // === Access to the USER variables before they are defined
   currentFetch() { return this.Ufetch(CURRENToffset); }
@@ -2767,8 +2772,7 @@ class Forth {
     } else {
       // Note there is what I believe is a JS bug where x >> 32 is a noop so do th double shift
       const x = a + b;
-      this.SPpush(x); // This should only push the bottom cell.
-      this.SPpush(x >> (this.CELLL * 4) >> (this.CELLL * 4));
+      this.SPpushD(x); // Push double word
     }
   }
   // === Define and initialize User variables Zen pg33 see Zen pg46
