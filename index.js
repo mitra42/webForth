@@ -72,7 +72,7 @@
       jsNeeds: true The execution address of this word is needed by the JS o will be stored in js2xt[n]
  */
 // it is used to build the dictionary in each instance.
-const jsFunctionAttributes = [
+let jsFunctionAttributes = [
   0, // 0 is not a valid token
   { n: 'tokenVocabulary', token: true }, // Token used for Vocabularies must be first 1
   { n: 'tokenNextVal', token: true }, // Token used for Constants must be next (2)
@@ -1937,15 +1937,17 @@ class Romable16_16 {
     const U8onM = new Uint8Array(buf, start, len);
     return new TextDecoder().decode(U8onM);
   }
+  buff8(byteAddr, bytes) { // TODO - backport to MemXX_XX
+    const isRam = byteAddr >= this.ram0;
+    let start = isRam ? byteAddr - this.ram0 : byteAddr; // in Cells
+    const buf = new Uint8Array(isRam ? this.ram.buffer : this.rom.buffer, start, bytes);
+    return buf;
+  }
   // Only used in token - which is bytes and never aligned
   copyWithin(byteDestn, byteSource, byteEnd) {
-    const dIsRam = byteDestn >= this.ram0;
-    const sIsRam = byteSource >= this.ram0;
-    let dStart = dIsRam ? byteDestn - this.ram0 : byteDestn; // in Cells
-    let sStart = sIsRam ? byteSource - this.ram0 : byteSource; // in Cells
     const bytes = byteEnd - byteSource;
-    const dBuf = new Uint8Array(dIsRam ? this.ram.buffer : this.rom.buffer, dStart, bytes);
-    const sBuf = new Uint8Array(sIsRam ? this.ram.buffer : this.rom.buffer, sStart, bytes);
+    const dBuf = this.buff8(byteDestn,bytes)
+    const sBuf = this.buff8(byteSource,bytes)
     for (let i = 0; i < bytes; i++) {
       dBuf[i] = sBuf[i];
     }
@@ -2056,7 +2058,7 @@ class Forth {
     this.Ustore(SP0offset, this.m.fromRamAddr(this.ramSPP));
     // Allow extensions of functions by caller - used for example to vector console I/O
     // Order is significant, as buildDictionary will define a jsFunction that points to the function as defined then.
-    jsFunctionAttributes.forEach((e) => this.extensionExpandDefaults(e)); // Expand things like "name"
+    jsFunctionAttributes = jsFunctionAttributes.map((e) => this.extensionExpandDefaults(e)); // Expand things like "name"
     extensions.forEach((e) => this.extensionAdd(e));
     this.buildDictionary();
     // compiling forthInForth is done outside this as it is async. TODO-23-NODEAPI may change
@@ -2140,7 +2142,7 @@ class Forth {
   // a: right at the start before building the dictionary, overrideing any prior definition but not adding to jsFunctions
   // b: after dictionary is built, when need to add to, or replace, in jsFunctions
   extensionAdd(e) {
-    extensionExpandDefaults(e); // Expand "foo" to {n: "foo"}
+    this.extensionExpandDefaults(e); // Expand "foo" to {n: "foo"}
     this.extensionAddFunction(e); // If its a function, add it to the instance
     this.extensionAddConstant(e); // If its a constant add to dictionary (or to "l" if not yet build dictionary
     if (e.constant) this.buildConstant(e.name, e.constant); // Will either build the constant, or queue for later
@@ -2165,6 +2167,7 @@ class Forth {
     if (typeof e === 'string') {
       e = { n: e };
     }
+    return e;
   }
   // if an extension includes a function, add (or replace) this to the instance
   // This allows replacing any of Forth's functions, or adding new ones
@@ -2316,9 +2319,12 @@ class Forth {
     this.m.cellRamStore(this.ramUP + userindex, w); }
   SPpushD(x) {
     this.SPpush(x); // This should only push the bottom cell.
-    this.SPpush(x >> (this.CELLL * 4) >> (this.CELLL * 4));
+    this.SPpush(x >> (this.CELLL * 4) >> (this.CELLL * 4)); // Work around JS bug with >> 32
   }
-
+  // d -- ; Pop double word off stac
+  SPpopD(x) {
+    return (this.SPpop() << (this.CELL * 4) << (this.CELL * 4)) + this.SPpop();
+  }
 
   // === Access to the USER variables before they are defined
   currentFetch() { return this.Ufetch(CURRENToffset); }
@@ -2341,6 +2347,12 @@ class Forth {
     return this.stringToJS(a + 1, this.Mfetch8(a) & l.BYTEMASK); }
   // Convert a name address to the code dictionary definition.
   na2xt(na) { return this.Mfetch(na - (2 * this.CELLL)); }
+  // a u --; return JS string given an ANS style string on stack.
+  SPpopString() {
+    const u = SPpop();
+    const a = SPpop();
+    return this.stringToJS(a,u);
+  }
 
   // Inner function of find, traverses a linked list Name dictionary.
   // name   javascript string looking for
