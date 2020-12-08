@@ -18,150 +18,154 @@
 #define NAMEE 33120
 #define CODEE 32768
 /* === Dumping Arduino source from names === */
-#define XT_WARM 0x11fe /* WARM*/
-#define XT_COLD 0x11e6 /* COLD*/
-#define XT__27BOOT 0x11e0 /* 'BOOT*/
-#define XT_EMPTY 0x11d0 /* EMPTY*/
-#define XT_hi 0x11c8 /* hi*/
-#define XT_version 0x1194 /* version*/
-#define XT_VER 0x1190 /* VER*/
-#define XT_SEE 0x110a /* SEE*/
-#define XT_FORTH_3ENAME 0x10cc /* FORTH>NAME*/
-#define XT_WORDS 0x10aa /* WORDS*/
-#define XT__2EID 0x108a /* .ID*/
-#define XT__3FCSP 0x1070 /* ?CSP*/
-#define XT__21CSP 0x1066 /* !CSP*/
-#define XT__2EFREE 0x105a /* .FREE*/
-#define XT__2EBASE 0x1048 /* .BASE*/
-#define XT__2ES 0x1028 /* .S*/
-#define XT_DUMP 0xfe4 /* DUMP*/
-#define XT_dm_2B 0xfbc /* dm+*/
-#define XT__5FTYPE 0xf9e /* _TYPE*/
-#define XT_CONSTANT 0xf8e /* CONSTANT*/
-#define XT_VARIABLE 0xf82 /* VARIABLE*/
-#define XT_vCREATE 0xf66 /* vCREATE*/
-#define XT_CREATE 0xf5e /* CREATE*/
-#define XT_create 0xf4c /* create*/
-#define XT_USER 0xf3e /* USER*/
-#define XT__3A 0xf30 /* :*/
-#define XT__5D 0xf24 /* ]*/
-#define XT__3B 0xf18 /* ;*/
-#define XT_OVERT 0xf0a /* OVERT*/
-#define XT__24COMPILE 0xedc /* $COMPILE*/
-#define XT__24_2Cn 0xea0 /* $,n*/
-#define XT__3FUNIQUE 0xe84 /* ?UNIQUE*/
-#define XT__24_22 0xe7a /* $"*/
-#define XT_RECURSE 0xe6e /* RECURSE*/
-#define XT__5BCOMPILE_5D 0xe66 /* [COMPILE]*/
-#define XT_vALLOT 0xe50 /* vALLOT*/
-#define XT_ALLOT 0xe48 /* ALLOT*/
-#define XT__27 0xe38 /* '*/
-#define XT_quit1 0xe24 /* quit1*/
-#define XT_QUIT 0xe04 /* QUIT*/
-#define XT_quitError 0xdd4 /* quitError*/
-#define XT_que 0xdcc /* que*/
-#define XT_CONSOLE 0xdbe /* CONSOLE*/
-#define XT_I_2FO 0xdb6 /* I/O*/
-#define XT_HAND 0xda4 /* HAND*/
-#define XT_FILE 0xd92 /* FILE*/
-#define XT_XIO 0xd7a /* XIO*/
-#define XT_PRESET 0xd68 /* PRESET*/
-#define XT__5B 0xd5c /* [*/
-#define XT_EVAL 0xd3e /* EVAL*/
-#define XT__3FSTACK 0xd2a /* ?STACK*/
-#define XT__2EOK 0xd10 /* .OK*/
-#define XT__24INTERPRET 0xcdc /* $INTERPRET*/
-#define XT__2E_22 0xcd2 /* ."*/
-#define XT_ABORT_22 0xcc8 /* ABORT"*/
-#define XT__24_2C_22 0xcb4 /* $,"*/
-#define XT_abort_22 0xca4 /* abort"*/
-#define XT_ABORT 0xc9c /* ABORT*/
-#define XT_NULL_24 0xc96 /* NULL$*/
-#define XT_THROW 0xc7a /* THROW*/
-#define XT_CATCH 0xc56 /* CATCH*/
-#define XT_QUERY 0xc3a /* QUERY*/
-#define XT_EXPECT 0xc2c /* EXPECT*/
-#define XT_accept 0xbf4 /* accept*/
-#define XT_kTAP 0xbb2 /* kTAP*/
-#define XT_TAP 0xb9e /* TAP*/
-#define XT__5EH 0xb72 /* ^H*/
-#define XT_NAME_3F 0xb38 /* NAME?*/
-#define XT_FORTHfind 0xac6 /* FORTHfind*/
-#define XT_SAME_3F 0xa92 /* SAME?*/
-#define XT_NAME_3E 0xa84 /* NAME>*/
-#define XT_WORD 0xa7a /* WORD*/
-#define XT_TOKEN 0xa60 /* TOKEN*/
-#define XT__2E_28 0xa54 /* .(*/
-#define XT_CTRL 0xa48 /* CTRL*/
-#define XT_CHAR 0xa3c /* CHAR*/
-#define XT_PARSE 0xa1c /* PARSE*/
-#define XT_parse 0x97a /* parse*/
-#define XT__2E_22_7C 0x972 /* ."|*/
-#define XT__24_22_7C 0x96c /* $"|*/
-#define XT_do_24 0x956 /* do$*/
-#define XT_CR 0x946 /* CR*/
-#define XT_PACE 0x93c /* PACE*/
-#define XT_NUF_3F 0x926 /* NUF?*/
-#define XT_KEY 0x910 /* KEY*/
-#define XT__3FKEY 0x908 /* ?KEY*/
-#define XT_NUMBER_3F 0x862 /* NUMBER?*/
-#define XT_DIGIT_3F 0x834 /* DIGIT?*/
-#define XT__3F 0x82c /* ?*/
-#define XT__2E 0x810 /* .*/
-#define XT_U_2E 0x802 /* U.*/
-#define XT_U_2ER 0x7ec /* U.R*/
-#define XT__2ER 0x7da /* .R*/
-#define XT_DECIMAL 0x7ce /* DECIMAL*/
-#define XT_HEX 0x7c2 /* HEX*/
-#define XT_str 0x7ae /* str*/
-#define XT__2E_24 0x7a6 /* .$*/
-#define XT_TYPE 0x78a /* TYPE*/
-#define XT_SPACES 0x782 /* SPACES*/
-#define XT_CHARS 0x766 /* CHARS*/
-#define XT_SPACE 0x75e /* SPACE*/
-#define XT_EMIT 0x756 /* EMIT*/
-#define XT__23_3E 0x746 /* #>*/
-#define XT_SIGN 0x736 /* SIGN*/
-#define XT__23S 0x726 /* #S*/
-#define XT__23 0x71a /* #*/
-#define XT_HOLD 0x704 /* HOLD*/
-#define XT__3C_23 0x6fa /* <#*/
-#define XT_EXTRACT 0x6ea /* EXTRACT*/
-#define XT_DIGIT 0x6d0 /* DIGIT*/
-#define XT_PACK_24 0x696 /* PACK$*/
-#define XT__2DTRAILING 0x66a /* -TRAILING*/
-#define XT_FILL 0x64c /* FILL*/
-#define XT_CMOVE 0x624 /* CMOVE*/
-#define XT_COUNT 0x614 /* COUNT*/
-#define XT__40EXECUTE 0x600 /* @EXECUTE*/
-#define XT_TIB 0x5f6 /* TIB*/
-#define XT_PAD 0x5ea /* PAD*/
-#define XT_vCREATE 0x5ce /* vCREATE*/
-#define XT_vALIGN 0x5c0 /* vALIGN*/
-#define XT_v_2C 0x5a0 /* v,*/
-#define XT_vHERE 0x58e /* vHERE*/
-#define XT_2_40 0x580 /* 2@*/
-#define XT_2_21 0x572 /* 2!*/
-#define XT__2B_21 0x562 /* +!*/
-#define XT_PICK 0x550 /* PICK*/
-#define XT_DEPTH 0x53e /* DEPTH*/
-#define XT__3ECHAR 0x520 /* >CHAR*/
-#define XT_CELLS 0x518 /* CELLS*/
-#define XT_CELL_2D 0x510 /* CELL-*/
-#define XT__2A_2F 0x508 /* * /*/
-#define XT__2A_2FMOD 0x4fc /* * /MOD*/
-#define XT_M_2A 0x4e0 /* M**/
-#define XT__2A 0x4d8 /* **/
-#define XT_UM_2A 0x49e /* UM**/
-#define XT__2F 0x496 /* /*/
-#define XT_MOD 0x48e /* MOD*/
-#define XT__2FMOD 0x482 /* /MOD*/
-#define XT_M_2FMOD 0x44c /* M/MOD*/
-#define XT_UM_2FMOD 0x3e8 /* UM/MOD*/
-#define XT_WITHIN 0x3d8 /* WITHIN*/
-#define XT_MIN 0x3c6 /* MIN*/
-#define XT_MAX 0x3b6 /* MAX*/
-#define XT__3C 0x39e /* <*/
+#define XT_WARM 0x123e /* WARM*/
+#define XT_COLD 0x1226 /* COLD*/
+#define XT__27BOOT 0x1220 /* 'BOOT*/
+#define XT_EMPTY 0x1210 /* EMPTY*/
+#define XT_hi 0x1208 /* hi*/
+#define XT_version 0x11ca /* version*/
+#define XT_VER 0x11c6 /* VER*/
+#define XT_SEE 0x1140 /* SEE*/
+#define XT_FORTH_3ENAME 0x1102 /* FORTH>NAME*/
+#define XT_WORDS 0x10e0 /* WORDS*/
+#define XT__2EID 0x10c0 /* .ID*/
+#define XT__3FCSP 0x10a6 /* ?CSP*/
+#define XT__21CSP 0x109c /* !CSP*/
+#define XT__2EFREE 0x1090 /* .FREE*/
+#define XT__2EBASE 0x107e /* .BASE*/
+#define XT__2ES 0x105e /* .S*/
+#define XT_DUMP 0x101a /* DUMP*/
+#define XT_dm_2B 0xff2 /* dm+*/
+#define XT__5FTYPE 0xfd4 /* _TYPE*/
+#define XT_CONSTANT 0xfc4 /* CONSTANT*/
+#define XT_VARIABLE 0xfb8 /* VARIABLE*/
+#define XT_vCREATE 0xf9c /* vCREATE*/
+#define XT_CREATE 0xf94 /* CREATE*/
+#define XT_create 0xf82 /* create*/
+#define XT_USER 0xf74 /* USER*/
+#define XT__3A 0xf66 /* :*/
+#define XT__5D 0xf5a /* ]*/
+#define XT__3B 0xf4e /* ;*/
+#define XT_OVERT 0xf40 /* OVERT*/
+#define XT__24COMPILE 0xf12 /* $COMPILE*/
+#define XT__24_2Cn 0xed6 /* $,n*/
+#define XT__3FUNIQUE 0xeba /* ?UNIQUE*/
+#define XT_S_22 0xeb0 /* S"*/
+#define XT__24_22 0xea6 /* $"*/
+#define XT_RECURSE 0xe9a /* RECURSE*/
+#define XT__5BCOMPILE_5D 0xe92 /* [COMPILE]*/
+#define XT_vALLOT 0xe7c /* vALLOT*/
+#define XT_ALLOT 0xe74 /* ALLOT*/
+#define XT__27 0xe64 /* '*/
+#define XT_quit1 0xe50 /* quit1*/
+#define XT_QUIT 0xe30 /* QUIT*/
+#define XT_quitError 0xe00 /* quitError*/
+#define XT_que 0xdf8 /* que*/
+#define XT_CONSOLE 0xdea /* CONSOLE*/
+#define XT_I_2FO 0xde2 /* I/O*/
+#define XT_HAND 0xdd0 /* HAND*/
+#define XT_FILE 0xdbe /* FILE*/
+#define XT_XIO 0xda6 /* XIO*/
+#define XT_PRESET 0xd94 /* PRESET*/
+#define XT__5B 0xd88 /* [*/
+#define XT_EVAL 0xd6a /* EVAL*/
+#define XT__3FSTACK 0xd56 /* ?STACK*/
+#define XT__2EOK 0xd3c /* .OK*/
+#define XT__24INTERPRET 0xd08 /* $INTERPRET*/
+#define XT__2E_22 0xcfe /* ."*/
+#define XT_ABORT_22 0xcf4 /* ABORT"*/
+#define XT__24_2C_22 0xce0 /* $,"*/
+#define XT_abort_22 0xcd0 /* abort"*/
+#define XT_ABORT 0xcc8 /* ABORT*/
+#define XT_NULL_24 0xcc2 /* NULL$*/
+#define XT_THROW 0xca0 /* THROW*/
+#define XT_CATCH 0xc7c /* CATCH*/
+#define XT_QUERY 0xc60 /* QUERY*/
+#define XT_EXPECT 0xc52 /* EXPECT*/
+#define XT_accept 0xc1a /* accept*/
+#define XT_kTAP 0xbe6 /* kTAP*/
+#define XT_crlf_3F 0xbd0 /* crlf?*/
+#define XT_TAP 0xbbc /* TAP*/
+#define XT__5EH 0xb90 /* ^H*/
+#define XT_NAME_3F 0xb56 /* NAME?*/
+#define XT_FORTHfind 0xae4 /* FORTHfind*/
+#define XT_SAME_3F 0xab0 /* SAME?*/
+#define XT_NAME_3E 0xaa2 /* NAME>*/
+#define XT_WORD 0xa98 /* WORD*/
+#define XT_TOKEN 0xa7e /* TOKEN*/
+#define XT__2E_28 0xa72 /* .(*/
+#define XT_CTRL 0xa66 /* CTRL*/
+#define XT_CHAR 0xa5a /* CHAR*/
+#define XT_PARSE 0xa3a /* PARSE*/
+#define XT_parse 0x998 /* parse*/
+#define XT_S_22_7C 0x990 /* S"|*/
+#define XT__2E_22_7C 0x988 /* ."|*/
+#define XT__24_22_7C 0x982 /* $"|*/
+#define XT_do_24 0x96c /* do$*/
+#define XT_CR 0x95c /* CR*/
+#define XT_PACE 0x952 /* PACE*/
+#define XT_NUF_3F 0x93c /* NUF?*/
+#define XT_KEY 0x926 /* KEY*/
+#define XT__3FKEY 0x91e /* ?KEY*/
+#define XT_NUMBER_3F 0x878 /* NUMBER?*/
+#define XT_DIGIT_3F 0x84a /* DIGIT?*/
+#define XT__3F 0x842 /* ?*/
+#define XT__2E 0x826 /* .*/
+#define XT_U_2E 0x818 /* U.*/
+#define XT_U_2ER 0x802 /* U.R*/
+#define XT__2ER 0x7f0 /* .R*/
+#define XT_DECIMAL 0x7e4 /* DECIMAL*/
+#define XT_HEX 0x7d8 /* HEX*/
+#define XT_str 0x7c4 /* str*/
+#define XT__2E_24 0x7bc /* .$*/
+#define XT_TYPE 0x7a0 /* TYPE*/
+#define XT_SPACES 0x798 /* SPACES*/
+#define XT_CHARS 0x77c /* CHARS*/
+#define XT_SPACE 0x774 /* SPACE*/
+#define XT_EMIT 0x76c /* EMIT*/
+#define XT__23_3E 0x75c /* #>*/
+#define XT_SIGN 0x74c /* SIGN*/
+#define XT__23S 0x73c /* #S*/
+#define XT__23 0x730 /* #*/
+#define XT_HOLD 0x71a /* HOLD*/
+#define XT__3C_23 0x710 /* <#*/
+#define XT_EXTRACT 0x700 /* EXTRACT*/
+#define XT_DIGIT 0x6e6 /* DIGIT*/
+#define XT_PACK_24 0x6b0 /* PACK$*/
+#define XT__2DTRAILING 0x684 /* -TRAILING*/
+#define XT_FILL 0x666 /* FILL*/
+#define XT_CMOVE 0x63e /* CMOVE*/
+#define XT_COUNT 0x62e /* COUNT*/
+#define XT__40EXECUTE 0x61a /* @EXECUTE*/
+#define XT_TIB 0x610 /* TIB*/
+#define XT_PAD 0x604 /* PAD*/
+#define XT_vCREATE 0x5e8 /* vCREATE*/
+#define XT_vALIGN 0x5da /* vALIGN*/
+#define XT_v_2C 0x5ba /* v,*/
+#define XT_vHERE 0x5a8 /* vHERE*/
+#define XT_2_40 0x59a /* 2@*/
+#define XT_2_21 0x58c /* 2!*/
+#define XT__2B_21 0x57c /* +!*/
+#define XT_PICK 0x56a /* PICK*/
+#define XT_DEPTH 0x558 /* DEPTH*/
+#define XT__3ECHAR 0x53a /* >CHAR*/
+#define XT_CELLS 0x532 /* CELLS*/
+#define XT_CELL_2D 0x52a /* CELL-*/
+#define XT__2A_2F 0x522 /* * /*/
+#define XT__2A_2FMOD 0x516 /* * /MOD*/
+#define XT_M_2A 0x4fa /* M**/
+#define XT__2A 0x4f2 /* **/
+#define XT_UM_2A 0x4b8 /* UM**/
+#define XT__2F 0x4b0 /* /*/
+#define XT_MOD 0x4a8 /* MOD*/
+#define XT__2FMOD 0x49c /* /MOD*/
+#define XT_M_2FMOD 0x466 /* M/MOD*/
+#define XT_UM_2FMOD 0x402 /* UM/MOD*/
+#define XT_WITHIN 0x3f2 /* WITHIN*/
+#define XT_MIN 0x3e0 /* MIN*/
+#define XT_MAX 0x3d0 /* MAX*/
+#define XT__3C 0x3b8 /* <*/
+#define XT_ud_3C 0x39e /* ud<*/
 #define XT_U_3C 0x386 /* U<*/
 #define XT__3D 0x372 /* =*/
 #define XT_0_3D 0x35e /* 0=*/
@@ -455,7 +459,7 @@ const CELLTYPE rom[ROMCELLS] PROGMEM = {
 /* 0x42 */ 0x8000,
 /* 0x44 */ 0x8004,
 /* 0x46 */ 0x8160,
-/* 0x48 */ 0x14f6,
+/* 0x48 */ 0x14d4,
 /* 0x4a */ 0,
 /* 0x4c */ 0,
 /* 0x4e */ 0,
@@ -624,153 +628,155 @@ const CELLTYPE rom[ROMCELLS] PROGMEM = {
 /* 0x35e: 0= */ F_tokenDoList, XT__3Fbranch, XT_0_3D + 0xe, XT_doLIT, 0, XT_branch, XT_0_3D + 0x12, XT_doLIT, 0xffff, XT_EXIT,
 /* 0x372: = */ F_tokenDoList, XT_XOR, XT__3Fbranch, XT__3D + 0xe, XT_doLIT, 0, XT_EXIT, XT_doLIT, 0xffff, XT_EXIT,
 /* 0x386: U< */ F_tokenDoList, XT_2DUP, XT_XOR, XT_0_3C, XT__3Fbranch, XT_U_3C + 0x12, XT_NIP, XT_0_3C, XT_EXIT, XT__2D, XT_0_3C, XT_EXIT,
-/* 0x39e: < */ F_tokenDoList, XT_2DUP, XT_XOR, XT_0_3C, XT__3Fbranch, XT__3C + 0x12, XT_DROP, XT_0_3C, XT_EXIT, XT__2D, XT_0_3C, XT_EXIT,
-/* 0x3b6: MAX */ F_tokenDoList, XT_2DUP, XT__3C, XT__3Fbranch, XT_MAX + 0xc, XT_SWAP, XT_DROP, XT_EXIT,
-/* 0x3c6: MIN */ F_tokenDoList, XT_2DUP, XT_SWAP, XT__3C, XT__3Fbranch, XT_MIN + 0xe, XT_SWAP, XT_DROP, XT_EXIT,
-/* 0x3d8: WITHIN */ F_tokenDoList, XT_OVER, XT__2D, XT__3ER, XT__2D, XT_R_3E, XT_U_3C, XT_EXIT,
-/* 0x3e8: UM/MOD */ F_tokenDoList, XT_2DUP, XT_U_3C, XT__3Fbranch, XT_UM_2FMOD + 0x58, XT_NEGATE, XT_CELLbits, XT__3ER, XT_branch, XT_UM_2FMOD + 0x4e, XT__3ER, XT_DUP, XT_UM_2B, XT__3ER, XT__3ER, XT_DUP, XT_UM_2B, XT_R_3E, XT__2B, XT_DUP, XT_R_3E, XT_R_40, XT_SWAP, XT__3ER, XT_UM_2B, XT_R_3E, XT_OR, XT__3Fbranch, XT_UM_2FMOD + 0x4a, XT__3ER, XT_DROP, XT_doLIT, 1, XT__2B, XT_R_3E, XT_branch, XT_UM_2FMOD + 0x4c, XT_DROP, XT_R_3E, XT_next, XT_UM_2FMOD + 0x14, XT_DROP, XT_SWAP, XT_EXIT, XT_DROP, XT_2DROP, XT_doLIT, 0xffff, XT_DUP, XT_EXIT,
-/* 0x44c: M/MOD */ F_tokenDoList, XT_DUP, XT_0_3C, XT_DUP, XT__3ER, XT__3Fbranch, XT_M_2FMOD + 0x16, XT_NEGATE, XT__3ER, XT_DNEGATE, XT_R_3E, XT__3ER, XT_DUP, XT_0_3C, XT__3Fbranch, XT_M_2FMOD + 0x24, XT_R_40, XT__2B, XT_R_3E, XT_UM_2FMOD, XT_R_3E, XT__3Fbranch, XT_M_2FMOD + 0x34, XT_SWAP, XT_NEGATE, XT_SWAP, XT_EXIT,
-/* 0x482: /MOD */ F_tokenDoList, XT_OVER, XT_0_3C, XT_SWAP, XT_M_2FMOD, XT_EXIT,
-/* 0x48e: MOD */ F_tokenDoList, XT__2FMOD, XT_DROP, XT_EXIT,
-/* 0x496: / */ F_tokenDoList, XT__2FMOD, XT_NIP, XT_EXIT,
-/* 0x49e: UM* */ F_tokenDoList, XT_doLIT, 0, XT_SWAP, XT_CELLbits, XT__3ER, XT_branch, XT_UM_2A + 0x30, XT_DUP, XT_UM_2B, XT__3ER, XT__3ER, XT_DUP, XT_UM_2B, XT_R_3E, XT__2B, XT_R_3E, XT__3Fbranch, XT_UM_2A + 0x30, XT__3ER, XT_OVER, XT_UM_2B, XT_R_3E, XT__2B, XT_next, XT_UM_2A + 0x10, XT_ROT, XT_DROP, XT_EXIT,
-/* 0x4d8: * */ F_tokenDoList, XT_UM_2A, XT_DROP, XT_EXIT,
-/* 0x4e0: M* */ F_tokenDoList, XT_2DUP, XT_XOR, XT_0_3C, XT__3ER, XT_ABS, XT_SWAP, XT_ABS, XT_UM_2A, XT_R_3E, XT__3Fbranch, XT_M_2A + 0x1a, XT_DNEGATE, XT_EXIT,
-/* 0x4fc: * /MOD */ F_tokenDoList, XT__3ER, XT_M_2A, XT_R_3E, XT_M_2FMOD, XT_EXIT,
-/* 0x508: * / */ F_tokenDoList, XT__2A_2FMOD, XT_NIP, XT_EXIT,
-/* 0x510: CELL- */ F_tokenDoList, XT_CELLL, XT__2D, XT_EXIT,
-/* 0x518: CELLS */ F_tokenDoList, XT_CELLL, XT__2A, XT_EXIT,
-/* 0x520: >CHAR */ F_tokenDoList, XT_doLIT, 0x7f, XT_AND, XT_DUP, XT_doLIT, 0x7f, XT_BL, XT_WITHIN, XT__3Fbranch, XT__3ECHAR + 0x1c, XT_DROP, XT_doLIT, 0x5f, XT_EXIT,
-/* 0x53e: DEPTH */ F_tokenDoList, XT_SP_40, XT_SP0, XT__40, XT_SWAP, XT__2D, XT_CELLL, XT__2F, XT_EXIT,
-/* 0x550: PICK */ F_tokenDoList, XT_doLIT, 1, XT__2B, XT_CELLS, XT_SP_40, XT__2B, XT__40, XT_EXIT,
-/* 0x562: +! */ F_tokenDoList, XT_SWAP, XT_OVER, XT__40, XT__2B, XT_SWAP, XT__21, XT_EXIT,
-/* 0x572: 2! */ F_tokenDoList, XT_SWAP, XT_OVER, XT__21, XT_CELL_2B, XT__21, XT_EXIT,
-/* 0x580: 2@ */ F_tokenDoList, XT_DUP, XT_CELL_2B, XT__40, XT_SWAP, XT__40, XT_EXIT,
-/* 0x58e: vHERE */ F_tokenDoList, XT_VP, XT__40, XT__3FDUP, XT__3Fbranch, XT_vHERE + 0xe, XT_EXIT, XT_HERE, XT_EXIT,
-/* 0x5a0: v, */ F_tokenDoList, XT_VP, XT__40, XT__3FDUP, XT__3Fbranch, XT_v_2C + 0x1c, XT_ALIGNED, XT_DUP, XT_CELL_2B, XT_VP, XT__21, XT__21, XT_branch, XT_v_2C + 0x1e, XT__2C, XT_EXIT,
-/* 0x5c0: vALIGN */ F_tokenDoList, XT_VP, XT__40, XT_ALIGNED, XT_VP, XT__21, XT_EXIT,
-/* 0x5ce: vCREATE */ F_tokenDoList, XT_VP, XT__40, XT__3FDUP, XT__3Fbranch, XT_vCREATE + 0x18, XT_tokenVar, XT_create, XT_vALIGN, XT__2C, XT_branch, XT_vCREATE + 0x1a, XT_CREATE, XT_EXIT,
-/* 0x5ea: PAD */ F_tokenDoList, XT_HERE, XT_doLIT, 0x50, XT__2B, XT_EXIT,
-/* 0x5f6: TIB */ F_tokenDoList, XT__23TIB, XT_CELL_2B, XT__40, XT_EXIT,
-/* 0x600: @EXECUTE */ F_tokenDoList, XT__40, XT__3FDUP, XT__3Fbranch, XT__40EXECUTE + 0x10, XT_EXECUTE, XT_branch, XT__40EXECUTE + 0x12, XT_Fbreak, XT_EXIT,
-/* 0x614: COUNT */ F_tokenDoList, XT_DUP, XT_doLIT, 1, XT__2B, XT_SWAP, XT_C_40, XT_EXIT,
-/* 0x624: CMOVE */ F_tokenDoList, XT__3ER, XT_branch, XT_CMOVE + 0x20, XT__3ER, XT_DUP, XT_C_40, XT_R_40, XT_C_21, XT_doLIT, 1, XT__2B, XT_R_3E, XT_doLIT, 1, XT__2B, XT_next, XT_CMOVE + 8, XT_2DROP, XT_EXIT,
-/* 0x64c: FILL */ F_tokenDoList, XT_SWAP, XT__3ER, XT_SWAP, XT_branch, XT_FILL + 0x16, XT_2DUP, XT_C_21, XT_doLIT, 1, XT__2B, XT_next, XT_FILL + 0xc, XT_2DROP, XT_EXIT,
-/* 0x66a: -TRAILING */ F_tokenDoList, XT__3ER, XT_branch, XT__2DTRAILING + 0x22, XT_BL, XT_OVER, XT_R_40, XT__2B, XT_C_40, XT__3C, XT__3Fbranch, XT__2DTRAILING + 0x22, XT_R_3E, XT_doLIT, 1, XT__2B, XT_EXIT, XT_next, XT__2DTRAILING + 8, XT_doLIT, 0, XT_EXIT,
-/* 0x696: PACK$ */ F_tokenDoList, XT_ALIGNED, XT_DUP, XT__3ER, XT_OVER, XT_DUP, XT_doLIT, 0, XT_CELLL, XT_UM_2FMOD, XT_DROP, XT__2D, XT_OVER, XT__2B, XT_doLIT, 0, XT_SWAP, XT__21, XT_2DUP, XT_C_21, XT_doLIT, 1, XT__2B, XT_SWAP, XT_CMOVE, XT_R_3E, XT_EXIT, XT_EXIT, XT_EXIT,
-/* 0x6d0: DIGIT */ F_tokenDoList, XT_doLIT, 9, XT_OVER, XT__3C, XT_doLIT, 7, XT_AND, XT__2B, XT_doLIT, 0x30, XT__2B, XT_EXIT,
-/* 0x6ea: EXTRACT */ F_tokenDoList, XT_doLIT, 0, XT_SWAP, XT_UM_2FMOD, XT_SWAP, XT_DIGIT, XT_EXIT,
-/* 0x6fa: <# */ F_tokenDoList, XT_PAD, XT_HLD, XT__21, XT_EXIT,
-/* 0x704: HOLD */ F_tokenDoList, XT_HLD, XT__40, XT_doLIT, 1, XT__2D, XT_DUP, XT_HLD, XT__21, XT_C_21, XT_EXIT,
-/* 0x71a: # */ F_tokenDoList, XT_BASE, XT__40, XT_EXTRACT, XT_HOLD, XT_EXIT,
-/* 0x726: #S */ F_tokenDoList, XT__23, XT_DUP, XT__3Fbranch, XT__23S + 0xe, XT_branch, XT__23S + 2, XT_EXIT,
-/* 0x736: SIGN */ F_tokenDoList, XT_0_3C, XT__3Fbranch, XT_SIGN + 0xe, XT_doLIT, 0x2d, XT_HOLD, XT_EXIT,
-/* 0x746: #> */ F_tokenDoList, XT_DROP, XT_HLD, XT__40, XT_PAD, XT_OVER, XT__2D, XT_EXIT,
-/* 0x756: EMIT */ F_tokenDoList, XT__27EMIT, XT__40EXECUTE, XT_EXIT,
-/* 0x75e: SPACE */ F_tokenDoList, XT_BL, XT_EMIT, XT_EXIT,
-/* 0x766: CHARS */ F_tokenDoList, XT_SWAP, XT_doLIT, 0, XT_MAX, XT__3ER, XT_branch, XT_CHARS + 0x14, XT_DUP, XT_EMIT, XT_next, XT_CHARS + 0x10, XT_DROP, XT_EXIT,
-/* 0x782: SPACES */ F_tokenDoList, XT_BL, XT_CHARS, XT_EXIT,
-/* 0x78a: TYPE */ F_tokenDoList, XT__3ER, XT_branch, XT_TYPE + 0x14, XT_DUP, XT_C_40, XT_EMIT, XT_doLIT, 1, XT__2B, XT_next, XT_TYPE + 8, XT_DROP, XT_EXIT,
-/* 0x7a6: .$ */ F_tokenDoList, XT_COUNT, XT_TYPE, XT_EXIT,
-/* 0x7ae: str */ F_tokenDoList, XT_DUP, XT__3ER, XT_ABS, XT__3C_23, XT__23S, XT_R_3E, XT_SIGN, XT__23_3E, XT_EXIT,
-/* 0x7c2: HEX */ F_tokenDoList, XT_doLIT, 0x10, XT_BASE, XT__21, XT_EXIT,
-/* 0x7ce: DECIMAL */ F_tokenDoList, XT_doLIT, 0xa, XT_BASE, XT__21, XT_EXIT,
-/* 0x7da: .R */ F_tokenDoList, XT__3ER, XT_str, XT_R_3E, XT_OVER, XT__2D, XT_SPACES, XT_TYPE, XT_EXIT,
-/* 0x7ec: U.R */ F_tokenDoList, XT__3ER, XT__3C_23, XT__23S, XT__23_3E, XT_R_3E, XT_OVER, XT__2D, XT_SPACES, XT_TYPE, XT_EXIT,
-/* 0x802: U. */ F_tokenDoList, XT__3C_23, XT__23S, XT__23_3E, XT_SPACE, XT_TYPE, XT_EXIT,
-/* 0x810: . */ F_tokenDoList, XT_BASE, XT__40, XT_doLIT, 0xa, XT_XOR, XT__3Fbranch, XT__2E + 0x14, XT_U_2E, XT_EXIT, XT_str, XT_SPACE, XT_TYPE, XT_EXIT,
-/* 0x82c: ? */ F_tokenDoList, XT__40, XT__2E, XT_EXIT,
-/* 0x834: DIGIT? */ F_tokenDoList, XT__3ER, XT_doLIT, 0x30, XT__2D, XT_doLIT, 9, XT_OVER, XT__3C, XT__3Fbranch, XT_DIGIT_3F + 0x26, XT_doLIT, 7, XT__2D, XT_DUP, XT_doLIT, 0xa, XT__3C, XT_OR, XT_DUP, XT_R_3E, XT_U_3C, XT_EXIT,
-/* 0x862: NUMBER? */ F_tokenDoList, XT_BASE, XT__40, XT__3ER, XT_doLIT, 0, XT_OVER, XT_COUNT, XT_OVER, XT_C_40, XT_doLIT, 0x24, XT__3D, XT__3Fbranch, XT_NUMBER_3F + 0x30, XT_HEX, XT_SWAP, XT_doLIT, 1, XT__2B, XT_SWAP, XT_doLIT, 1, XT__2D, XT_OVER, XT_C_40, XT_doLIT, 0x2d, XT__3D, XT__3ER, XT_SWAP, XT_R_40, XT__2D, XT_SWAP, XT_R_40, XT__2B, XT__3FDUP, XT__3Fbranch, XT_NUMBER_3F + 0x9a, XT_doLIT, 1, XT__2D, XT__3ER, XT_DUP, XT__3ER, XT_C_40, XT_BASE, XT__40, XT_DIGIT_3F, XT__3Fbranch, XT_NUMBER_3F + 0x8c, XT_SWAP, XT_BASE, XT__40, XT__2A, XT__2B, XT_R_3E, XT_doLIT, 1, XT__2B, XT_next, XT_NUMBER_3F + 0x56, XT_DROP, XT_R_40, XT__3Fbranch, XT_NUMBER_3F + 0x86, XT_NEGATE, XT_SWAP, XT_branch, XT_NUMBER_3F + 0x98, XT_R_3E, XT_R_3E, XT_2DROP, XT_2DROP, XT_doLIT, 0, XT_DUP, XT_R_3E, XT_2DROP, XT_R_3E, XT_BASE, XT__21, XT_EXIT,
-/* 0x908: ?KEY */ F_tokenDoList, XT__27_3FKEY, XT__40EXECUTE, XT_EXIT,
-/* 0x910: KEY */ F_tokenDoList, XT_doLIT, 0, XT_MS, XT_doLIT, XT_BYE, XT__3FKEY, XT__3Fbranch, XT_KEY + 6, XT_NIP, XT_EXIT,
-/* 0x926: NUF? */ F_tokenDoList, XT__3FKEY, XT_DUP, XT__3Fbranch, XT_NUF_3F + 0x14, XT_2DROP, XT_KEY, XT_doLIT, 0xd, XT__3D, XT_EXIT,
-/* 0x93c: PACE */ F_tokenDoList, XT_doLIT, 0xb, XT_EMIT, XT_EXIT,
-/* 0x946: CR */ F_tokenDoList, XT_doLIT, 0xd, XT_EMIT, XT_doLIT, 0xa, XT_EMIT, XT_EXIT,
-/* 0x956: do$ */ F_tokenDoList, XT_R_3E, XT_R_40, XT_R_3E, XT_COUNT, XT__2B, XT_ALIGNED, XT__3ER, XT_SWAP, XT__3ER, XT_EXIT,
-/* 0x96c: $"| */ F_tokenDoList, XT_do_24, XT_EXIT,
-/* 0x972: ."| */ F_tokenDoList, XT_do_24, XT__2E_24, XT_EXIT,
-/* 0x97a: parse */ F_tokenDoList, XT_temp, XT__21, XT_OVER, XT__3ER, XT_DUP, XT__3Fbranch, XT_parse + 0x9a, XT_doLIT, 1, XT__2D, XT_temp, XT__40, XT_BL, XT__3D, XT__3Fbranch, XT_parse + 0x4c, XT__3ER, XT_BL, XT_OVER, XT_C_40, XT__2D, XT_0_3C, XT_INVERT, XT__3Fbranch, XT_parse + 0x4a, XT_doLIT, 1, XT__2B, XT_next, XT_parse + 0x24, XT_R_3E, XT_DROP, XT_doLIT, 0, XT_DUP, XT_EXIT, XT_R_3E, XT_OVER, XT_SWAP, XT__3ER, XT_temp, XT__40, XT_OVER, XT_C_40, XT__2D, XT_temp, XT__40, XT_BL, XT__3D, XT__3Fbranch, XT_parse + 0x6a, XT_0_3C, XT__3Fbranch, XT_parse + 0x80, XT_doLIT, 1, XT__2B, XT_next, XT_parse + 0x52, XT_DUP, XT__3ER, XT_branch, XT_parse + 0x8e, XT_R_3E, XT_DROP, XT_DUP, XT_doLIT, 1, XT__2B, XT__3ER, XT_OVER, XT__2D, XT_R_3E, XT_R_3E, XT__2D, XT_EXIT, XT_OVER, XT_R_3E, XT__2D, XT_EXIT,
-/* 0xa1c: PARSE */ F_tokenDoList, XT__3ER, XT_TIB, XT__3EIN, XT__40, XT__2B, XT__23TIB, XT__40, XT__3EIN, XT__40, XT__2D, XT_R_3E, XT_parse, XT__3EIN, XT__2B_21, XT_EXIT,
-/* 0xa3c: CHAR */ F_tokenDoList, XT_BL, XT_PARSE, XT_DROP, XT_C_40, XT_EXIT,
-/* 0xa48: CTRL */ F_tokenDoList, XT_CHAR, XT_doLIT, 0x1f, XT_AND, XT_EXIT,
-/* 0xa54: .( */ F_tokenDoList, XT_doLIT, 0x29, XT_PARSE, XT_TYPE, XT_EXIT,
-/* 0xa60: TOKEN */ F_tokenDoList, XT_BL, XT_PARSE, XT_BYTEMASK, XT_MIN, XT_NP, XT__40, XT_OVER, XT__2D, XT_CELLL, XT__2D, XT_PACK_24, XT_EXIT,
-/* 0xa7a: WORD */ F_tokenDoList, XT_PARSE, XT_HERE, XT_PACK_24, XT_EXIT,
-/* 0xa84: NAME> */ F_tokenDoList, XT_doLIT, 2, XT_CELLS, XT__2D, XT__40, XT_EXIT,
-/* 0xa92: SAME? */ F_tokenDoList, XT__3ER, XT_branch, XT_SAME_3F + 0x2a, XT_OVER, XT_R_40, XT_CELLS, XT__2B, XT__40, XT_OVER, XT_R_40, XT_CELLS, XT__2B, XT__40, XT__2D, XT__3FDUP, XT__3Fbranch, XT_SAME_3F + 0x2a, XT_R_3E, XT_DROP, XT_EXIT, XT_next, XT_SAME_3F + 8, XT_doLIT, 0, XT_EXIT,
-/* 0xac6: FORTHfind */ F_tokenDoList, XT_SWAP, XT_DUP, XT_C_40, XT_CELLL, XT__2F, XT_temp, XT__21, XT_DUP, XT__40, XT__3ER, XT_CELL_2B, XT_SWAP, XT__40, XT_DUP, XT__3Fbranch, XT_FORTHfind + 0x4a, XT_DUP, XT__40, XT_doLIT, 0xff1f, XT_AND, XT_R_40, XT_XOR, XT__3Fbranch, XT_FORTHfind + 0x3e, XT_CELL_2B, XT_doLIT, 0xffff, XT_branch, XT_FORTHfind + 0x46, XT_CELL_2B, XT_temp, XT__40, XT_SAME_3F, XT_branch, XT_FORTHfind + 0x56, XT_R_3E, XT_DROP, XT_SWAP, XT_CELL_2D, XT_SWAP, XT_EXIT, XT__3Fbranch, XT_FORTHfind + 0x62, XT_CELL_2D, XT_CELL_2D, XT_branch, XT_FORTHfind + 0x1a, XT_R_3E, XT_DROP, XT_NIP, XT_CELL_2D, XT_DUP, XT_NAME_3E, XT_SWAP, XT_EXIT,
-/* 0xb38: NAME? */ F_tokenDoList, XT_CONTEXT, XT_DUP, XT_2_40, XT_XOR, XT__3Fbranch, XT_NAME_3F + 0x10, XT_CELL_2D, XT__3ER, XT_R_3E, XT_CELL_2B, XT_DUP, XT__3ER, XT__40, XT__3FDUP, XT__3Fbranch, XT_NAME_3F + 0x30, XT_find, XT__3FDUP, XT__3Fbranch, XT_NAME_3F + 0x12, XT_R_3E, XT_DROP, XT_EXIT, XT_R_3E, XT_DROP, XT_doLIT, 0, XT_EXIT,
-/* 0xb72: ^H */ F_tokenDoList, XT__3ER, XT_OVER, XT_R_40, XT__3C, XT_DUP, XT__3Fbranch, XT__5EH + 0x26, XT_doLIT, 8, XT__27ECHO, XT__40EXECUTE, XT_BL, XT__27ECHO, XT__40EXECUTE, XT_doLIT, 8, XT__27ECHO, XT__40EXECUTE, XT_R_3E, XT__2B, XT_EXIT,
-/* 0xb9e: TAP */ F_tokenDoList, XT_DUP, XT__27ECHO, XT__40EXECUTE, XT_OVER, XT_C_21, XT_doLIT, 1, XT__2B, XT_EXIT,
-/* 0xbb2: kTAP */ F_tokenDoList, XT_DUP, XT_doLIT, 0xd, XT__3D, XT_OVER, XT_doLIT, 0xa, XT__3D, XT_OR, XT_0_3D, XT__3Fbranch, XT_kTAP + 0x3a, XT_doLIT, 8, XT__3D, XT_OVER, XT_doLIT, 0x7f, XT__3D, XT_OR, XT__3Fbranch, XT_kTAP + 0x36, XT_BL, XT_TAP, XT_branch, XT_kTAP + 0x38, XT__5EH, XT_EXIT, XT_DROP, XT_NIP, XT_DUP, XT_EXIT,
-/* 0xbf4: accept */ F_tokenDoList, XT_OVER, XT__2B, XT_OVER, XT_2DUP, XT_XOR, XT__3Fbranch, XT_accept + 0x30, XT_KEY, XT_DUP, XT_BL, XT__2D, XT_doLIT, 0x5f, XT_U_3C, XT__3Fbranch, XT_accept + 0x28, XT_TAP, XT_branch, XT_accept + 0x2c, XT__27TAP, XT__40EXECUTE, XT_branch, XT_accept + 8, XT_DROP, XT_OVER, XT__2D, XT_EXIT,
-/* 0xc2c: EXPECT */ F_tokenDoList, XT__27EXPECT, XT__40EXECUTE, XT_SPAN, XT__21, XT_DROP, XT_EXIT,
-/* 0xc3a: QUERY */ F_tokenDoList, XT_TIB, XT_doLIT, 0x50, XT__27EXPECT, XT__40EXECUTE, XT__23TIB, XT__21, XT_DROP, XT_doLIT, 0, XT__3EIN, XT__21, XT_EXIT,
-/* 0xc56: CATCH */ F_tokenDoList, XT_SP_40, XT__3ER, XT_HANDLER, XT__40, XT__3ER, XT_RP_40, XT_HANDLER, XT__21, XT_EXECUTE, XT_R_3E, XT_HANDLER, XT__21, XT_R_3E, XT_DROP, XT_doLIT, 0, XT_EXIT,
-/* 0xc7a: THROW */ F_tokenDoList, XT_HANDLER, XT__40, XT_RP_21, XT_R_3E, XT_HANDLER, XT__21, XT_R_3E, XT_SWAP, XT__3ER, XT_SP_21, XT_DROP, XT_R_3E, XT_EXIT,
-/* 0xc96: NULL$ */ F_tokenCreate, 0, 0,
-/* 0xc9c: ABORT */ F_tokenDoList, XT_NULL_24, XT_THROW, XT_EXIT,
-/* 0xca4: abort" */ F_tokenDoList, XT__3Fbranch, XT_abort_22 + 0xa, XT_do_24, XT_THROW, XT_do_24, XT_DROP, XT_EXIT,
-/* 0xcb4: $," */ F_tokenDoList, XT_doLIT, 0x22, XT_WORD, XT_COUNT, XT__2B, XT_ALIGNED, XT_CP, XT__21, XT_EXIT,
-/* 0xcc8: ABORT" */ F_tokenDoList, XT_COMPILE, XT_abort_22, XT__24_2C_22, XT_EXIT,
-/* 0xcd2: ." */ F_tokenDoList, XT_COMPILE, XT__2E_22_7C, XT__24_2C_22, XT_EXIT,
-/* 0xcdc: $INTERPRET */ F_tokenDoList, XT_NAME_3F, XT__3FDUP, XT__3Fbranch, XT__24INTERPRET + 0x26, XT_C_40, XT_doLIT, 0x40, XT_AND, XT_abort_22, 0x630c, 0x6d6f, 0x6970, 0x656c, 0x4f20, 0x4c4e, 0x59, XT_EXECUTE, XT_EXIT, XT__27NUMBER, XT__40EXECUTE, XT__3Fbranch, XT__24INTERPRET + 0x30, XT_EXIT, XT_THROW, XT_EXIT,
-/* 0xd10: .OK */ F_tokenDoList, XT_doLIT, XT__24INTERPRET, XT__27EVAL, XT__40, XT__3D, XT__3Fbranch, XT__2EOK + 0x16, XT__2E_22_7C, 0x2003, 0x6b6f, XT_CR, XT_EXIT,
-/* 0xd2a: ?STACK */ F_tokenDoList, XT_DEPTH, XT_0_3C, XT_abort_22, 0x7509, 0x646e, 0x7265, 0x6c66, 0x776f, XT_EXIT,
-/* 0xd3e: EVAL */ F_tokenDoList, XT_TOKEN, XT_DUP, XT_C_40, XT__3Fbranch, XT_EVAL + 0x16, XT__27EVAL, XT__40EXECUTE, XT__3FSTACK, XT_branch, XT_EVAL + 2, XT_DROP, XT__27PROMPT, XT__40EXECUTE, XT_EXIT,
-/* 0xd5c: [ */ F_tokenDoList, XT_doLIT, XT__24INTERPRET, XT__27EVAL, XT__21, XT_EXIT,
-/* 0xd68: PRESET */ F_tokenDoList, XT_SP0, XT__40, XT_SP_21, XT_TIB0, XT__23TIB, XT_CELL_2B, XT__21, XT_EXIT,
-/* 0xd7a: XIO */ F_tokenDoList, XT_doLIT, XT_accept, XT__27EXPECT, XT__21, XT__27TAP, XT__21, XT__27ECHO, XT__21, XT__27PROMPT, XT__21, XT_EXIT,
-/* 0xd92: FILE */ F_tokenDoList, XT_doLIT, XT_PACE, XT_doLIT, XT_DROP, XT_doLIT, XT_kTAP, XT_XIO, XT_EXIT,
-/* 0xda4: HAND */ F_tokenDoList, XT_doLIT, XT__2EOK, XT_doLIT, XT_EMIT, XT_doLIT, XT_kTAP, XT_XIO, XT_EXIT,
-/* 0xdb6: I/O */ F_tokenCreate, 0, XT__3FRX, XT_TX_21,
-/* 0xdbe: CONSOLE */ F_tokenDoList, XT_I_2FO, XT_2_40, XT__27_3FKEY, XT_2_21, XT_HAND, XT_EXIT,
-/* 0xdcc: que */ F_tokenDoList, XT_QUERY, XT_EVAL, XT_EXIT,
-/* 0xdd4: quitError */ F_tokenDoList, XT_NULL_24, XT_OVER, XT_XOR, XT__3Fbranch, XT_quitError + 0x2c, XT_CR, XT_TIB, XT__23TIB, XT__40, XT_TYPE, XT_CR, XT__3EIN, XT__40, XT_doLIT, 0x5e, XT_CHARS, XT_CR, XT__2E_24, XT__2E_22_7C, 0x2003, 0x203f, XT_PRESET, XT_EXIT,
-/* 0xe04: QUIT */ F_tokenDoList, XT_RP0, XT__40, XT_RP_21, XT__5B, XT_doLIT, XT_que, XT_CATCH, XT__3FDUP, XT__3Fbranch, XT_QUIT + 0xa, XT_CONSOLE, XT_quitError, XT_branch, XT_QUIT + 8, XT_EXIT,
-/* 0xe24: quit1 */ F_tokenDoList, XT_doLIT, XT_EVAL, XT_CATCH, XT__3FDUP, XT__3Fbranch, XT_quit1 + 0x12, XT_quitError, XT__5B, XT_EXIT,
-/* 0xe38: ' */ F_tokenDoList, XT_TOKEN, XT_NAME_3F, XT__3Fbranch, XT__27 + 0xc, XT_EXIT, XT_THROW, XT_EXIT,
-/* 0xe48: ALLOT */ F_tokenDoList, XT_CP, XT__2B_21, XT_EXIT,
-/* 0xe50: vALLOT */ F_tokenDoList, XT_VP, XT__40, XT__3Fbranch, XT_vALLOT + 0x12, XT_VP, XT__2B_21, XT_branch, XT_vALLOT + 0x14, XT_ALLOT, XT_EXIT,
-/* 0xe66: [COMPILE] */ F_tokenDoList, XT__27, XT__2C, XT_EXIT,
-/* 0xe6e: RECURSE */ F_tokenDoList, XT_LAST, XT__40, XT_NAME_3E, XT__2C, XT_EXIT,
-/* 0xe7a: $" */ F_tokenDoList, XT_COMPILE, XT__24_22_7C, XT__24_2C_22, XT_EXIT,
-/* 0xe84: ?UNIQUE */ F_tokenDoList, XT_DUP, XT_NAME_3F, XT__3Fbranch, XT__3FUNIQUE + 0x18, XT__2E_22_7C, 0x2007, 0x6572, 0x6544, 0x2066, XT_OVER, XT__2E_24, XT_DROP, XT_EXIT,
-/* 0xea0: $,n */ F_tokenDoList, XT_DUP, XT_C_40, XT__3Fbranch, XT__24_2Cn + 0x30, XT__3FUNIQUE, XT_DUP, XT_LAST, XT__21, XT_HERE, XT_ALIGNED, XT_SWAP, XT_CELL_2D, XT_CURRENT, XT__40, XT__40, XT_OVER, XT__21, XT_CELL_2D, XT_DUP, XT_NP, XT__21, XT__21, XT_EXIT, XT__24_22_7C, 0x6e04, 0x6d61, 0x65, XT_THROW, XT_EXIT,
-/* 0xedc: $COMPILE */ F_tokenDoList, XT_NAME_3F, XT__3FDUP, XT__3Fbranch, XT__24COMPILE + 0x1e, XT_C_40, XT_IMED, XT_AND, XT__3Fbranch, XT__24COMPILE + 0x1a, XT_EXECUTE, XT_branch, XT__24COMPILE + 0x1c, XT__2C, XT_EXIT, XT__27NUMBER, XT__40EXECUTE, XT__3Fbranch, XT__24COMPILE + 0x2a, XT_LITERAL, XT_EXIT, XT_THROW, XT_EXIT,
-/* 0xf0a: OVERT */ F_tokenDoList, XT_LAST, XT__40, XT_CURRENT, XT__40, XT__21, XT_EXIT,
-/* 0xf18: ; */ F_tokenDoList, XT_COMPILE, XT_EXIT, XT__5B, XT_OVERT, XT_EXIT,
-/* 0xf24: ] */ F_tokenDoList, XT_doLIT, XT__24COMPILE, XT__27EVAL, XT__21, XT_EXIT,
-/* 0xf30: : */ F_tokenDoList, XT_TOKEN, XT__24_2Cn, XT_tokenDoList, XT__2C, XT__5D, XT_EXIT,
-/* 0xf3e: USER */ F_tokenDoList, XT_TOKEN, XT__24_2Cn, XT_OVERT, XT_tokenUser, XT__2C, XT_EXIT,
-/* 0xf4c: create */ F_tokenDoList, XT_TOKEN, XT__24_2Cn, XT_OVERT, XT__2C, XT_doLIT, 0, XT__2C, XT_EXIT,
-/* 0xf5e: CREATE */ F_tokenDoList, XT_tokenCreate, XT_create, XT_EXIT,
-/* 0xf66: vCREATE */ F_tokenDoList, XT_VP, XT__40, XT__3FDUP, XT_0_3D, XT__3Fbranch, XT_vCREATE + 0x14, XT_CREATE, XT_branch, XT_vCREATE + 0x1a, XT_tokenVar, XT_create, XT__2C, XT_EXIT,
-/* 0xf82: VARIABLE */ F_tokenDoList, XT_vCREATE, XT_doLIT, 0, XT_v_2C, XT_EXIT,
-/* 0xf8e: CONSTANT */ F_tokenDoList, XT_TOKEN, XT__24_2Cn, XT_OVERT, XT_tokenNextVal, XT__2C, XT__2C, XT_EXIT,
-/* 0xf9e: _TYPE */ F_tokenDoList, XT__3ER, XT_branch, XT__5FTYPE + 0x16, XT_DUP, XT_C_40, XT__3ECHAR, XT_EMIT, XT_doLIT, 1, XT__2B, XT_next, XT__5FTYPE + 8, XT_DROP, XT_EXIT,
-/* 0xfbc: dm+ */ F_tokenDoList, XT_OVER, XT_doLIT, 4, XT_U_2ER, XT_SPACE, XT__3ER, XT_branch, XT_dm_2B + 0x22, XT_DUP, XT_C_40, XT_doLIT, 3, XT_U_2ER, XT_doLIT, 1, XT__2B, XT_next, XT_dm_2B + 0x12, XT_EXIT,
-/* 0xfe4: DUMP */ F_tokenDoList, XT_BASE, XT__40, XT__3ER, XT_HEX, XT_doLIT, 0x10, XT__2F, XT__3ER, XT_CR, XT_doLIT, 0x10, XT_2DUP, XT_dm_2B, XT__2DROT, XT_doLIT, 2, XT_SPACES, XT__5FTYPE, XT_NUF_3F, XT_0_3D, XT__3Fbranch, XT_DUMP + 0x36, XT_next, XT_DUMP + 0x12, XT_branch, XT_DUMP + 0x3a, XT_R_3E, XT_DROP, XT_DROP, XT_R_3E, XT_BASE, XT__21, XT_EXIT,
-/* 0x1028: .S */ F_tokenDoList, XT_CR, XT_DEPTH, XT__3ER, XT_branch, XT__2ES + 0x12, XT_R_40, XT_PICK, XT__2E, XT_next, XT__2ES + 0xc, XT__2E_22_7C, 0x2004, 0x733c, 0x70, XT_EXIT,
-/* 0x1048: .BASE */ F_tokenDoList, XT_BASE, XT__40, XT_DECIMAL, XT_DUP, XT__2E, XT_BASE, XT__21, XT_EXIT,
-/* 0x105a: .FREE */ F_tokenDoList, XT_CP, XT_2_40, XT__2D, XT_U_2E, XT_EXIT,
-/* 0x1066: !CSP */ F_tokenDoList, XT_SP_40, XT_CSP, XT__21, XT_EXIT,
-/* 0x1070: ?CSP */ F_tokenDoList, XT_SP_40, XT_CSP, XT__40, XT_XOR, XT_abort_22, 0x730b, 0x6174, 0x6b63, 0x6420, 0x7065, 0x6874, XT_EXIT,
-/* 0x108a: .ID */ F_tokenDoList, XT__3FDUP, XT__3Fbranch, XT__2EID + 0x12, XT_COUNT, XT_BYTEMASK, XT_AND, XT__5FTYPE, XT_EXIT, XT__2E_22_7C, 0x7b08, 0x6f6e, 0x614e, 0x656d, 0x7d, XT_EXIT,
-/* 0x10aa: WORDS */ F_tokenDoList, XT_CR, XT_CONTEXT, XT__40, XT__40, XT__3FDUP, XT__3Fbranch, XT_WORDS + 0x20, XT_DUP, XT_SPACE, XT__2EID, XT_CELL_2D, XT_NUF_3F, XT__3Fbranch, XT_WORDS + 8, XT_DROP, XT_EXIT,
-/* 0x10cc: FORTH>NAME */ F_tokenDoList, XT_CURRENT, XT_CELL_2B, XT__40, XT__3FDUP, XT__3Fbranch, XT_FORTH_3ENAME + 0x36, XT_2DUP, XT__40, XT_DUP, XT__3Fbranch, XT_FORTH_3ENAME + 0x28, XT_2DUP, XT_NAME_3E, XT_XOR, XT__3Fbranch, XT_FORTH_3ENAME + 0x28, XT_CELL_2D, XT_branch, XT_FORTH_3ENAME + 0x10, XT_NIP, XT__3FDUP, XT__3Fbranch, XT_FORTH_3ENAME + 4, XT_NIP, XT_NIP, XT_EXIT, XT_DROP, XT_doLIT, 0, XT_EXIT,
-/* 0x110a: SEE */ F_tokenDoList, XT__27, XT_CR, XT_DUP, XT__40, XT_tokenDoList, XT__3D, XT__3Fbranch, XT_SEE + 0x6a, XT__2E_22_7C, 0x3a02, 0x20, XT_DUP, XT__3ENAME, XT__2EID, XT_CELL_2B, XT_DUP, XT__40, XT_DUP, XT__3Fbranch, XT_SEE + 0x2c, XT__3ENAME, XT__3FDUP, XT__3Fbranch, XT_SEE + 0x5a, XT_SPACE, XT__2EID, XT_DUP, XT__40, XT_doLIT, XT_EXIT, XT__3D, XT_OVER, XT_CELL_2B, XT__40, XT_doLIT, 0x14, XT__3C, XT_AND, XT__3Fbranch, XT_SEE + 0x56, XT_DROP, XT_EXIT, XT_branch, XT_SEE + 0x60, XT_DUP, XT__40, XT_U_2E, XT_NUF_3F, XT__3Fbranch, XT_SEE + 0x1e, XT_branch, XT_SEE + 0x82, XT__2E_22_7C, 0x4e14, 0x746f, 0x6320, 0x6c6f, 0x6e6f, 0x6420, 0x6665, 0x6e69, 0x7469, 0x6f69, 0x6e, XT_DROP, XT_EXIT,
-/* 0x1190: VER */ F_tokenNextVal, 0xb,
-/* 0x1194: version */ F_tokenDoList, XT_CR, XT__2E_22_7C, 0x770a, 0x6265, 0x4f46, 0x5452, 0x2048, 0x56, XT_VER, XT__3C_23, XT__23, XT__23, XT_doLIT, 0x2e, XT_HOLD, XT__23, XT__23, XT_doLIT, 0x2e, XT_HOLD, XT__23, XT__23_3E, XT_TYPE, XT_CR, XT_EXIT,
-/* 0x11c8: hi */ F_tokenDoList, XT__21IO, XT_version, XT_EXIT,
-/* 0x11d0: EMPTY */ F_tokenDoList, XT_FORTH, XT_CONTEXT, XT__40, XT_DUP, XT_CURRENT, XT_2_21, XT_EXIT,
-/* 0x11e0: 'BOOT */ F_tokenCreate, 0, XT_hi,
-/* 0x11e6: COLD */ F_tokenDoList, XT_userAreaInit, XT_PRESET, XT_CONSOLE, XT__27BOOT, XT__40EXECUTE, XT_EMPTY, XT_OVERT, XT_QUIT, XT_branch, XT_COLD + 2, XT_EXIT,
-/* 0x11fe: WARM */ F_tokenDoList, XT_CONSOLE, XT__27BOOT, XT__40EXECUTE, XT_QUIT, XT_EXIT,
+/* 0x39e: ud< */ F_tokenDoList, XT_ROT, XT_SWAP, XT_U_3C, XT__3Fbranch, XT_ud_3C + 0x16, XT_2DROP, XT_doLIT, 0xffff, XT_branch, XT_ud_3C + 0x18, XT_U_3C, XT_EXIT,
+/* 0x3b8: < */ F_tokenDoList, XT_2DUP, XT_XOR, XT_0_3C, XT__3Fbranch, XT__3C + 0x12, XT_DROP, XT_0_3C, XT_EXIT, XT__2D, XT_0_3C, XT_EXIT,
+/* 0x3d0: MAX */ F_tokenDoList, XT_2DUP, XT__3C, XT__3Fbranch, XT_MAX + 0xc, XT_SWAP, XT_DROP, XT_EXIT,
+/* 0x3e0: MIN */ F_tokenDoList, XT_2DUP, XT_SWAP, XT__3C, XT__3Fbranch, XT_MIN + 0xe, XT_SWAP, XT_DROP, XT_EXIT,
+/* 0x3f2: WITHIN */ F_tokenDoList, XT_OVER, XT__2D, XT__3ER, XT__2D, XT_R_3E, XT_U_3C, XT_EXIT,
+/* 0x402: UM/MOD */ F_tokenDoList, XT_2DUP, XT_U_3C, XT__3Fbranch, XT_UM_2FMOD + 0x58, XT_NEGATE, XT_CELLbits, XT__3ER, XT_branch, XT_UM_2FMOD + 0x4e, XT__3ER, XT_DUP, XT_UM_2B, XT__3ER, XT__3ER, XT_DUP, XT_UM_2B, XT_R_3E, XT__2B, XT_DUP, XT_R_3E, XT_R_40, XT_SWAP, XT__3ER, XT_UM_2B, XT_R_3E, XT_OR, XT__3Fbranch, XT_UM_2FMOD + 0x4a, XT__3ER, XT_DROP, XT_doLIT, 1, XT__2B, XT_R_3E, XT_branch, XT_UM_2FMOD + 0x4c, XT_DROP, XT_R_3E, XT_next, XT_UM_2FMOD + 0x14, XT_DROP, XT_SWAP, XT_EXIT, XT_DROP, XT_2DROP, XT_doLIT, 0xffff, XT_DUP, XT_EXIT,
+/* 0x466: M/MOD */ F_tokenDoList, XT_DUP, XT_0_3C, XT_DUP, XT__3ER, XT__3Fbranch, XT_M_2FMOD + 0x16, XT_NEGATE, XT__3ER, XT_DNEGATE, XT_R_3E, XT__3ER, XT_DUP, XT_0_3C, XT__3Fbranch, XT_M_2FMOD + 0x24, XT_R_40, XT__2B, XT_R_3E, XT_UM_2FMOD, XT_R_3E, XT__3Fbranch, XT_M_2FMOD + 0x34, XT_SWAP, XT_NEGATE, XT_SWAP, XT_EXIT,
+/* 0x49c: /MOD */ F_tokenDoList, XT_OVER, XT_0_3C, XT_SWAP, XT_M_2FMOD, XT_EXIT,
+/* 0x4a8: MOD */ F_tokenDoList, XT__2FMOD, XT_DROP, XT_EXIT,
+/* 0x4b0: / */ F_tokenDoList, XT__2FMOD, XT_NIP, XT_EXIT,
+/* 0x4b8: UM* */ F_tokenDoList, XT_doLIT, 0, XT_SWAP, XT_CELLbits, XT__3ER, XT_branch, XT_UM_2A + 0x30, XT_DUP, XT_UM_2B, XT__3ER, XT__3ER, XT_DUP, XT_UM_2B, XT_R_3E, XT__2B, XT_R_3E, XT__3Fbranch, XT_UM_2A + 0x30, XT__3ER, XT_OVER, XT_UM_2B, XT_R_3E, XT__2B, XT_next, XT_UM_2A + 0x10, XT_ROT, XT_DROP, XT_EXIT,
+/* 0x4f2: * */ F_tokenDoList, XT_UM_2A, XT_DROP, XT_EXIT,
+/* 0x4fa: M* */ F_tokenDoList, XT_2DUP, XT_XOR, XT_0_3C, XT__3ER, XT_ABS, XT_SWAP, XT_ABS, XT_UM_2A, XT_R_3E, XT__3Fbranch, XT_M_2A + 0x1a, XT_DNEGATE, XT_EXIT,
+/* 0x516: * /MOD */ F_tokenDoList, XT__3ER, XT_M_2A, XT_R_3E, XT_M_2FMOD, XT_EXIT,
+/* 0x522: * / */ F_tokenDoList, XT__2A_2FMOD, XT_NIP, XT_EXIT,
+/* 0x52a: CELL- */ F_tokenDoList, XT_CELLL, XT__2D, XT_EXIT,
+/* 0x532: CELLS */ F_tokenDoList, XT_CELLL, XT__2A, XT_EXIT,
+/* 0x53a: >CHAR */ F_tokenDoList, XT_doLIT, 0x7f, XT_AND, XT_DUP, XT_doLIT, 0x7f, XT_BL, XT_WITHIN, XT__3Fbranch, XT__3ECHAR + 0x1c, XT_DROP, XT_doLIT, 0x5f, XT_EXIT,
+/* 0x558: DEPTH */ F_tokenDoList, XT_SP_40, XT_SP0, XT__40, XT_SWAP, XT__2D, XT_CELLL, XT__2F, XT_EXIT,
+/* 0x56a: PICK */ F_tokenDoList, XT_doLIT, 1, XT__2B, XT_CELLS, XT_SP_40, XT__2B, XT__40, XT_EXIT,
+/* 0x57c: +! */ F_tokenDoList, XT_SWAP, XT_OVER, XT__40, XT__2B, XT_SWAP, XT__21, XT_EXIT,
+/* 0x58c: 2! */ F_tokenDoList, XT_SWAP, XT_OVER, XT__21, XT_CELL_2B, XT__21, XT_EXIT,
+/* 0x59a: 2@ */ F_tokenDoList, XT_DUP, XT_CELL_2B, XT__40, XT_SWAP, XT__40, XT_EXIT,
+/* 0x5a8: vHERE */ F_tokenDoList, XT_VP, XT__40, XT__3FDUP, XT__3Fbranch, XT_vHERE + 0xe, XT_EXIT, XT_HERE, XT_EXIT,
+/* 0x5ba: v, */ F_tokenDoList, XT_VP, XT__40, XT__3FDUP, XT__3Fbranch, XT_v_2C + 0x1c, XT_ALIGNED, XT_DUP, XT_CELL_2B, XT_VP, XT__21, XT__21, XT_branch, XT_v_2C + 0x1e, XT__2C, XT_EXIT,
+/* 0x5da: vALIGN */ F_tokenDoList, XT_VP, XT__40, XT_ALIGNED, XT_VP, XT__21, XT_EXIT,
+/* 0x5e8: vCREATE */ F_tokenDoList, XT_VP, XT__40, XT__3FDUP, XT__3Fbranch, XT_vCREATE + 0x18, XT_tokenVar, XT_create, XT_vALIGN, XT__2C, XT_branch, XT_vCREATE + 0x1a, XT_CREATE, XT_EXIT,
+/* 0x604: PAD */ F_tokenDoList, XT_HERE, XT_doLIT, 0x50, XT__2B, XT_EXIT,
+/* 0x610: TIB */ F_tokenDoList, XT__23TIB, XT_CELL_2B, XT__40, XT_EXIT,
+/* 0x61a: @EXECUTE */ F_tokenDoList, XT__40, XT__3FDUP, XT__3Fbranch, XT__40EXECUTE + 0x10, XT_EXECUTE, XT_branch, XT__40EXECUTE + 0x12, XT_Fbreak, XT_EXIT,
+/* 0x62e: COUNT */ F_tokenDoList, XT_DUP, XT_doLIT, 1, XT__2B, XT_SWAP, XT_C_40, XT_EXIT,
+/* 0x63e: CMOVE */ F_tokenDoList, XT__3ER, XT_branch, XT_CMOVE + 0x20, XT__3ER, XT_DUP, XT_C_40, XT_R_40, XT_C_21, XT_doLIT, 1, XT__2B, XT_R_3E, XT_doLIT, 1, XT__2B, XT_next, XT_CMOVE + 8, XT_2DROP, XT_EXIT,
+/* 0x666: FILL */ F_tokenDoList, XT_SWAP, XT__3ER, XT_SWAP, XT_branch, XT_FILL + 0x16, XT_2DUP, XT_C_21, XT_doLIT, 1, XT__2B, XT_next, XT_FILL + 0xc, XT_2DROP, XT_EXIT,
+/* 0x684: -TRAILING */ F_tokenDoList, XT__3ER, XT_branch, XT__2DTRAILING + 0x22, XT_BL, XT_OVER, XT_R_40, XT__2B, XT_C_40, XT__3C, XT__3Fbranch, XT__2DTRAILING + 0x22, XT_R_3E, XT_doLIT, 1, XT__2B, XT_EXIT, XT_next, XT__2DTRAILING + 8, XT_doLIT, 0, XT_EXIT,
+/* 0x6b0: PACK$ */ F_tokenDoList, XT_ALIGNED, XT_DUP, XT__3ER, XT_OVER, XT_DUP, XT_doLIT, 0, XT_CELLL, XT_UM_2FMOD, XT_DROP, XT__2D, XT_OVER, XT__2B, XT_doLIT, 0, XT_SWAP, XT__21, XT_2DUP, XT_C_21, XT_doLIT, 1, XT__2B, XT_SWAP, XT_CMOVE, XT_R_3E, XT_EXIT,
+/* 0x6e6: DIGIT */ F_tokenDoList, XT_doLIT, 9, XT_OVER, XT__3C, XT_doLIT, 7, XT_AND, XT__2B, XT_doLIT, 0x30, XT__2B, XT_EXIT,
+/* 0x700: EXTRACT */ F_tokenDoList, XT_doLIT, 0, XT_SWAP, XT_UM_2FMOD, XT_SWAP, XT_DIGIT, XT_EXIT,
+/* 0x710: <# */ F_tokenDoList, XT_PAD, XT_HLD, XT__21, XT_EXIT,
+/* 0x71a: HOLD */ F_tokenDoList, XT_HLD, XT__40, XT_doLIT, 1, XT__2D, XT_DUP, XT_HLD, XT__21, XT_C_21, XT_EXIT,
+/* 0x730: # */ F_tokenDoList, XT_BASE, XT__40, XT_EXTRACT, XT_HOLD, XT_EXIT,
+/* 0x73c: #S */ F_tokenDoList, XT__23, XT_DUP, XT__3Fbranch, XT__23S + 0xe, XT_branch, XT__23S + 2, XT_EXIT,
+/* 0x74c: SIGN */ F_tokenDoList, XT_0_3C, XT__3Fbranch, XT_SIGN + 0xe, XT_doLIT, 0x2d, XT_HOLD, XT_EXIT,
+/* 0x75c: #> */ F_tokenDoList, XT_DROP, XT_HLD, XT__40, XT_PAD, XT_OVER, XT__2D, XT_EXIT,
+/* 0x76c: EMIT */ F_tokenDoList, XT__27EMIT, XT__40EXECUTE, XT_EXIT,
+/* 0x774: SPACE */ F_tokenDoList, XT_BL, XT_EMIT, XT_EXIT,
+/* 0x77c: CHARS */ F_tokenDoList, XT_SWAP, XT_doLIT, 0, XT_MAX, XT__3ER, XT_branch, XT_CHARS + 0x14, XT_DUP, XT_EMIT, XT_next, XT_CHARS + 0x10, XT_DROP, XT_EXIT,
+/* 0x798: SPACES */ F_tokenDoList, XT_BL, XT_CHARS, XT_EXIT,
+/* 0x7a0: TYPE */ F_tokenDoList, XT__3ER, XT_branch, XT_TYPE + 0x14, XT_DUP, XT_C_40, XT_EMIT, XT_doLIT, 1, XT__2B, XT_next, XT_TYPE + 8, XT_DROP, XT_EXIT,
+/* 0x7bc: .$ */ F_tokenDoList, XT_COUNT, XT_TYPE, XT_EXIT,
+/* 0x7c4: str */ F_tokenDoList, XT_DUP, XT__3ER, XT_ABS, XT__3C_23, XT__23S, XT_R_3E, XT_SIGN, XT__23_3E, XT_EXIT,
+/* 0x7d8: HEX */ F_tokenDoList, XT_doLIT, 0x10, XT_BASE, XT__21, XT_EXIT,
+/* 0x7e4: DECIMAL */ F_tokenDoList, XT_doLIT, 0xa, XT_BASE, XT__21, XT_EXIT,
+/* 0x7f0: .R */ F_tokenDoList, XT__3ER, XT_str, XT_R_3E, XT_OVER, XT__2D, XT_SPACES, XT_TYPE, XT_EXIT,
+/* 0x802: U.R */ F_tokenDoList, XT__3ER, XT__3C_23, XT__23S, XT__23_3E, XT_R_3E, XT_OVER, XT__2D, XT_SPACES, XT_TYPE, XT_EXIT,
+/* 0x818: U. */ F_tokenDoList, XT__3C_23, XT__23S, XT__23_3E, XT_SPACE, XT_TYPE, XT_EXIT,
+/* 0x826: . */ F_tokenDoList, XT_BASE, XT__40, XT_doLIT, 0xa, XT_XOR, XT__3Fbranch, XT__2E + 0x14, XT_U_2E, XT_EXIT, XT_str, XT_SPACE, XT_TYPE, XT_EXIT,
+/* 0x842: ? */ F_tokenDoList, XT__40, XT__2E, XT_EXIT,
+/* 0x84a: DIGIT? */ F_tokenDoList, XT__3ER, XT_doLIT, 0x30, XT__2D, XT_doLIT, 9, XT_OVER, XT__3C, XT__3Fbranch, XT_DIGIT_3F + 0x26, XT_doLIT, 7, XT__2D, XT_DUP, XT_doLIT, 0xa, XT__3C, XT_OR, XT_DUP, XT_R_3E, XT_U_3C, XT_EXIT,
+/* 0x878: NUMBER? */ F_tokenDoList, XT_BASE, XT__40, XT__3ER, XT_doLIT, 0, XT_OVER, XT_COUNT, XT_OVER, XT_C_40, XT_doLIT, 0x24, XT__3D, XT__3Fbranch, XT_NUMBER_3F + 0x30, XT_HEX, XT_SWAP, XT_doLIT, 1, XT__2B, XT_SWAP, XT_doLIT, 1, XT__2D, XT_OVER, XT_C_40, XT_doLIT, 0x2d, XT__3D, XT__3ER, XT_SWAP, XT_R_40, XT__2D, XT_SWAP, XT_R_40, XT__2B, XT__3FDUP, XT__3Fbranch, XT_NUMBER_3F + 0x9a, XT_doLIT, 1, XT__2D, XT__3ER, XT_DUP, XT__3ER, XT_C_40, XT_BASE, XT__40, XT_DIGIT_3F, XT__3Fbranch, XT_NUMBER_3F + 0x8c, XT_SWAP, XT_BASE, XT__40, XT__2A, XT__2B, XT_R_3E, XT_doLIT, 1, XT__2B, XT_next, XT_NUMBER_3F + 0x56, XT_DROP, XT_R_40, XT__3Fbranch, XT_NUMBER_3F + 0x86, XT_NEGATE, XT_SWAP, XT_branch, XT_NUMBER_3F + 0x98, XT_R_3E, XT_R_3E, XT_2DROP, XT_2DROP, XT_doLIT, 0, XT_DUP, XT_R_3E, XT_2DROP, XT_R_3E, XT_BASE, XT__21, XT_EXIT,
+/* 0x91e: ?KEY */ F_tokenDoList, XT__27_3FKEY, XT__40EXECUTE, XT_EXIT,
+/* 0x926: KEY */ F_tokenDoList, XT_doLIT, 0, XT_MS, XT_doLIT, XT_BYE, XT__3FKEY, XT__3Fbranch, XT_KEY + 6, XT_NIP, XT_EXIT,
+/* 0x93c: NUF? */ F_tokenDoList, XT__3FKEY, XT_DUP, XT__3Fbranch, XT_NUF_3F + 0x14, XT_2DROP, XT_KEY, XT_doLIT, 0xd, XT__3D, XT_EXIT,
+/* 0x952: PACE */ F_tokenDoList, XT_doLIT, 0xb, XT_EMIT, XT_EXIT,
+/* 0x95c: CR */ F_tokenDoList, XT_doLIT, 0xd, XT_EMIT, XT_doLIT, 0xa, XT_EMIT, XT_EXIT,
+/* 0x96c: do$ */ F_tokenDoList, XT_R_3E, XT_R_40, XT_R_3E, XT_COUNT, XT__2B, XT_ALIGNED, XT__3ER, XT_SWAP, XT__3ER, XT_EXIT,
+/* 0x982: $"| */ F_tokenDoList, XT_do_24, XT_EXIT,
+/* 0x988: ."| */ F_tokenDoList, XT_do_24, XT__2E_24, XT_EXIT,
+/* 0x990: S"| */ F_tokenDoList, XT_do_24, XT_COUNT, XT_EXIT,
+/* 0x998: parse */ F_tokenDoList, XT_temp, XT__21, XT_OVER, XT__3ER, XT_DUP, XT__3Fbranch, XT_parse + 0x9a, XT_doLIT, 1, XT__2D, XT_temp, XT__40, XT_BL, XT__3D, XT__3Fbranch, XT_parse + 0x4c, XT__3ER, XT_BL, XT_OVER, XT_C_40, XT__2D, XT_0_3C, XT_INVERT, XT__3Fbranch, XT_parse + 0x4a, XT_doLIT, 1, XT__2B, XT_next, XT_parse + 0x24, XT_R_3E, XT_DROP, XT_doLIT, 0, XT_DUP, XT_EXIT, XT_R_3E, XT_OVER, XT_SWAP, XT__3ER, XT_temp, XT__40, XT_OVER, XT_C_40, XT__2D, XT_temp, XT__40, XT_BL, XT__3D, XT__3Fbranch, XT_parse + 0x6a, XT_0_3C, XT__3Fbranch, XT_parse + 0x80, XT_doLIT, 1, XT__2B, XT_next, XT_parse + 0x52, XT_DUP, XT__3ER, XT_branch, XT_parse + 0x8e, XT_R_3E, XT_DROP, XT_DUP, XT_doLIT, 1, XT__2B, XT__3ER, XT_OVER, XT__2D, XT_R_3E, XT_R_3E, XT__2D, XT_EXIT, XT_OVER, XT_R_3E, XT__2D, XT_EXIT,
+/* 0xa3a: PARSE */ F_tokenDoList, XT__3ER, XT_TIB, XT__3EIN, XT__40, XT__2B, XT__23TIB, XT__40, XT__3EIN, XT__40, XT__2D, XT_R_3E, XT_parse, XT__3EIN, XT__2B_21, XT_EXIT,
+/* 0xa5a: CHAR */ F_tokenDoList, XT_BL, XT_PARSE, XT_DROP, XT_C_40, XT_EXIT,
+/* 0xa66: CTRL */ F_tokenDoList, XT_CHAR, XT_doLIT, 0x1f, XT_AND, XT_EXIT,
+/* 0xa72: .( */ F_tokenDoList, XT_doLIT, 0x29, XT_PARSE, XT_TYPE, XT_EXIT,
+/* 0xa7e: TOKEN */ F_tokenDoList, XT_BL, XT_PARSE, XT_BYTEMASK, XT_MIN, XT_NP, XT__40, XT_OVER, XT__2D, XT_CELLL, XT__2D, XT_PACK_24, XT_EXIT,
+/* 0xa98: WORD */ F_tokenDoList, XT_PARSE, XT_HERE, XT_PACK_24, XT_EXIT,
+/* 0xaa2: NAME> */ F_tokenDoList, XT_doLIT, 2, XT_CELLS, XT__2D, XT__40, XT_EXIT,
+/* 0xab0: SAME? */ F_tokenDoList, XT__3ER, XT_branch, XT_SAME_3F + 0x2a, XT_OVER, XT_R_40, XT_CELLS, XT__2B, XT__40, XT_OVER, XT_R_40, XT_CELLS, XT__2B, XT__40, XT__2D, XT__3FDUP, XT__3Fbranch, XT_SAME_3F + 0x2a, XT_R_3E, XT_DROP, XT_EXIT, XT_next, XT_SAME_3F + 8, XT_doLIT, 0, XT_EXIT,
+/* 0xae4: FORTHfind */ F_tokenDoList, XT_SWAP, XT_DUP, XT_C_40, XT_CELLL, XT__2F, XT_temp, XT__21, XT_DUP, XT__40, XT__3ER, XT_CELL_2B, XT_SWAP, XT__40, XT_DUP, XT__3Fbranch, XT_FORTHfind + 0x4a, XT_DUP, XT__40, XT_doLIT, 0xff1f, XT_AND, XT_R_40, XT_XOR, XT__3Fbranch, XT_FORTHfind + 0x3e, XT_CELL_2B, XT_doLIT, 0xffff, XT_branch, XT_FORTHfind + 0x46, XT_CELL_2B, XT_temp, XT__40, XT_SAME_3F, XT_branch, XT_FORTHfind + 0x56, XT_R_3E, XT_DROP, XT_SWAP, XT_CELL_2D, XT_SWAP, XT_EXIT, XT__3Fbranch, XT_FORTHfind + 0x62, XT_CELL_2D, XT_CELL_2D, XT_branch, XT_FORTHfind + 0x1a, XT_R_3E, XT_DROP, XT_NIP, XT_CELL_2D, XT_DUP, XT_NAME_3E, XT_SWAP, XT_EXIT,
+/* 0xb56: NAME? */ F_tokenDoList, XT_CONTEXT, XT_DUP, XT_2_40, XT_XOR, XT__3Fbranch, XT_NAME_3F + 0x10, XT_CELL_2D, XT__3ER, XT_R_3E, XT_CELL_2B, XT_DUP, XT__3ER, XT__40, XT__3FDUP, XT__3Fbranch, XT_NAME_3F + 0x30, XT_find, XT__3FDUP, XT__3Fbranch, XT_NAME_3F + 0x12, XT_R_3E, XT_DROP, XT_EXIT, XT_R_3E, XT_DROP, XT_doLIT, 0, XT_EXIT,
+/* 0xb90: ^H */ F_tokenDoList, XT__3ER, XT_OVER, XT_R_40, XT__3C, XT_DUP, XT__3Fbranch, XT__5EH + 0x26, XT_doLIT, 8, XT__27ECHO, XT__40EXECUTE, XT_BL, XT__27ECHO, XT__40EXECUTE, XT_doLIT, 8, XT__27ECHO, XT__40EXECUTE, XT_R_3E, XT__2B, XT_EXIT,
+/* 0xbbc: TAP */ F_tokenDoList, XT_DUP, XT__27ECHO, XT__40EXECUTE, XT_OVER, XT_C_21, XT_doLIT, 1, XT__2B, XT_EXIT,
+/* 0xbd0: crlf? */ F_tokenDoList, XT_DUP, XT_doLIT, 0xa, XT__3D, XT_SWAP, XT_doLIT, 0xd, XT__3D, XT_OR, XT_EXIT,
+/* 0xbe6: kTAP */ F_tokenDoList, XT_DUP, XT_crlf_3F, XT_0_3D, XT__3Fbranch, XT_kTAP + 0x2c, XT_doLIT, 8, XT__3D, XT_OVER, XT_doLIT, 0x7f, XT__3D, XT_OR, XT__3Fbranch, XT_kTAP + 0x28, XT_BL, XT_TAP, XT_branch, XT_kTAP + 0x2a, XT__5EH, XT_EXIT, XT_DROP, XT_NIP, XT_DUP, XT_EXIT,
+/* 0xc1a: accept */ F_tokenDoList, XT_OVER, XT__2B, XT_OVER, XT_2DUP, XT_XOR, XT__3Fbranch, XT_accept + 0x30, XT_KEY, XT_DUP, XT_BL, XT__2D, XT_doLIT, 0x5f, XT_U_3C, XT__3Fbranch, XT_accept + 0x28, XT_TAP, XT_branch, XT_accept + 0x2c, XT__27TAP, XT__40EXECUTE, XT_branch, XT_accept + 8, XT_DROP, XT_OVER, XT__2D, XT_EXIT,
+/* 0xc52: EXPECT */ F_tokenDoList, XT__27EXPECT, XT__40EXECUTE, XT_SPAN, XT__21, XT_DROP, XT_EXIT,
+/* 0xc60: QUERY */ F_tokenDoList, XT_TIB, XT_doLIT, 0x50, XT__27EXPECT, XT__40EXECUTE, XT__23TIB, XT__21, XT_DROP, XT_doLIT, 0, XT__3EIN, XT__21, XT_EXIT,
+/* 0xc7c: CATCH */ F_tokenDoList, XT_SP_40, XT__3ER, XT_HANDLER, XT__40, XT__3ER, XT_RP_40, XT_HANDLER, XT__21, XT_EXECUTE, XT_R_3E, XT_HANDLER, XT__21, XT_R_3E, XT_DROP, XT_doLIT, 0, XT_EXIT,
+/* 0xca0: THROW */ F_tokenDoList, XT__3FDUP, XT__3Fbranch, XT_THROW + 0x20, XT_HANDLER, XT__40, XT_RP_21, XT_R_3E, XT_HANDLER, XT__21, XT_R_3E, XT_SWAP, XT__3ER, XT_SP_21, XT_DROP, XT_R_3E, XT_EXIT,
+/* 0xcc2: NULL$ */ F_tokenCreate, 0, 0,
+/* 0xcc8: ABORT */ F_tokenDoList, XT_NULL_24, XT_THROW, XT_EXIT,
+/* 0xcd0: abort" */ F_tokenDoList, XT__3Fbranch, XT_abort_22 + 0xa, XT_do_24, XT_THROW, XT_do_24, XT_DROP, XT_EXIT,
+/* 0xce0: $," */ F_tokenDoList, XT_doLIT, 0x22, XT_WORD, XT_COUNT, XT__2B, XT_ALIGNED, XT_CP, XT__21, XT_EXIT,
+/* 0xcf4: ABORT" */ F_tokenDoList, XT_COMPILE, XT_abort_22, XT__24_2C_22, XT_EXIT,
+/* 0xcfe: ." */ F_tokenDoList, XT_COMPILE, XT__2E_22_7C, XT__24_2C_22, XT_EXIT,
+/* 0xd08: $INTERPRET */ F_tokenDoList, XT_NAME_3F, XT__3FDUP, XT__3Fbranch, XT__24INTERPRET + 0x26, XT_C_40, XT_doLIT, 0x40, XT_AND, XT_abort_22, 0x630c, 0x6d6f, 0x6970, 0x656c, 0x4f20, 0x4c4e, 0x59, XT_EXECUTE, XT_EXIT, XT__27NUMBER, XT__40EXECUTE, XT__3Fbranch, XT__24INTERPRET + 0x30, XT_EXIT, XT_THROW, XT_EXIT,
+/* 0xd3c: .OK */ F_tokenDoList, XT_doLIT, XT__24INTERPRET, XT__27EVAL, XT__40, XT__3D, XT__3Fbranch, XT__2EOK + 0x16, XT__2E_22_7C, 0x2003, 0x6b6f, XT_CR, XT_EXIT,
+/* 0xd56: ?STACK */ F_tokenDoList, XT_DEPTH, XT_0_3C, XT_abort_22, 0x7509, 0x646e, 0x7265, 0x6c66, 0x776f, XT_EXIT,
+/* 0xd6a: EVAL */ F_tokenDoList, XT_TOKEN, XT_DUP, XT_C_40, XT__3Fbranch, XT_EVAL + 0x16, XT__27EVAL, XT__40EXECUTE, XT__3FSTACK, XT_branch, XT_EVAL + 2, XT_DROP, XT__27PROMPT, XT__40EXECUTE, XT_EXIT,
+/* 0xd88: [ */ F_tokenDoList, XT_doLIT, XT__24INTERPRET, XT__27EVAL, XT__21, XT_EXIT,
+/* 0xd94: PRESET */ F_tokenDoList, XT_SP0, XT__40, XT_SP_21, XT_TIB0, XT__23TIB, XT_CELL_2B, XT__21, XT_EXIT,
+/* 0xda6: XIO */ F_tokenDoList, XT_doLIT, XT_accept, XT__27EXPECT, XT__21, XT__27TAP, XT__21, XT__27ECHO, XT__21, XT__27PROMPT, XT__21, XT_EXIT,
+/* 0xdbe: FILE */ F_tokenDoList, XT_doLIT, XT_PACE, XT_doLIT, XT_DROP, XT_doLIT, XT_kTAP, XT_XIO, XT_EXIT,
+/* 0xdd0: HAND */ F_tokenDoList, XT_doLIT, XT__2EOK, XT_doLIT, XT_EMIT, XT_doLIT, XT_kTAP, XT_XIO, XT_EXIT,
+/* 0xde2: I/O */ F_tokenCreate, 0, XT__3FRX, XT_TX_21,
+/* 0xdea: CONSOLE */ F_tokenDoList, XT_I_2FO, XT_2_40, XT__27_3FKEY, XT_2_21, XT_HAND, XT_EXIT,
+/* 0xdf8: que */ F_tokenDoList, XT_QUERY, XT_EVAL, XT_EXIT,
+/* 0xe00: quitError */ F_tokenDoList, XT_NULL_24, XT_OVER, XT_XOR, XT__3Fbranch, XT_quitError + 0x2c, XT_CR, XT_TIB, XT__23TIB, XT__40, XT_TYPE, XT_CR, XT__3EIN, XT__40, XT_doLIT, 0x5e, XT_CHARS, XT_CR, XT__2E_24, XT__2E_22_7C, 0x2003, 0x203f, XT_PRESET, XT_EXIT,
+/* 0xe30: QUIT */ F_tokenDoList, XT_RP0, XT__40, XT_RP_21, XT__5B, XT_doLIT, XT_que, XT_CATCH, XT__3FDUP, XT__3Fbranch, XT_QUIT + 0xa, XT_CONSOLE, XT_quitError, XT_branch, XT_QUIT + 8, XT_EXIT,
+/* 0xe50: quit1 */ F_tokenDoList, XT_doLIT, XT_EVAL, XT_CATCH, XT__3FDUP, XT__3Fbranch, XT_quit1 + 0x12, XT_quitError, XT__5B, XT_EXIT,
+/* 0xe64: ' */ F_tokenDoList, XT_TOKEN, XT_NAME_3F, XT__3Fbranch, XT__27 + 0xc, XT_EXIT, XT_THROW, XT_EXIT,
+/* 0xe74: ALLOT */ F_tokenDoList, XT_CP, XT__2B_21, XT_EXIT,
+/* 0xe7c: vALLOT */ F_tokenDoList, XT_VP, XT__40, XT__3Fbranch, XT_vALLOT + 0x12, XT_VP, XT__2B_21, XT_branch, XT_vALLOT + 0x14, XT_ALLOT, XT_EXIT,
+/* 0xe92: [COMPILE] */ F_tokenDoList, XT__27, XT__2C, XT_EXIT,
+/* 0xe9a: RECURSE */ F_tokenDoList, XT_LAST, XT__40, XT_NAME_3E, XT__2C, XT_EXIT,
+/* 0xea6: $" */ F_tokenDoList, XT_COMPILE, XT__24_22_7C, XT__24_2C_22, XT_EXIT,
+/* 0xeb0: S" */ F_tokenDoList, XT_COMPILE, XT_S_22_7C, XT__24_2C_22, XT_EXIT,
+/* 0xeba: ?UNIQUE */ F_tokenDoList, XT_DUP, XT_NAME_3F, XT__3Fbranch, XT__3FUNIQUE + 0x18, XT__2E_22_7C, 0x2007, 0x6572, 0x6544, 0x2066, XT_OVER, XT__2E_24, XT_DROP, XT_EXIT,
+/* 0xed6: $,n */ F_tokenDoList, XT_DUP, XT_C_40, XT__3Fbranch, XT__24_2Cn + 0x30, XT__3FUNIQUE, XT_DUP, XT_LAST, XT__21, XT_HERE, XT_ALIGNED, XT_SWAP, XT_CELL_2D, XT_CURRENT, XT__40, XT__40, XT_OVER, XT__21, XT_CELL_2D, XT_DUP, XT_NP, XT__21, XT__21, XT_EXIT, XT__24_22_7C, 0x6e04, 0x6d61, 0x65, XT_THROW, XT_EXIT,
+/* 0xf12: $COMPILE */ F_tokenDoList, XT_NAME_3F, XT__3FDUP, XT__3Fbranch, XT__24COMPILE + 0x1e, XT_C_40, XT_IMED, XT_AND, XT__3Fbranch, XT__24COMPILE + 0x1a, XT_EXECUTE, XT_branch, XT__24COMPILE + 0x1c, XT__2C, XT_EXIT, XT__27NUMBER, XT__40EXECUTE, XT__3Fbranch, XT__24COMPILE + 0x2a, XT_LITERAL, XT_EXIT, XT_THROW, XT_EXIT,
+/* 0xf40: OVERT */ F_tokenDoList, XT_LAST, XT__40, XT_CURRENT, XT__40, XT__21, XT_EXIT,
+/* 0xf4e: ; */ F_tokenDoList, XT_COMPILE, XT_EXIT, XT__5B, XT_OVERT, XT_EXIT,
+/* 0xf5a: ] */ F_tokenDoList, XT_doLIT, XT__24COMPILE, XT__27EVAL, XT__21, XT_EXIT,
+/* 0xf66: : */ F_tokenDoList, XT_TOKEN, XT__24_2Cn, XT_tokenDoList, XT__2C, XT__5D, XT_EXIT,
+/* 0xf74: USER */ F_tokenDoList, XT_TOKEN, XT__24_2Cn, XT_OVERT, XT_tokenUser, XT__2C, XT_EXIT,
+/* 0xf82: create */ F_tokenDoList, XT_TOKEN, XT__24_2Cn, XT_OVERT, XT__2C, XT_doLIT, 0, XT__2C, XT_EXIT,
+/* 0xf94: CREATE */ F_tokenDoList, XT_tokenCreate, XT_create, XT_EXIT,
+/* 0xf9c: vCREATE */ F_tokenDoList, XT_VP, XT__40, XT__3FDUP, XT_0_3D, XT__3Fbranch, XT_vCREATE + 0x14, XT_CREATE, XT_branch, XT_vCREATE + 0x1a, XT_tokenVar, XT_create, XT__2C, XT_EXIT,
+/* 0xfb8: VARIABLE */ F_tokenDoList, XT_vCREATE, XT_doLIT, 0, XT_v_2C, XT_EXIT,
+/* 0xfc4: CONSTANT */ F_tokenDoList, XT_TOKEN, XT__24_2Cn, XT_OVERT, XT_tokenNextVal, XT__2C, XT__2C, XT_EXIT,
+/* 0xfd4: _TYPE */ F_tokenDoList, XT__3ER, XT_branch, XT__5FTYPE + 0x16, XT_DUP, XT_C_40, XT__3ECHAR, XT_EMIT, XT_doLIT, 1, XT__2B, XT_next, XT__5FTYPE + 8, XT_DROP, XT_EXIT,
+/* 0xff2: dm+ */ F_tokenDoList, XT_OVER, XT_doLIT, 4, XT_U_2ER, XT_SPACE, XT__3ER, XT_branch, XT_dm_2B + 0x22, XT_DUP, XT_C_40, XT_doLIT, 3, XT_U_2ER, XT_doLIT, 1, XT__2B, XT_next, XT_dm_2B + 0x12, XT_EXIT,
+/* 0x101a: DUMP */ F_tokenDoList, XT_BASE, XT__40, XT__3ER, XT_HEX, XT_doLIT, 0x10, XT__2F, XT__3ER, XT_CR, XT_doLIT, 0x10, XT_2DUP, XT_dm_2B, XT__2DROT, XT_doLIT, 2, XT_SPACES, XT__5FTYPE, XT_NUF_3F, XT_0_3D, XT__3Fbranch, XT_DUMP + 0x36, XT_next, XT_DUMP + 0x12, XT_branch, XT_DUMP + 0x3a, XT_R_3E, XT_DROP, XT_DROP, XT_R_3E, XT_BASE, XT__21, XT_EXIT,
+/* 0x105e: .S */ F_tokenDoList, XT_CR, XT_DEPTH, XT__3ER, XT_branch, XT__2ES + 0x12, XT_R_40, XT_PICK, XT__2E, XT_next, XT__2ES + 0xc, XT__2E_22_7C, 0x2004, 0x733c, 0x70, XT_EXIT,
+/* 0x107e: .BASE */ F_tokenDoList, XT_BASE, XT__40, XT_DECIMAL, XT_DUP, XT__2E, XT_BASE, XT__21, XT_EXIT,
+/* 0x1090: .FREE */ F_tokenDoList, XT_CP, XT_2_40, XT__2D, XT_U_2E, XT_EXIT,
+/* 0x109c: !CSP */ F_tokenDoList, XT_SP_40, XT_CSP, XT__21, XT_EXIT,
+/* 0x10a6: ?CSP */ F_tokenDoList, XT_SP_40, XT_CSP, XT__40, XT_XOR, XT_abort_22, 0x730b, 0x6174, 0x6b63, 0x6420, 0x7065, 0x6874, XT_EXIT,
+/* 0x10c0: .ID */ F_tokenDoList, XT__3FDUP, XT__3Fbranch, XT__2EID + 0x12, XT_COUNT, XT_BYTEMASK, XT_AND, XT__5FTYPE, XT_EXIT, XT__2E_22_7C, 0x7b08, 0x6f6e, 0x614e, 0x656d, 0x7d, XT_EXIT,
+/* 0x10e0: WORDS */ F_tokenDoList, XT_CR, XT_CONTEXT, XT__40, XT__40, XT__3FDUP, XT__3Fbranch, XT_WORDS + 0x20, XT_DUP, XT_SPACE, XT__2EID, XT_CELL_2D, XT_NUF_3F, XT__3Fbranch, XT_WORDS + 8, XT_DROP, XT_EXIT,
+/* 0x1102: FORTH>NAME */ F_tokenDoList, XT_CURRENT, XT_CELL_2B, XT__40, XT__3FDUP, XT__3Fbranch, XT_FORTH_3ENAME + 0x36, XT_2DUP, XT__40, XT_DUP, XT__3Fbranch, XT_FORTH_3ENAME + 0x28, XT_2DUP, XT_NAME_3E, XT_XOR, XT__3Fbranch, XT_FORTH_3ENAME + 0x28, XT_CELL_2D, XT_branch, XT_FORTH_3ENAME + 0x10, XT_NIP, XT__3FDUP, XT__3Fbranch, XT_FORTH_3ENAME + 4, XT_NIP, XT_NIP, XT_EXIT, XT_DROP, XT_doLIT, 0, XT_EXIT,
+/* 0x1140: SEE */ F_tokenDoList, XT__27, XT_CR, XT_DUP, XT__40, XT_tokenDoList, XT__3D, XT__3Fbranch, XT_SEE + 0x6a, XT__2E_22_7C, 0x3a02, 0x20, XT_DUP, XT__3ENAME, XT__2EID, XT_CELL_2B, XT_DUP, XT__40, XT_DUP, XT__3Fbranch, XT_SEE + 0x2c, XT__3ENAME, XT__3FDUP, XT__3Fbranch, XT_SEE + 0x5a, XT_SPACE, XT__2EID, XT_DUP, XT__40, XT_doLIT, XT_EXIT, XT__3D, XT_OVER, XT_CELL_2B, XT__40, XT_doLIT, 0x14, XT__3C, XT_AND, XT__3Fbranch, XT_SEE + 0x56, XT_DROP, XT_EXIT, XT_branch, XT_SEE + 0x60, XT_DUP, XT__40, XT_U_2E, XT_NUF_3F, XT__3Fbranch, XT_SEE + 0x1e, XT_branch, XT_SEE + 0x82, XT__2E_22_7C, 0x4e14, 0x746f, 0x6320, 0x6c6f, 0x6e6f, 0x6420, 0x6665, 0x6e69, 0x7469, 0x6f69, 0x6e, XT_DROP, XT_EXIT,
+/* 0x11c6: VER */ F_tokenNextVal, 0xc,
+/* 0x11ca: version */ F_tokenDoList, XT_CR, XT__2E_22_7C, 0x770a, 0x6265, 0x4f46, 0x5452, 0x2048, 0x56, XT_BASE, XT__40, XT_DECIMAL, XT_VER, XT__3C_23, XT__23, XT__23, XT_doLIT, 0x2e, XT_HOLD, XT__23, XT__23, XT_doLIT, 0x2e, XT_HOLD, XT__23, XT__23_3E, XT_TYPE, XT_BASE, XT__21, XT_CR, XT_EXIT,
+/* 0x1208: hi */ F_tokenDoList, XT__21IO, XT_version, XT_EXIT,
+/* 0x1210: EMPTY */ F_tokenDoList, XT_FORTH, XT_CONTEXT, XT__40, XT_DUP, XT_CURRENT, XT_2_21, XT_EXIT,
+/* 0x1220: 'BOOT */ F_tokenCreate, 0, XT_hi,
+/* 0x1226: COLD */ F_tokenDoList, XT_userAreaInit, XT_PRESET, XT_CONSOLE, XT__27BOOT, XT__40EXECUTE, XT_EMPTY, XT_OVERT, XT_QUIT, XT_branch, XT_COLD + 2, XT_EXIT,
+/* 0x123e: WARM */ F_tokenDoList, XT_CONSOLE, XT__27BOOT, XT__40EXECUTE, XT_QUIT, XT_EXIT,
 /* ==== CURRENT TOP OF CODE DICTIONARY ==== */
-/* 0x120a: */ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-/* 0x122a: */ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
 /* 0x124a: */ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
 /* 0x126a: */ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
 /* 0x128a: */ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -790,154 +796,157 @@ const CELLTYPE rom[ROMCELLS] PROGMEM = {
 /* 0x144a: */ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
 /* 0x146a: */ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
 /* 0x148a: */ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-/* 0x14aa: */ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-/* 0x14ca: */ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0x750c, 0x6573, 0x4172,
-/* 0x14ea: */ 0x6572, 0x5361, 0x7661, 0x65,
+/* 0x14aa: */ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0x750c, 0x6573, 0x4172, 0x6572,
+/* 0x14ca: */ 0x5361, 0x7661, 0x65,
 /* ==== CURRENT BOTTOM OF NAME DICTIONARY ==== */
-/* 0x14f2 WARM */ XT_WARM, 0x1500, 0x5704, 0x5241, 0x4d,
-/* 0x14fc COLD */ XT_COLD, 0x150a, 0x4304, 0x4c4f, 0x44,
-/* 0x1506 'BOOT */ XT__27BOOT, 0x1514, 0x2705, 0x4f42, 0x544f,
-/* 0x1510 EMPTY */ XT_EMPTY, 0x151e, 0x4505, 0x504d, 0x5954,
-/* 0x151a hi */ XT_hi, 0x1526, 0x6842, 0x69,
-/* 0x1522 version */ XT_version, 0x1532, 0x7607, 0x7265, 0x6973, 0x6e6f,
-/* 0x152e VER */ XT_VER, 0x153a, 0x5603, 0x5245,
-/* 0x1536 SEE */ XT_SEE, 0x1542, 0x5303, 0x4545,
-/* 0x153e FORTH>NAME */ XT_FORTH_3ENAME, 0x1552, 0x460a, 0x524f, 0x4854, 0x4e3e, 0x4d41, 0x45,
-/* 0x154e WORDS */ XT_WORDS, 0x155c, 0x5705, 0x524f, 0x5344,
-/* 0x1558 .ID */ XT__2EID, 0x1564, 0x2e03, 0x4449,
-/* 0x1560 ?CSP */ XT__3FCSP, 0x156e, 0x3f04, 0x5343, 0x50,
-/* 0x156a !CSP */ XT__21CSP, 0x1578, 0x2104, 0x5343, 0x50,
-/* 0x1574 .FREE */ XT__2EFREE, 0x1582, 0x2e05, 0x5246, 0x4545,
-/* 0x157e .BASE */ XT__2EBASE, 0x158c, 0x2e05, 0x4142, 0x4553,
-/* 0x1588 .S */ XT__2ES, 0x1594, 0x2e02, 0x53,
-/* 0x1590 DUMP */ XT_DUMP, 0x159e, 0x4404, 0x4d55, 0x50,
-/* 0x159a dm+ */ XT_dm_2B, 0x15a6, 0x6403, 0x2b6d,
-/* 0x15a2 _TYPE */ XT__5FTYPE, 0x15b0, 0x5f05, 0x5954, 0x4550,
-/* 0x15ac CONSTANT */ XT_CONSTANT, 0x15be, 0x4308, 0x4e4f, 0x5453, 0x4e41, 0x54,
-/* 0x15ba VARIABLE */ XT_VARIABLE, 0x15cc, 0x5608, 0x5241, 0x4149, 0x4c42, 0x45,
-/* 0x15c8 vCREATE */ XT_vCREATE, 0x15d8, 0x7607, 0x5243, 0x4145, 0x4554,
-/* 0x15d4 CREATE */ XT_CREATE, 0x15e4, 0x4306, 0x4552, 0x5441, 0x45,
-/* 0x15e0 create */ XT_create, 0x15f0, 0x6306, 0x6572, 0x7461, 0x65,
-/* 0x15ec USER */ XT_USER, 0x15fa, 0x5504, 0x4553, 0x52,
-/* 0x15f6 : */ XT__3A, 0x1600, 0x3a01,
-/* 0x15fc ] */ XT__5D, 0x1606, 0x5d01,
-/* 0x1602 ; */ XT__3B, 0x160c, 0x3bc1,
-/* 0x1608 OVERT */ XT_OVERT, 0x1616, 0x4f05, 0x4556, 0x5452,
-/* 0x1612 $COMPILE */ XT__24COMPILE, 0x1624, 0x2408, 0x4f43, 0x504d, 0x4c49, 0x45,
-/* 0x1620 $,n */ XT__24_2Cn, 0x162c, 0x2403, 0x6e2c,
-/* 0x1628 ?UNIQUE */ XT__3FUNIQUE, 0x1638, 0x3f07, 0x4e55, 0x5149, 0x4555,
-/* 0x1634 $" */ XT__24_22, 0x1640, 0x2482, 0x22,
-/* 0x163c RECURSE */ XT_RECURSE, 0x164c, 0x5287, 0x4345, 0x5255, 0x4553,
-/* 0x1648 [COMPILE] */ XT__5BCOMPILE_5D, 0x165a, 0x5b89, 0x4f43, 0x504d, 0x4c49, 0x5d45,
-/* 0x1656 vALLOT */ XT_vALLOT, 0x1666, 0x7606, 0x4c41, 0x4f4c, 0x54,
-/* 0x1662 ALLOT */ XT_ALLOT, 0x1670, 0x4105, 0x4c4c, 0x544f,
-/* 0x166c ' */ XT__27, 0x1676, 0x2701,
-/* 0x1672 quit1 */ XT_quit1, 0x1680, 0x7105, 0x6975, 0x3174,
-/* 0x167c QUIT */ XT_QUIT, 0x168a, 0x5104, 0x4955, 0x54,
-/* 0x1686 quitError */ XT_quitError, 0x1698, 0x7109, 0x6975, 0x4574, 0x7272, 0x726f,
-/* 0x1694 que */ XT_que, 0x16a0, 0x7103, 0x6575,
-/* 0x169c CONSOLE */ XT_CONSOLE, 0x16ac, 0x4307, 0x4e4f, 0x4f53, 0x454c,
-/* 0x16a8 I/O */ XT_I_2FO, 0x16b4, 0x4903, 0x4f2f,
-/* 0x16b0 HAND */ XT_HAND, 0x16be, 0x4804, 0x4e41, 0x44,
-/* 0x16ba FILE */ XT_FILE, 0x16c8, 0x4604, 0x4c49, 0x45,
-/* 0x16c4 XIO */ XT_XIO, 0x16d0, 0x5803, 0x4f49,
-/* 0x16cc PRESET */ XT_PRESET, 0x16dc, 0x5006, 0x4552, 0x4553, 0x54,
-/* 0x16d8 [ */ XT__5B, 0x16e2, 0x5b81,
-/* 0x16de EVAL */ XT_EVAL, 0x16ec, 0x4504, 0x4156, 0x4c,
-/* 0x16e8 ?STACK */ XT__3FSTACK, 0x16f8, 0x3f06, 0x5453, 0x4341, 0x4b,
-/* 0x16f4 .OK */ XT__2EOK, 0x1700, 0x2e03, 0x4b4f,
-/* 0x16fc $INTERPRET */ XT__24INTERPRET, 0x1710, 0x240a, 0x4e49, 0x4554, 0x5052, 0x4552, 0x54,
-/* 0x170c ." */ XT__2E_22, 0x1718, 0x2e82, 0x22,
-/* 0x1714 ABORT" */ XT_ABORT_22, 0x1724, 0x4186, 0x4f42, 0x5452, 0x22,
-/* 0x1720 $," */ XT__24_2C_22, 0x172c, 0x2403, 0x222c,
-/* 0x1728 abort" */ XT_abort_22, 0x1738, 0x6146, 0x6f62, 0x7472, 0x22,
-/* 0x1734 ABORT */ XT_ABORT, 0x1742, 0x4105, 0x4f42, 0x5452,
-/* 0x173e NULL$ */ XT_NULL_24, 0x174c, 0x4e05, 0x4c55, 0x244c,
-/* 0x1748 THROW */ XT_THROW, 0x1756, 0x5405, 0x5248, 0x574f,
-/* 0x1752 CATCH */ XT_CATCH, 0x1760, 0x4305, 0x5441, 0x4843,
-/* 0x175c QUERY */ XT_QUERY, 0x176a, 0x5105, 0x4555, 0x5952,
-/* 0x1766 EXPECT */ XT_EXPECT, 0x1776, 0x4506, 0x5058, 0x4345, 0x54,
-/* 0x1772 accept */ XT_accept, 0x1782, 0x6106, 0x6363, 0x7065, 0x74,
-/* 0x177e kTAP */ XT_kTAP, 0x178c, 0x6b04, 0x4154, 0x50,
-/* 0x1788 TAP */ XT_TAP, 0x1794, 0x5403, 0x5041,
-/* 0x1790 ^H */ XT__5EH, 0x179c, 0x5e02, 0x48,
-/* 0x1798 NAME? */ XT_NAME_3F, 0x17a6, 0x4e05, 0x4d41, 0x3f45,
-/* 0x17a2 FORTHfind */ XT_FORTHfind, 0x17b4, 0x4609, 0x524f, 0x4854, 0x6966, 0x646e,
-/* 0x17b0 SAME? */ XT_SAME_3F, 0x17be, 0x5305, 0x4d41, 0x3f45,
-/* 0x17ba NAME> */ XT_NAME_3E, 0x17c8, 0x4e05, 0x4d41, 0x3e45,
-/* 0x17c4 WORD */ XT_WORD, 0x17d2, 0x5704, 0x524f, 0x44,
-/* 0x17ce TOKEN */ XT_TOKEN, 0x17dc, 0x5405, 0x4b4f, 0x4e45,
-/* 0x17d8 .( */ XT__2E_28, 0x17e4, 0x2e82, 0x28,
-/* 0x17e0 CTRL */ XT_CTRL, 0x17ee, 0x4304, 0x5254, 0x4c,
-/* 0x17ea CHAR */ XT_CHAR, 0x17f8, 0x4304, 0x4148, 0x52,
-/* 0x17f4 PARSE */ XT_PARSE, 0x1802, 0x5005, 0x5241, 0x4553,
-/* 0x17fe parse */ XT_parse, 0x180c, 0x7005, 0x7261, 0x6573,
-/* 0x1808 ."| */ XT__2E_22_7C, 0x1814, 0x2e03, 0x7c22,
-/* 0x1810 $"| */ XT__24_22_7C, 0x181c, 0x2403, 0x7c22,
-/* 0x1818 do$ */ XT_do_24, 0x1824, 0x6403, 0x246f,
-/* 0x1820 CR */ XT_CR, 0x182c, 0x4302, 0x52,
-/* 0x1828 PACE */ XT_PACE, 0x1836, 0x5004, 0x4341, 0x45,
-/* 0x1832 NUF? */ XT_NUF_3F, 0x1840, 0x4e04, 0x4655, 0x3f,
-/* 0x183c KEY */ XT_KEY, 0x1848, 0x4b03, 0x5945,
-/* 0x1844 ?KEY */ XT__3FKEY, 0x1852, 0x3f04, 0x454b, 0x59,
-/* 0x184e NUMBER? */ XT_NUMBER_3F, 0x185e, 0x4e07, 0x4d55, 0x4542, 0x3f52,
-/* 0x185a DIGIT? */ XT_DIGIT_3F, 0x186a, 0x4406, 0x4749, 0x5449, 0x3f,
-/* 0x1866 ? */ XT__3F, 0x1870, 0x3f01,
-/* 0x186c . */ XT__2E, 0x1876, 0x2e01,
-/* 0x1872 U. */ XT_U_2E, 0x187e, 0x5502, 0x2e,
-/* 0x187a U.R */ XT_U_2ER, 0x1886, 0x5503, 0x522e,
-/* 0x1882 .R */ XT__2ER, 0x188e, 0x2e02, 0x52,
-/* 0x188a DECIMAL */ XT_DECIMAL, 0x189a, 0x4407, 0x4345, 0x4d49, 0x4c41,
-/* 0x1896 HEX */ XT_HEX, 0x18a2, 0x4803, 0x5845,
-/* 0x189e str */ XT_str, 0x18aa, 0x7303, 0x7274,
-/* 0x18a6 .$ */ XT__2E_24, 0x18b2, 0x2e02, 0x24,
-/* 0x18ae TYPE */ XT_TYPE, 0x18bc, 0x5404, 0x5059, 0x45,
-/* 0x18b8 SPACES */ XT_SPACES, 0x18c8, 0x5306, 0x4150, 0x4543, 0x53,
-/* 0x18c4 CHARS */ XT_CHARS, 0x18d2, 0x4305, 0x4148, 0x5352,
-/* 0x18ce SPACE */ XT_SPACE, 0x18dc, 0x5305, 0x4150, 0x4543,
-/* 0x18d8 EMIT */ XT_EMIT, 0x18e6, 0x4504, 0x494d, 0x54,
-/* 0x18e2 #> */ XT__23_3E, 0x18ee, 0x2302, 0x3e,
-/* 0x18ea SIGN */ XT_SIGN, 0x18f8, 0x5304, 0x4749, 0x4e,
-/* 0x18f4 #S */ XT__23S, 0x1900, 0x2302, 0x53,
-/* 0x18fc # */ XT__23, 0x1906, 0x2301,
-/* 0x1902 HOLD */ XT_HOLD, 0x1910, 0x4804, 0x4c4f, 0x44,
-/* 0x190c <# */ XT__3C_23, 0x1918, 0x3c02, 0x23,
-/* 0x1914 EXTRACT */ XT_EXTRACT, 0x1924, 0x4507, 0x5458, 0x4152, 0x5443,
-/* 0x1920 DIGIT */ XT_DIGIT, 0x192e, 0x4405, 0x4749, 0x5449,
-/* 0x192a PACK$ */ XT_PACK_24, 0x1938, 0x5005, 0x4341, 0x244b,
-/* 0x1934 -TRAILING */ XT__2DTRAILING, 0x1946, 0x2d09, 0x5254, 0x4941, 0x494c, 0x474e,
-/* 0x1942 FILL */ XT_FILL, 0x1950, 0x4604, 0x4c49, 0x4c,
-/* 0x194c CMOVE */ XT_CMOVE, 0x195a, 0x4305, 0x4f4d, 0x4556,
-/* 0x1956 COUNT */ XT_COUNT, 0x1964, 0x4305, 0x554f, 0x544e,
-/* 0x1960 @EXECUTE */ XT__40EXECUTE, 0x1972, 0x4008, 0x5845, 0x4345, 0x5455, 0x45,
-/* 0x196e TIB */ XT_TIB, 0x197a, 0x5403, 0x4249,
-/* 0x1976 PAD */ XT_PAD, 0x1982, 0x5003, 0x4441,
-/* 0x197e vCREATE */ XT_vCREATE, 0x198e, 0x7607, 0x5243, 0x4145, 0x4554,
-/* 0x198a vALIGN */ XT_vALIGN, 0x199a, 0x7606, 0x4c41, 0x4749, 0x4e,
-/* 0x1996 v, */ XT_v_2C, 0x19a2, 0x7602, 0x2c,
-/* 0x199e vHERE */ XT_vHERE, 0x19ac, 0x7605, 0x4548, 0x4552,
-/* 0x19a8 2@ */ XT_2_40, 0x19b4, 0x3202, 0x40,
-/* 0x19b0 2! */ XT_2_21, 0x19bc, 0x3202, 0x21,
-/* 0x19b8 +! */ XT__2B_21, 0x19c4, 0x2b02, 0x21,
-/* 0x19c0 PICK */ XT_PICK, 0x19ce, 0x5004, 0x4349, 0x4b,
-/* 0x19ca DEPTH */ XT_DEPTH, 0x19d8, 0x4405, 0x5045, 0x4854,
-/* 0x19d4 >CHAR */ XT__3ECHAR, 0x19e2, 0x3e05, 0x4843, 0x5241,
-/* 0x19de CELLS */ XT_CELLS, 0x19ec, 0x4305, 0x4c45, 0x534c,
-/* 0x19e8 CELL- */ XT_CELL_2D, 0x19f6, 0x4305, 0x4c45, 0x2d4c,
-/* 0x19f2 * / */ XT__2A_2F, 0x19fe, 0x2a02, 0x2f,
-/* 0x19fa * /MOD */ XT__2A_2FMOD, 0x1a08, 0x2a05, 0x4d2f, 0x444f,
-/* 0x1a04 M* */ XT_M_2A, 0x1a10, 0x4d02, 0x2a,
-/* 0x1a0c * */ XT__2A, 0x1a16, 0x2a01,
-/* 0x1a12 UM* */ XT_UM_2A, 0x1a1e, 0x5503, 0x2a4d,
-/* 0x1a1a / */ XT__2F, 0x1a24, 0x2f01,
-/* 0x1a20 MOD */ XT_MOD, 0x1a2c, 0x4d03, 0x444f,
-/* 0x1a28 /MOD */ XT__2FMOD, 0x1a36, 0x2f04, 0x4f4d, 0x44,
-/* 0x1a32 M/MOD */ XT_M_2FMOD, 0x1a40, 0x4d05, 0x4d2f, 0x444f,
-/* 0x1a3c UM/MOD */ XT_UM_2FMOD, 0x1a4c, 0x5506, 0x2f4d, 0x4f4d, 0x44,
-/* 0x1a48 WITHIN */ XT_WITHIN, 0x1a58, 0x5706, 0x5449, 0x4948, 0x4e,
-/* 0x1a54 MIN */ XT_MIN, 0x1a60, 0x4d03, 0x4e49,
-/* 0x1a5c MAX */ XT_MAX, 0x1a68, 0x4d03, 0x5841,
-/* 0x1a64 < */ XT__3C, 0x1a6e, 0x3c01,
+/* 0x14d0 WARM */ XT_WARM, 0x14de, 0x5704, 0x5241, 0x4d,
+/* 0x14da COLD */ XT_COLD, 0x14e8, 0x4304, 0x4c4f, 0x44,
+/* 0x14e4 'BOOT */ XT__27BOOT, 0x14f2, 0x2705, 0x4f42, 0x544f,
+/* 0x14ee EMPTY */ XT_EMPTY, 0x14fc, 0x4505, 0x504d, 0x5954,
+/* 0x14f8 hi */ XT_hi, 0x1504, 0x6842, 0x69,
+/* 0x1500 version */ XT_version, 0x1510, 0x7607, 0x7265, 0x6973, 0x6e6f,
+/* 0x150c VER */ XT_VER, 0x1518, 0x5603, 0x5245,
+/* 0x1514 SEE */ XT_SEE, 0x1520, 0x5303, 0x4545,
+/* 0x151c FORTH>NAME */ XT_FORTH_3ENAME, 0x1530, 0x460a, 0x524f, 0x4854, 0x4e3e, 0x4d41, 0x45,
+/* 0x152c WORDS */ XT_WORDS, 0x153a, 0x5705, 0x524f, 0x5344,
+/* 0x1536 .ID */ XT__2EID, 0x1542, 0x2e03, 0x4449,
+/* 0x153e ?CSP */ XT__3FCSP, 0x154c, 0x3f04, 0x5343, 0x50,
+/* 0x1548 !CSP */ XT__21CSP, 0x1556, 0x2104, 0x5343, 0x50,
+/* 0x1552 .FREE */ XT__2EFREE, 0x1560, 0x2e05, 0x5246, 0x4545,
+/* 0x155c .BASE */ XT__2EBASE, 0x156a, 0x2e05, 0x4142, 0x4553,
+/* 0x1566 .S */ XT__2ES, 0x1572, 0x2e02, 0x53,
+/* 0x156e DUMP */ XT_DUMP, 0x157c, 0x4404, 0x4d55, 0x50,
+/* 0x1578 dm+ */ XT_dm_2B, 0x1584, 0x6403, 0x2b6d,
+/* 0x1580 _TYPE */ XT__5FTYPE, 0x158e, 0x5f05, 0x5954, 0x4550,
+/* 0x158a CONSTANT */ XT_CONSTANT, 0x159c, 0x4308, 0x4e4f, 0x5453, 0x4e41, 0x54,
+/* 0x1598 VARIABLE */ XT_VARIABLE, 0x15aa, 0x5608, 0x5241, 0x4149, 0x4c42, 0x45,
+/* 0x15a6 vCREATE */ XT_vCREATE, 0x15b6, 0x7607, 0x5243, 0x4145, 0x4554,
+/* 0x15b2 CREATE */ XT_CREATE, 0x15c2, 0x4306, 0x4552, 0x5441, 0x45,
+/* 0x15be create */ XT_create, 0x15ce, 0x6306, 0x6572, 0x7461, 0x65,
+/* 0x15ca USER */ XT_USER, 0x15d8, 0x5504, 0x4553, 0x52,
+/* 0x15d4 : */ XT__3A, 0x15de, 0x3a01,
+/* 0x15da ] */ XT__5D, 0x15e4, 0x5d01,
+/* 0x15e0 ; */ XT__3B, 0x15ea, 0x3bc1,
+/* 0x15e6 OVERT */ XT_OVERT, 0x15f4, 0x4f05, 0x4556, 0x5452,
+/* 0x15f0 $COMPILE */ XT__24COMPILE, 0x1602, 0x2408, 0x4f43, 0x504d, 0x4c49, 0x45,
+/* 0x15fe $,n */ XT__24_2Cn, 0x160a, 0x2403, 0x6e2c,
+/* 0x1606 ?UNIQUE */ XT__3FUNIQUE, 0x1616, 0x3f07, 0x4e55, 0x5149, 0x4555,
+/* 0x1612 S" */ XT_S_22, 0x161e, 0x5382, 0x22,
+/* 0x161a $" */ XT__24_22, 0x1626, 0x2482, 0x22,
+/* 0x1622 RECURSE */ XT_RECURSE, 0x1632, 0x5287, 0x4345, 0x5255, 0x4553,
+/* 0x162e [COMPILE] */ XT__5BCOMPILE_5D, 0x1640, 0x5b89, 0x4f43, 0x504d, 0x4c49, 0x5d45,
+/* 0x163c vALLOT */ XT_vALLOT, 0x164c, 0x7606, 0x4c41, 0x4f4c, 0x54,
+/* 0x1648 ALLOT */ XT_ALLOT, 0x1656, 0x4105, 0x4c4c, 0x544f,
+/* 0x1652 ' */ XT__27, 0x165c, 0x2701,
+/* 0x1658 quit1 */ XT_quit1, 0x1666, 0x7105, 0x6975, 0x3174,
+/* 0x1662 QUIT */ XT_QUIT, 0x1670, 0x5104, 0x4955, 0x54,
+/* 0x166c quitError */ XT_quitError, 0x167e, 0x7109, 0x6975, 0x4574, 0x7272, 0x726f,
+/* 0x167a que */ XT_que, 0x1686, 0x7103, 0x6575,
+/* 0x1682 CONSOLE */ XT_CONSOLE, 0x1692, 0x4307, 0x4e4f, 0x4f53, 0x454c,
+/* 0x168e I/O */ XT_I_2FO, 0x169a, 0x4903, 0x4f2f,
+/* 0x1696 HAND */ XT_HAND, 0x16a4, 0x4804, 0x4e41, 0x44,
+/* 0x16a0 FILE */ XT_FILE, 0x16ae, 0x4604, 0x4c49, 0x45,
+/* 0x16aa XIO */ XT_XIO, 0x16b6, 0x5803, 0x4f49,
+/* 0x16b2 PRESET */ XT_PRESET, 0x16c2, 0x5006, 0x4552, 0x4553, 0x54,
+/* 0x16be [ */ XT__5B, 0x16c8, 0x5b81,
+/* 0x16c4 EVAL */ XT_EVAL, 0x16d2, 0x4504, 0x4156, 0x4c,
+/* 0x16ce ?STACK */ XT__3FSTACK, 0x16de, 0x3f06, 0x5453, 0x4341, 0x4b,
+/* 0x16da .OK */ XT__2EOK, 0x16e6, 0x2e03, 0x4b4f,
+/* 0x16e2 $INTERPRET */ XT__24INTERPRET, 0x16f6, 0x240a, 0x4e49, 0x4554, 0x5052, 0x4552, 0x54,
+/* 0x16f2 ." */ XT__2E_22, 0x16fe, 0x2e82, 0x22,
+/* 0x16fa ABORT" */ XT_ABORT_22, 0x170a, 0x4186, 0x4f42, 0x5452, 0x22,
+/* 0x1706 $," */ XT__24_2C_22, 0x1712, 0x2403, 0x222c,
+/* 0x170e abort" */ XT_abort_22, 0x171e, 0x6146, 0x6f62, 0x7472, 0x22,
+/* 0x171a ABORT */ XT_ABORT, 0x1728, 0x4105, 0x4f42, 0x5452,
+/* 0x1724 NULL$ */ XT_NULL_24, 0x1732, 0x4e05, 0x4c55, 0x244c,
+/* 0x172e THROW */ XT_THROW, 0x173c, 0x5405, 0x5248, 0x574f,
+/* 0x1738 CATCH */ XT_CATCH, 0x1746, 0x4305, 0x5441, 0x4843,
+/* 0x1742 QUERY */ XT_QUERY, 0x1750, 0x5105, 0x4555, 0x5952,
+/* 0x174c EXPECT */ XT_EXPECT, 0x175c, 0x4506, 0x5058, 0x4345, 0x54,
+/* 0x1758 accept */ XT_accept, 0x1768, 0x6106, 0x6363, 0x7065, 0x74,
+/* 0x1764 kTAP */ XT_kTAP, 0x1772, 0x6b04, 0x4154, 0x50,
+/* 0x176e crlf? */ XT_crlf_3F, 0x177c, 0x6305, 0x6c72, 0x3f66,
+/* 0x1778 TAP */ XT_TAP, 0x1784, 0x5403, 0x5041,
+/* 0x1780 ^H */ XT__5EH, 0x178c, 0x5e02, 0x48,
+/* 0x1788 NAME? */ XT_NAME_3F, 0x1796, 0x4e05, 0x4d41, 0x3f45,
+/* 0x1792 FORTHfind */ XT_FORTHfind, 0x17a4, 0x4609, 0x524f, 0x4854, 0x6966, 0x646e,
+/* 0x17a0 SAME? */ XT_SAME_3F, 0x17ae, 0x5305, 0x4d41, 0x3f45,
+/* 0x17aa NAME> */ XT_NAME_3E, 0x17b8, 0x4e05, 0x4d41, 0x3e45,
+/* 0x17b4 WORD */ XT_WORD, 0x17c2, 0x5704, 0x524f, 0x44,
+/* 0x17be TOKEN */ XT_TOKEN, 0x17cc, 0x5405, 0x4b4f, 0x4e45,
+/* 0x17c8 .( */ XT__2E_28, 0x17d4, 0x2e82, 0x28,
+/* 0x17d0 CTRL */ XT_CTRL, 0x17de, 0x4304, 0x5254, 0x4c,
+/* 0x17da CHAR */ XT_CHAR, 0x17e8, 0x4304, 0x4148, 0x52,
+/* 0x17e4 PARSE */ XT_PARSE, 0x17f2, 0x5005, 0x5241, 0x4553,
+/* 0x17ee parse */ XT_parse, 0x17fc, 0x7005, 0x7261, 0x6573,
+/* 0x17f8 S"| */ XT_S_22_7C, 0x1804, 0x5303, 0x7c22,
+/* 0x1800 ."| */ XT__2E_22_7C, 0x180c, 0x2e03, 0x7c22,
+/* 0x1808 $"| */ XT__24_22_7C, 0x1814, 0x2403, 0x7c22,
+/* 0x1810 do$ */ XT_do_24, 0x181c, 0x6403, 0x246f,
+/* 0x1818 CR */ XT_CR, 0x1824, 0x4302, 0x52,
+/* 0x1820 PACE */ XT_PACE, 0x182e, 0x5004, 0x4341, 0x45,
+/* 0x182a NUF? */ XT_NUF_3F, 0x1838, 0x4e04, 0x4655, 0x3f,
+/* 0x1834 KEY */ XT_KEY, 0x1840, 0x4b03, 0x5945,
+/* 0x183c ?KEY */ XT__3FKEY, 0x184a, 0x3f04, 0x454b, 0x59,
+/* 0x1846 NUMBER? */ XT_NUMBER_3F, 0x1856, 0x4e07, 0x4d55, 0x4542, 0x3f52,
+/* 0x1852 DIGIT? */ XT_DIGIT_3F, 0x1862, 0x4406, 0x4749, 0x5449, 0x3f,
+/* 0x185e ? */ XT__3F, 0x1868, 0x3f01,
+/* 0x1864 . */ XT__2E, 0x186e, 0x2e01,
+/* 0x186a U. */ XT_U_2E, 0x1876, 0x5502, 0x2e,
+/* 0x1872 U.R */ XT_U_2ER, 0x187e, 0x5503, 0x522e,
+/* 0x187a .R */ XT__2ER, 0x1886, 0x2e02, 0x52,
+/* 0x1882 DECIMAL */ XT_DECIMAL, 0x1892, 0x4407, 0x4345, 0x4d49, 0x4c41,
+/* 0x188e HEX */ XT_HEX, 0x189a, 0x4803, 0x5845,
+/* 0x1896 str */ XT_str, 0x18a2, 0x7303, 0x7274,
+/* 0x189e .$ */ XT__2E_24, 0x18aa, 0x2e02, 0x24,
+/* 0x18a6 TYPE */ XT_TYPE, 0x18b4, 0x5404, 0x5059, 0x45,
+/* 0x18b0 SPACES */ XT_SPACES, 0x18c0, 0x5306, 0x4150, 0x4543, 0x53,
+/* 0x18bc CHARS */ XT_CHARS, 0x18ca, 0x4305, 0x4148, 0x5352,
+/* 0x18c6 SPACE */ XT_SPACE, 0x18d4, 0x5305, 0x4150, 0x4543,
+/* 0x18d0 EMIT */ XT_EMIT, 0x18de, 0x4504, 0x494d, 0x54,
+/* 0x18da #> */ XT__23_3E, 0x18e6, 0x2302, 0x3e,
+/* 0x18e2 SIGN */ XT_SIGN, 0x18f0, 0x5304, 0x4749, 0x4e,
+/* 0x18ec #S */ XT__23S, 0x18f8, 0x2302, 0x53,
+/* 0x18f4 # */ XT__23, 0x18fe, 0x2301,
+/* 0x18fa HOLD */ XT_HOLD, 0x1908, 0x4804, 0x4c4f, 0x44,
+/* 0x1904 <# */ XT__3C_23, 0x1910, 0x3c02, 0x23,
+/* 0x190c EXTRACT */ XT_EXTRACT, 0x191c, 0x4507, 0x5458, 0x4152, 0x5443,
+/* 0x1918 DIGIT */ XT_DIGIT, 0x1926, 0x4405, 0x4749, 0x5449,
+/* 0x1922 PACK$ */ XT_PACK_24, 0x1930, 0x5005, 0x4341, 0x244b,
+/* 0x192c -TRAILING */ XT__2DTRAILING, 0x193e, 0x2d09, 0x5254, 0x4941, 0x494c, 0x474e,
+/* 0x193a FILL */ XT_FILL, 0x1948, 0x4604, 0x4c49, 0x4c,
+/* 0x1944 CMOVE */ XT_CMOVE, 0x1952, 0x4305, 0x4f4d, 0x4556,
+/* 0x194e COUNT */ XT_COUNT, 0x195c, 0x4305, 0x554f, 0x544e,
+/* 0x1958 @EXECUTE */ XT__40EXECUTE, 0x196a, 0x4008, 0x5845, 0x4345, 0x5455, 0x45,
+/* 0x1966 TIB */ XT_TIB, 0x1972, 0x5403, 0x4249,
+/* 0x196e PAD */ XT_PAD, 0x197a, 0x5003, 0x4441,
+/* 0x1976 vCREATE */ XT_vCREATE, 0x1986, 0x7607, 0x5243, 0x4145, 0x4554,
+/* 0x1982 vALIGN */ XT_vALIGN, 0x1992, 0x7606, 0x4c41, 0x4749, 0x4e,
+/* 0x198e v, */ XT_v_2C, 0x199a, 0x7602, 0x2c,
+/* 0x1996 vHERE */ XT_vHERE, 0x19a4, 0x7605, 0x4548, 0x4552,
+/* 0x19a0 2@ */ XT_2_40, 0x19ac, 0x3202, 0x40,
+/* 0x19a8 2! */ XT_2_21, 0x19b4, 0x3202, 0x21,
+/* 0x19b0 +! */ XT__2B_21, 0x19bc, 0x2b02, 0x21,
+/* 0x19b8 PICK */ XT_PICK, 0x19c6, 0x5004, 0x4349, 0x4b,
+/* 0x19c2 DEPTH */ XT_DEPTH, 0x19d0, 0x4405, 0x5045, 0x4854,
+/* 0x19cc >CHAR */ XT__3ECHAR, 0x19da, 0x3e05, 0x4843, 0x5241,
+/* 0x19d6 CELLS */ XT_CELLS, 0x19e4, 0x4305, 0x4c45, 0x534c,
+/* 0x19e0 CELL- */ XT_CELL_2D, 0x19ee, 0x4305, 0x4c45, 0x2d4c,
+/* 0x19ea * / */ XT__2A_2F, 0x19f6, 0x2a02, 0x2f,
+/* 0x19f2 * /MOD */ XT__2A_2FMOD, 0x1a00, 0x2a05, 0x4d2f, 0x444f,
+/* 0x19fc M* */ XT_M_2A, 0x1a08, 0x4d02, 0x2a,
+/* 0x1a04 * */ XT__2A, 0x1a0e, 0x2a01,
+/* 0x1a0a UM* */ XT_UM_2A, 0x1a16, 0x5503, 0x2a4d,
+/* 0x1a12 / */ XT__2F, 0x1a1c, 0x2f01,
+/* 0x1a18 MOD */ XT_MOD, 0x1a24, 0x4d03, 0x444f,
+/* 0x1a20 /MOD */ XT__2FMOD, 0x1a2e, 0x2f04, 0x4f4d, 0x44,
+/* 0x1a2a M/MOD */ XT_M_2FMOD, 0x1a38, 0x4d05, 0x4d2f, 0x444f,
+/* 0x1a34 UM/MOD */ XT_UM_2FMOD, 0x1a44, 0x5506, 0x2f4d, 0x4f4d, 0x44,
+/* 0x1a40 WITHIN */ XT_WITHIN, 0x1a50, 0x5706, 0x5449, 0x4948, 0x4e,
+/* 0x1a4c MIN */ XT_MIN, 0x1a58, 0x4d03, 0x4e49,
+/* 0x1a54 MAX */ XT_MAX, 0x1a60, 0x4d03, 0x5841,
+/* 0x1a5c < */ XT__3C, 0x1a66, 0x3c01,
+/* 0x1a62 ud< */ XT_ud_3C, 0x1a6e, 0x7503, 0x3c64,
 /* 0x1a6a U< */ XT_U_3C, 0x1a76, 0x5502, 0x3c,
 /* 0x1a72 = */ XT__3D, 0x1a7c, 0x3d01,
 /* 0x1a78 0= */ XT_0_3D, 0x1a84, 0x3002, 0x3d,
