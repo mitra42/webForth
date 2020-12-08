@@ -3,6 +3,8 @@ import { Forth, ForthNodeExtensions, RP0offset, jsFunctionAttributes, Romable16_
 /*
  * This is a first cut at a dictionary dumper aka cross-compiler for Arduino
  * Its written in Javascript - it could be written in Forth, but there is some significant string handling going on.
+ *
+ * To use this, see README.md and search for "Arduino support"
  */
 
 // Valid choices for CELL:MEM are 2:8 2:16 2:32 3:8 4:8 4:16 4:32 - Arduino is 2:16 and memClass = ROmable16_16
@@ -42,9 +44,9 @@ class ForthDumper extends Forth {
       const val = this[k];
       this.xcLine(`\n#define ${k} ${val}`);
     });
-    this.xcLine(`\n#define CELLTYPE ${this.CELLL === 2 ? 'unsigned' : 'unsigned long'}`);
-    this.xcLine(`\n#define SIGNEDCELLTYPE ${this.CELLL === 2 ? 'int' : 'long'}`);
-    this.xcLine(`\n#define DOUBLECELLTYPE ${this.CELLL === 2 ? 'unsigned long' : 'XXXbroken'}`); // TODO-ARDUINO-32
+    this.xcLine(`\n#define CELLTYPE ${this.CELLL === 2 ? 'uint16' : 'uint32'}`);
+    this.xcLine(`\n#define SIGNEDCELLTYPE ${this.CELLL === 2 ? 'sint16' : 'sint32'}`);
+    this.xcLine(`\n#define DOUBLECELLTYPE ${this.CELLL === 2 ? 'uint32' : 'uint64'}`); // TODO-ARDUINO-32
     this.xcLine(`\n#define CELLSHIFT ${this.CELLL === 2 ? 1 : 2}`);
     this.xcLine('\n#define LITTLEENDIAN true');
     this.xcLine(`\n#define ROMCELLS ${ROMSIZE / this.CELLL}`);
@@ -85,7 +87,7 @@ class ForthDumper extends Forth {
       }
     });
     // This is the actual array of functions - will have 0 for replaced ones
-    this.xcLine(`\nconst void (*f[${this.jsFunctions.length+1}])() = {`);
+    this.xcLine(`\nvoid (* const f[${this.jsFunctions.length + 1}])() PROGMEM = {`);
     const itemsPerLine = 4;
     let itemsToGoOnLine = 0;
     this.jsFunctions.forEach((func, token) => {

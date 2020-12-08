@@ -11,7 +11,7 @@ const ROMSIZE = 0x2000 * CELLL;
 const RAMSIZE = 0x400 * CELLL;
 const extensions = ForthNodeExtensions;
 let memClass = undefined;
-//memClass = Romable16_16; // Uncomment this to simulate a chip with separate Rom and Ram (like an Arduino).
+memClass = Romable16_16; // Uncomment this to simulate a chip with separate Rom and Ram (like an Arduino).
 
 const forth = new Forth({ CELLL, ROMSIZE, RAMSIZE, MEM, extensions, memClass });
 forth.compileForthInForth()

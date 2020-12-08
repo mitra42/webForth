@@ -6,9 +6,9 @@
 #define TIB0 33392
 #define UPP 33664
 #define UZERO 0
-#define CELLTYPE unsigned
-#define SIGNEDCELLTYPE int
-#define DOUBLECELLTYPE unsigned long
+#define CELLTYPE uint16
+#define SIGNEDCELLTYPE sint16
+#define DOUBLECELLTYPE uint32
 #define CELLSHIFT 1
 #define LITTLEENDIAN true
 #define ROMCELLS 4096
@@ -400,7 +400,7 @@ extern void testing3();
 extern void Fbreak();
 extern void debugPrintTIB();
 extern void TEST();
-const void (*f[62])() = {
+void (* const f[62])() PROGMEM = {
 0, tokenVocabulary, tokenNextVal, tokenDoList,
 tokenUser, tokenVar, tokenCreate, ALIGNED,
 /* find */ jsFind, 0, 0, /* >NAME */ ToNAME,
@@ -1218,11 +1218,13 @@ void TEST() { //  a1 a2 a3 b1 b2 b3 n -- ; Check n parameters on stack
 #ifdef WRITEROM
 #define ROM(cellAddr) rom[cellAddr]
 #else
-#define ROM(cellAddr) pgm_read_word_near(rom + cellAddr)
+#define ROM(cellAddr) pgm_read_word_near(&rom[cellAddr])
 #endif
 CELLTYPE cellRomFetch(const CELLTYPE cellAddr) {
   if (cellAddr >= ROMCELLS) { Serial.print(F("Attempt to read above top of Rom at ")); Serial.println(cellAddr); debugStack(); delay(10000); } // TODO-OPTIMIZE comment out
-  return ROM(cellAddr); };
+
+  return ROM(cellAddr);
+  };
 CELLTYPE cellRamFetch(const CELLTYPE cellAddr) {
   if (cellAddr >= RAMCELLS) { Serial.print(F("Attempt to read above top of Ram at ")); Serial.println(cellAddr); debugStack(); delay(10000); } // TODO-OPTIMIZE comment out
   return ram[cellAddr]; };
@@ -1965,7 +1967,7 @@ void console() {
 void setup() {
   // put your setup code here, to run once:
   Serial.begin(57600); // Initialize IO port TODO move to somewhere Forth wants it
-  //Serial.print(F("Starting: Space for, ")); Serial.print(NAMEE - CODEE), Serial.println(F("bytes for code and names"));
+  Serial.print(F("Starting: Space for, ")); Serial.print(NAMEE - CODEE), Serial.println(F("bytes for code and names"));
   IP = XT_COLD+CELLL; // This has a tight interaction with loop - which will look at next value and threadToken on it. (So this only works on a colon definition)
 }
 
