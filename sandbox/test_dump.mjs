@@ -44,9 +44,9 @@ class ForthDumper extends Forth {
       const val = this[k];
       this.xcLine(`\n#define ${k} ${val}`);
     });
-    this.xcLine(`\n#define CELLTYPE ${this.CELLL === 2 ? 'uint16' : 'uint32'}`);
-    this.xcLine(`\n#define SIGNEDCELLTYPE ${this.CELLL === 2 ? 'sint16' : 'sint32'}`);
-    this.xcLine(`\n#define DOUBLECELLTYPE ${this.CELLL === 2 ? 'uint32' : 'uint64'}`); // TODO-ARDUINO-32
+    this.xcLine(`\n#define CELLTYPE ${this.CELLL === 2 ? 'uint16_t' : 'uint32_t'}`);
+    this.xcLine(`\n#define SIGNEDCELLTYPE ${this.CELLL === 2 ? 'int16_t' : 'int32_t'}`);
+    this.xcLine(`\n#define DOUBLECELLTYPE ${this.CELLL === 2 ? 'uint32_t' : 'uint64_t'}`); // TODO-ARDUINO-32
     this.xcLine(`\n#define CELLSHIFT ${this.CELLL === 2 ? 1 : 2}`);
     this.xcLine('\n#define LITTLEENDIAN true');
     this.xcLine(`\n#define ROMCELLS ${ROMSIZE / this.CELLL}`);
@@ -87,6 +87,7 @@ class ForthDumper extends Forth {
       }
     });
     // This is the actual array of functions - will have 0 for replaced ones
+    // On Arduino uno `const void (*f[62])() = {` worked, but ESP8266 rquired `void (* const f[])() PROGMEM = {`
     this.xcLine(`\nvoid (* const f[${this.jsFunctions.length + 1}])() PROGMEM = {`);
     const itemsPerLine = 4;
     let itemsToGoOnLine = 0;

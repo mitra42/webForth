@@ -6,9 +6,9 @@
 #define TIB0 33392
 #define UPP 33664
 #define UZERO 0
-#define CELLTYPE uint16
-#define SIGNEDCELLTYPE sint16
-#define DOUBLECELLTYPE uint32
+#define CELLTYPE uint16_t
+#define SIGNEDCELLTYPE int16_t
+#define DOUBLECELLTYPE uint32_t
 #define CELLSHIFT 1
 #define LITTLEENDIAN true
 #define ROMCELLS 4096
@@ -404,7 +404,7 @@ extern void testing3();
 extern void Fbreak();
 extern void debugPrintTIB();
 extern void TEST();
-void (* const f[62])() PROGMEM = {
+void (* const f[62])() = {
 0, tokenVocabulary, tokenNextVal, tokenDoList,
 tokenUser, tokenVar, tokenCreate, ALIGNED,
 /* find */ jsFind, 0, 0, /* >NAME */ ToNAME,
@@ -1093,6 +1093,8 @@ const CELLTYPE rom[ROMCELLS] PROGMEM = {
 /*
  * NOTES
  * See https://www.arduino.cc/reference/en/language/variables/utilities/progmem/ for reading program memory (where dictionary will be)
+ * Board: Arduino Uno:
+ * Board: Wemos D1 R2 & Mini; Upload: 921600; CPU 80MHz; Flash 4M/3M SPIFFS; cu.usbserial-1420
  */
 
 
