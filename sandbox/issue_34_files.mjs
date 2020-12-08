@@ -153,10 +153,6 @@ const fsExtensions = [
 
 ];
 const filesExtension = `
-: S"| do$ COUNT ; ( -- caddr u)
-: S" COMPILE S"| $," ; IMMEDIATE
-: ud< ( ud ud -- f ) ROT SWAP U< IF 2DROP -1 ELSE U< THEN ;
-
 : WRITE-LINE ( c-addr u fileid -- ior ; https://forth-standard.org/standard/file/WRITE-LINE )
   DUP >R WRITE-FILE R> SWAP ?DUP 0= IF write-cr ELSE DROP THEN ;
 
@@ -165,18 +161,16 @@ const filesExtension = `
   ROT FILE-SIZE THROW ( udouble udouble )
   ud< 0= ;
 
-: isCRLF ( c -- f) 
-  DUP 10 = SWAP 13 = OR ;
 : skipCRLF ( caddr u -- caddr u )
   BEGIN
-    DUP IF OVER C@ isCRLF ELSE 0 THEN ( caddr u bool)
+    DUP IF OVER C@ crlf? ELSE 0 THEN ( caddr u bool)
   WHILE ( caddr u )
     1 - SWAP 1 + SWAP ( caddr' u')
   REPEAT
 ;
 : skipToCRLF ( caddr u -- caddr' u' )
   BEGIN
-    DUP IF OVER C@ isCRLF 0= ELSE 0 THEN ( caddr u bool)
+    DUP IF OVER C@ crlf? 0= ELSE 0 THEN ( caddr u bool)
   WHILE ( caddr u )
     1 - SWAP 1 + SWAP ( caddr' u')
   REPEAT

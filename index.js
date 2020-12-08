@@ -318,9 +318,10 @@ const forthInForth = `
 \\T 111 >R R@ RP@ R> SWAP RP@ SWAP - 111 111 CELLL 3 TEST
 \\T 1 2 SP@ CELL+ SP! 1 1 TEST
 
-( === More comparison Zen pg51-52 )
+( === More comparison Zen pg51-52 - ud< is added)
 : = XOR IF 0 EXIT THEN -1 ; ( w w -- t)
 : U< 2DUP XOR 0< IF NIP 0< EXIT THEN - 0< ;
+: ud< ( ud ud -- f ) ROT SWAP U< IF 2DROP -1 ELSE U< THEN ;
 : < 2DUP XOR 0< IF DROP 0< EXIT THEN - 0< ;
 : MAX 2DUP < IF SWAP THEN DROP ;
 : MIN 2DUP SWAP < IF SWAP THEN DROP ;
@@ -774,6 +775,9 @@ const forthInForth = `
 : ."| ( -- ) ( Run time routine of ." . Output a compiled string.)
   do$        ( get string address)
   .$ ;       ( print the compiled string)
+: S"| ( -- caddr u; ANS version )
+  do$ COUNT ;
+
 
 ( ."| tested by ."; $"| tested by $" )
 
@@ -975,10 +979,12 @@ const forthInForth = `
   OVER C!     ( store at current location )
   1 + ;       ( increment current pointer )
 
-( Diff - Staapl doesnt check for 10 )
+( Diff - Staapl doesnt check for 10 - crlf? split out as used by READ-LINE )
+: crlf? ( c -- f; is key a return or line feed?)
+  DUP 10 = SWAP 13 = OR ;
 : kTAP ( bot eot cur key -- bot eot cur )
   ( Process a key stroke, CR or backspace.)
-  DUP 13 = OVER 10 = OR 0= ( is key a return or line feed?)
+  DUP crlf? 0= 
   IF
     [ CTRL H ] LITERAL = OVER 127 = OR ( is key a backspace or DEL ? )
     IF BL TAP   ( none of above, replace by space )
@@ -1259,10 +1265,11 @@ CREATE I/O  ' ?RX , ' TX! , ( Array to store default I/O vectors. )
 
 ( === String Literals Zen pg93: ABORT" $" ." ( ABORT" ." moved to Zen pg84 where used )
 
-: $" ( -- ; <string> )
-  ( Compile an inline string literal.)
+: $" ( compile time: <string> --; interpet time: -- addr ; Compile an inline string literal that puts counted string on stack.)
   COMPILE $"|     ( compile string runtime code)
   $," ; IMMEDIATE ( compile string itself )
+: S" ( compile time: <string> ; interpret time: -- caddr u ; ANS version puts address and length ) 
+  COMPILE S"| $," ; IMMEDIATE 
 
 \\T : foo $" hello" COUNT NIP ; foo 5 1 TEST
 
