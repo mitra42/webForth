@@ -262,7 +262,7 @@ const forthInForth = `
 ( === Control structures - were on Zen pg91 but needed earlier Zen pg 91-92 but moved early )
 ( this version comes from EFORTH-V5 which introduced MARK> >MARK )
 
-( FOR-NEXT FOR-AFT-THEN-NEXT BEGIN-AGAIN BEGIN-WHILE-REPEAT BEGIN-UNTIL AHEAD-THEN IF-ELSE-THEN ?WHEN)
+( FOR-NEXT FOR-AFT-THEN-NEXT BEGIN-AGAIN BEGIN-WHILE-REPEAT BEGIN-UNTIL IF-ELSE-THEN ?WHEN)
 : <MARK ( -- a ) HERE ;
 : <RESOLVE ( a -- ) , ;
 : >MARK ( -- A ) HERE 0 , ;
@@ -279,7 +279,7 @@ const forthInForth = `
 ( ERRATA ZEN - doesnt mark this as immediate)
 : AFT ( a -- a A ) DROP [COMPILE] AHEAD [COMPILE] BEGIN SWAP ; IMMEDIATE
 : ELSE ( A -- A )  [COMPILE] AHEAD SWAP [COMPILE] THEN ; IMMEDIATE
-: WHEN ( a A -- a A a ) [COMPILE] IF OVER ; IMMEDIATE ( Cannot find documentation on how this is used )
+: WHEN ( a -- a A a ) [COMPILE] IF OVER ; IMMEDIATE ( Cannot find documentation on how this is used )
 : WHILE ( a -- A a )    [COMPILE] IF SWAP ; IMMEDIATE
 
 ( TODO-TEST of above group non-obvious as writing to dictionary. )
@@ -302,7 +302,7 @@ const forthInForth = `
 : + UM+ DROP ; ( w1 w2 -- w1+w2)
 : D+ >R SWAP >R UM+ R> R> + + ; ( d1 d2 -- d1+d2)
 : INVERT -1 XOR ; ( w -- w; 1's compliment)
-( NOT's meaning is deprecated use 0= or INVERT bitwise see http://lars.nocrew.org/forth2012/core/INVERT.html)
+( NOT's meaning is deprecated use 0= logical or INVERT bitwise see http://lars.nocrew.org/forth2012/core/INVERT.html)
 : NEGATE INVERT  1 + ; ( w -- w; 2's complement)
 : DNEGATE INVERT >R INVERT  1 UM+ R> + ;
 : - NEGATE + ; ( n1 n2 -- n1-n2)
@@ -318,9 +318,10 @@ const forthInForth = `
 \\T 111 >R R@ RP@ R> SWAP RP@ SWAP - 111 111 CELLL 3 TEST
 \\T 1 2 SP@ CELL+ SP! 1 1 TEST
 
-( === More comparison Zen pg51-52 )
+( === More comparison Zen pg51-52 - ud< is added)
 : = XOR IF 0 EXIT THEN -1 ; ( w w -- t)
 : U< 2DUP XOR 0< IF NIP 0< EXIT THEN - 0< ;
+: ud< ( ud ud -- f ) ROT SWAP U< IF 2DROP -1 ELSE U< THEN ;
 : < 2DUP XOR 0< IF DROP 0< EXIT THEN - 0< ;
 : MAX 2DUP < IF SWAP THEN DROP ;
 : MIN 2DUP SWAP < IF SWAP THEN DROP ;
@@ -558,7 +559,7 @@ const forthInForth = `
 
 \\T NP @ CELL+ CELL+ COUNT NIP 5 1 TEST
   ( TODO-11-CELLL - need these tests)
-\\T NP @ 4 + COUNT OVER PAD ROT CMOVE C@ PAD C@ 1 TEST ( Check first character copied - expact pad="PACK$"
+\\T NP @ 4 + COUNT OVER PAD ROT CMOVE C@ PAD C@ 1 TEST ( Check first character copied - expect pad="PACK$"
 \\T PAD 3 + 5 BL FILL PAD 7 + C@ BL 1 TEST
 \\T PAD 8 -TRAILING PAD 3 2 TEST
 
@@ -774,6 +775,9 @@ const forthInForth = `
 : ."| ( -- ) ( Run time routine of ." . Output a compiled string.)
   do$        ( get string address)
   .$ ;       ( print the compiled string)
+: S"| ( -- caddr u; ANS version )
+  do$ COUNT ;
+
 
 ( ."| tested by ."; $"| tested by $" )
 
@@ -975,10 +979,12 @@ const forthInForth = `
   OVER C!     ( store at current location )
   1 + ;       ( increment current pointer )
 
-( Diff - Staapl doesnt check for 10 )
+( Diff - Staapl doesnt check for 10 - crlf? split out as used by READ-LINE )
+: crlf? ( c -- f; is key a return or line feed?)
+  DUP 10 = SWAP 13 = OR ;
 : kTAP ( bot eot cur key -- bot eot cur )
   ( Process a key stroke, CR or backspace.)
-  DUP 13 = OVER 10 = OR 0= ( is key a return or line feed?)
+  DUP crlf? 0= 
   IF
     [ CTRL H ] LITERAL = OVER 127 = OR ( is key a backspace or DEL ? )
     IF BL TAP   ( none of above, replace by space )
@@ -1036,14 +1042,18 @@ const forthInForth = `
   R> DROP         ( discard the saved data stack pointer )
   0 ;             ( push a no-error flag on data stack )
 
+( EFORTH DIFFERENCE - eForth always THROWs, but ANS doesnt throw if non-zero, since eForth use cases always have a err# )
+( the ANS definition servers both and is used)
 : THROW ( err# -- err# )
   ( Reset system to current local error frame and update error flag.)
-  HANDLER @ RP! ( expose latest error handler frame on return stack )
-  R> HANDLER !  ( restore previously saved error handler frame )
-  R> SWAP >R    ( retrieve the data stack pointer saved )
-  SP!           ( restore the data stack )
-  DROP
-  R> ;          ( retrieved err# )
+  ?DUP IF 
+    HANDLER @ RP! ( expose latest error handler frame on return stack )
+    R> HANDLER !  ( restore previously saved error handler frame )
+    R> SWAP >R    ( retrieve the data stack pointer saved )
+    SP!           ( restore the data stack )
+    DROP
+    R> 
+  THEN ;          ( retrieved err# )
 
 CREATE NULL$ 0 , ( EFORTH-ZEN-ERRATA inserts a string "coyote" after this, no idea why! )
 
@@ -1255,10 +1265,11 @@ CREATE I/O  ' ?RX , ' TX! , ( Array to store default I/O vectors. )
 
 ( === String Literals Zen pg93: ABORT" $" ." ( ABORT" ." moved to Zen pg84 where used )
 
-: $" ( -- ; <string> )
-  ( Compile an inline string literal.)
+: $" ( compile time: <string> --; interpet time: -- addr ; Compile an inline string literal that puts counted string on stack.)
   COMPILE $"|     ( compile string runtime code)
   $," ; IMMEDIATE ( compile string itself )
+: S" ( compile time: <string> ; interpret time: -- caddr u ; ANS version puts address and length ) 
+  COMPILE S"| $," ; IMMEDIATE 
 
 \\T : foo $" hello" COUNT NIP ; foo 5 1 TEST
 
@@ -1538,9 +1549,9 @@ let stdinBuffer = null; // Local to ?RX do not access directly - but there can b
  */
 // Mem8 assumes bigEndian
 // TODO-27-MEMORY could easily built a version of Mem8 that just used a raw Buffer or possibly Array Buffer (underlying buffer at Uint8Array.buffer )
-function align8(byteaddr) { return byteaddr} // 8
+function align8(byteaddr) { return byteaddr; } // 8
 function align16(byteAddr) { return (((byteAddr - 1) >> 1) + 1) << 1; }
-function align24(byteAddr) { return ((((byteAddr - 1) / 3) >>0) + 1) * 3; }
+function align24(byteAddr) { return ((((byteAddr - 1) / 3) >> 0) + 1) * 3; }
 function align32(byteAddr) { return (((byteAddr - 1) >> 2) + 1) << 2; } // 32
 
 class Mem8 extends Uint8Array {
@@ -1844,7 +1855,7 @@ class Romable16_16 {
   cellRomFetch(cellAddr) {
     if (cellAddr >= this.romCells) {
       console.log('Attempt to read above top of Rom at', cellAddr);
-    } // TODO-OPTIMIZE comment out
+    } // TODO-OTIMIZE comment out
     return this.rom[cellAddr];
   }
 
@@ -1937,15 +1948,16 @@ class Romable16_16 {
     const U8onM = new Uint8Array(buf, start, len);
     return new TextDecoder().decode(U8onM);
   }
+  buff8(byteAddr, bytes) { // TODO - backport to MemXX_XX
+    const isRam = byteAddr >= this.ram0;
+    const start = isRam ? byteAddr - this.ram0 : byteAddr; // in Cells
+    return new Uint8Array(isRam ? this.ram.buffer : this.rom.buffer, start, bytes);
+  }
   // Only used in token - which is bytes and never aligned
   copyWithin(byteDestn, byteSource, byteEnd) {
-    const dIsRam = byteDestn >= this.ram0;
-    const sIsRam = byteSource >= this.ram0;
-    let dStart = dIsRam ? byteDestn - this.ram0 : byteDestn; // in Cells
-    let sStart = sIsRam ? byteSource - this.ram0 : byteSource; // in Cells
     const bytes = byteEnd - byteSource;
-    const dBuf = new Uint8Array(dIsRam ? this.ram.buffer : this.rom.buffer, dStart, bytes);
-    const sBuf = new Uint8Array(sIsRam ? this.ram.buffer : this.rom.buffer, sStart, bytes);
+    const dBuf = this.buff8(byteDestn, bytes);
+    const sBuf = this.buff8(byteSource, bytes);
     for (let i = 0; i < bytes; i++) {
       dBuf[i] = sBuf[i];
     }
@@ -1983,7 +1995,7 @@ class Forth {
     // ported to Arduino below here to L.1831
     this.testing = 0x0; // 0x01 display words passed to interpreters; 0x02 each word in tokenthread - typically set by 'testing3'
     // ported to Arduino above
-    this.testingDepth = 1;
+    this.testingDepth = 9;
     this.padTestLength = 0; // Display pad length
     // === Javascript structures - implement the memory map and record the full state.
 
@@ -2056,26 +2068,8 @@ class Forth {
     this.Ustore(SP0offset, this.m.fromRamAddr(this.ramSPP));
     // Allow extensions of functions by caller - used for example to vector console I/O
     // Order is significant, as buildDictionary will define a jsFunction that points to the function as defined then.
-    extensions.forEach((e) => {
-      // Replace any of Forth's functions, or add new ones
-      if (typeof e.f === 'function') {
-        let fname = e.f.name; // Might be 'f' if undefined
-        if (fname.startsWith('bound ')) { fname = fname.slice(6); } // name gets changed if bind it.
-        if (fname === 'f') fname = undefined; // an anonymous function will be called 'f' since assigned to a field f.
-        if (fname) {
-          this[fname] = e.f;
-        }
-      }
-      if (e.n) { // Have a forth name for this
-        // Add to or replace jsFunctionAttributes for dictionary building.
-        const i = jsFunctionAttributes.findIndex((j) => j.n === e.n);
-        if (i === -1) { // Not found and have a name (forth name) for it.
-          jsFunctionAttributes.push(e);
-        } else {
-          Object.keys(e).forEach((k) => jsFunctionAttributes[i][k] = e[k]); // Copy over attributes as may not define all of the options
-        }
-      }
-    });
+    jsFunctionAttributes.forEach((e, i) => { jsFunctionAttributes[i] = this.extensionExpandDefaults(e); }); // Expand things like "name"
+    extensions.forEach((e) => this.extensionAdd(e));
     this.buildDictionary();
     // compiling forthInForth is done outside this as it is async. TODO-23-NODEAPI may change
   }
@@ -2101,34 +2095,7 @@ class Forth {
     this.js2xt = {};
 
     // Make some functions available as Forth words
-    jsFunctionAttributes.forEach((attribs) => {
-      if (attribs === 0) {
-        this.jsFunctions.push(attribs); // Intentionally invalid pointer in slot 0
-      } else {
-        // Shortcut
-        if (this.testing & 0x01) console.log('>> ', attribs);
-        if (typeof attribs === 'string') {
-          attribs = { n: attribs };
-        }
-        const n = attribs.n;
-        // noinspection JSUnresolvedVariable
-        const f = typeof attribs.f === 'function' ? attribs.f : this[attribs.f || n];
-        console.assert(typeof f === 'function');
-        const tok = this.jsFunctions.length; // Where function will be pushed
-        // special case: token Functions that need constants
-        this.jsFunctions.push(f);
-        if (attribs.token) {
-          this.buildConstant(n, tok);
-          // regular code functions that just need a pointer.
-        } else {
-          const xt = this.buildCode(n, tok, attribs);
-          //console.assert(xt === this.JStoXT(n));
-          if (attribs.jsNeeds) {
-            this.js2xt[n] = xt;
-          }
-        }
-      }
-    });
+    jsFunctionAttributes.forEach((e) => this.extensionAddToJSFunctions(e));
 
     // Build user variables
     // Bracket with a sanity check - also initializes TIB0 from this.TIB0
@@ -2136,7 +2103,15 @@ class Forth {
     jsUsers.forEach((nv) => this.buildUser(nv[0], nv[1]));
     console.assert(this.Ufetch(NPoffset) > 0);
   }
-
+  extensionAddConstant(e) {
+    if (typeof e.constant === "number") {
+      if (this.lastFetch()) {
+        this.buildConstant(e.n, e.constant);
+      } else {
+        l[e.n] = e.constant; // Will be added later
+      }
+    }
+  }
   buildConstant(name, val) {
     // Defining function for constants, Replaced by CONSTANT in FORTH
     this.CODE(name);
@@ -2173,10 +2148,91 @@ class Forth {
     this._USER++; // Need to skip to next _USER
   }
 
+  // Add an extension, there are two cases of this
+  // a: right at the start before building the dictionary, overriding any prior definition but not adding to jsFunctions
+  // b: after dictionary is built, when need to add to, or replace, in jsFunctions
+  extensionAdd(e) {
+    this.extensionExpandDefaults(e); // Expand "foo" to {n: "foo"}
+    this.extensionAddFunction(e); // If its a function, add it to the instance
+    this.extensionAddConstant(e); // If its a constant add to dictionary (or to "l" if not yet build dictionary
+    if (e.n && this.extensionFindFunction(e)) { // Have a forth name for this and its a function
+      // Add to or replace jsFunctionAttributes for dictionary building.
+      const i = jsFunctionAttributes.findIndex((j) => j.n === e.n);
+      if (i === -1) { // Not found and have a name (forth name) for it.
+        jsFunctionAttributes.push(e);
+        if (this.jsFunctions.length) { // Have we built it already
+          this.extensionAddToJSFunctions(e); // Add into JSFunctions
+        }
+      } else {
+        Object.keys(e).forEach((k) => jsFunctionAttributes[i][k] = e[k]); // Copy over attributes as may not define all of the options
+        if (this.jsFunctions.length) { // Have we built it already
+          this.extensionReplaceInJSFunctions(e, i);
+        }
+      }
+    }
+  }
+
+  extensionExpandDefaults(e) {
+    if (typeof e === 'string') {
+      e = { n: e };
+    }
+    return e;
+  }
+  // if an extension includes a function, add (or replace) this to the instance
+  // This allows replacing any of Forth's functions, or adding new ones
+  // Called when parsing extensions, or in extensionAdd()
+  extensionAddFunction(e) {
+    if (typeof e.f === 'function') { // It could be a string, referring to an existing function, or not a function at all
+      let fname = e.f.name; // Might be 'f' if undefined
+      if (fname.startsWith('bound ')) { fname = fname.slice(6); } // name gets changed if bind it.
+      if (fname === 'f') fname = undefined; // an anonymous function will be called 'f' since assigned to a field f.
+      if (fname) {
+        this[fname] = e.f;
+      }
+    }
+  }
+  // Add a JS function (or token?) to make it available to the dictionary (see extensionAddFunction for where its added to the instance)
+  // It is an error to call this if don't have a function (unless e is 0)
+  extensionAddToJSFunctions(e) {
+    if (e === 0) {
+      this.jsFunctions.push(e); // Intentionally invalid pointer in slot 0
+    } else {
+      // Shortcut
+      if (this.testing & 0x01) console.log('>> ', e);
+      // for the function - first choice is a supplied, function otherwise look up either string supplied or n as a method of the forth instance.
+      // noinspection JSUnresolvedVariable
+      const f = this.extensionFindFunction(e);
+      const tok = this.jsFunctions.length; // Where function will be pushed
+      // special case: token Functions that need constants
+      this.jsFunctions.push(f);
+      if (e.token) {
+        this.buildConstant(e.n, tok);
+      } else {
+        // regular code functions that just need a pointer in the dictionary.
+        const xt = this.buildCode(e.n, tok, e);
+        //console.assert(xt === this.JStoXT(e.n));
+        if (e.jsNeeds) {
+          this.js2xt[e.n] = xt;
+        }
+      }
+    }
+  }
+
+  extensionReplaceInJSFunctions(e, i) {
+    this.jsFunctions[i] = this.extensionFindFunction(e);
+  }
+
+  extensionFindFunction(e) {
+    // for the function - first choice is a supplied, function otherwise look up either string supplied or n as a method of the forth instance.
+    // noinspection JSUnresolvedVariable
+    return typeof e.f === 'function' ? e.f : this[e.f || e.n];
+  }
+
   compileForthInForth() {
     this.openBracket(); // Start off interpreting
     return this.interpret(forthInForth); // return a Promise
   }
+
   cleanupBootstrap() {
     // Cleanup - remove routines that shouldnt be being used
     jsFunctionAttributes.forEach((attribs, i) => {
@@ -2269,6 +2325,14 @@ class Forth {
     return this.m.cellRamFetch(this.ramUP + userindex); }
   Ustore(userindex, w) {
     this.m.cellRamStore(this.ramUP + userindex, w); }
+  SPpushD(x) {
+    this.SPpush(x); // This should only push the bottom cell.
+    this.SPpush(x >> (this.CELLL * 4) >> (this.CELLL * 4)); // Work around JS bug with >> 32
+  }
+  // d -- ; Pop double word off stack
+  SPpopD() {
+    return (this.SPpop() << (this.CELLL * 4) << (this.CELLL * 4)) + this.SPpop();
+  }
 
   // === Access to the USER variables before they are defined
   currentFetch() { return this.Ufetch(CURRENToffset); }
@@ -2285,12 +2349,17 @@ class Forth {
   // Convert a string made up of a count and that many bytes to a Javascript string.
   // it assumes a maximum of nameMaxLength (31) characters.
   // Mostly used for debugging but also in number conversion.
-  countedToJS(a) {
-    return this.m.decodeString(a + 1, a + (this.Mfetch8(a) & l.BYTEMASK) + 1);
-  }
+  stringToJS(caddr, u) {  // Convert string specified by address and count
+    return this.m.decodeString(caddr, caddr + u); }
+  countedToJS(a) { // Convert string specified by address which holds a count - possibly with a bytemask to JS
+    return this.stringToJS(a + 1, this.Mfetch8(a) & l.BYTEMASK); }
   // Convert a name address to the code dictionary definition.
-  na2xt(na) {
-    return this.Mfetch(na - (2 * this.CELLL));
+  na2xt(na) { return this.Mfetch(na - (2 * this.CELLL)); }
+  // a u --; return JS string given an ANS style string on stack.
+  SPpopString() {
+    const u = this.SPpop();
+    const a = this.SPpop();
+    return this.stringToJS(a, u);
   }
 
   // Inner function of find, traverses a linked list Name dictionary.
@@ -2380,7 +2449,7 @@ class Forth {
 
   // -- a; Push a Javascript string to a temporary location as a counted string, and put its address on the stack
   JStoCounted(s) {
-    const tempBuf = this.vpFetch() + 52; // Above Data or Code below HLD which builds numbers down from PAD which is vpFetch + 80
+    const tempBuf = this.vpFetch() + 10; // Above Data or Code below HLD which builds numbers down from PAD which is vpFetch + 80
     // copy string to TIB, and return length in bytes (which may not be same as s.length if UTF8;
     const count = this.m.encodeString(tempBuf + 1, s);
     this.Mstore8(tempBuf, count);
@@ -2539,12 +2608,10 @@ class Forth {
   // This is quite different from eForth as its token-threaded rather than direct threaded
 
   threadtoken(xt) {
-    // console.assert(xt >= this.CODEE && xt < this.NAMEE); // Uncomment to catch bizarre xt values earlier
     // This next section is only done while testing, and outputs a trace, so set it on (with testing3) immediately before a likely error.
     this.debugThread(xt);
     const tok = this.Mfetch(xt);
     xt += this.CELLL;
-    // console.assert(tok < this.jsFunctions.length); // commented out for efficiency, a fail will just break in the next line anyway.
     return this.jsFunctions[tok].call(this, xt); // Run the token function - like tokenDoList or tokenVar - will return null or a Promise
   }
 
@@ -2572,8 +2639,8 @@ class Forth {
     }
   }
 
-  async MS() { // ms --; delay for a period of time.
-    await new Promise((resolve) => setTimeout(resolve, this.SPpop()));
+  MS() { // ms --; delay for a period of time  (async but just returns a promise)
+    return new Promise((resolve) => setTimeout(resolve, this.SPpop()));
   }
 
   BYE() { // Should exit all the way out
@@ -2592,7 +2659,7 @@ class Forth {
   // and because there is nothing after the return from threadtoken which would get executed out of order
   // Note that it has a return which could be a promise, which the 'run' will await on.
   // This pattern may or may not work in other situations.
-  EXECUTE() { this.threadtoken(this.SPpop()); }
+  EXECUTE() { return this.threadtoken(this.SPpop()); }
 
   // === Basic low level key I/O and links to OS - Zen pg 35
   // This section will need editing for other systems.
@@ -2711,7 +2778,7 @@ class Forth {
   XOR() { this.SPpush(this.SPpop() ^ this.SPpop()); }
 
   // Primitive Arithmetic Word eForthAndZen44
-  UMplus() {
+  UMplus() { // w w -- d )
     const a = this.SPpop();
     const b = this.SPpop();
     if (this.CELLL === 4) {
@@ -2722,8 +2789,7 @@ class Forth {
     } else {
       // Note there is what I believe is a JS bug where x >> 32 is a noop so do th double shift
       const x = a + b;
-      this.SPpush(x); // This should only push the bottom cell.
-      this.SPpush(x >> (this.CELLL * 4) >> (this.CELLL * 4));
+      this.SPpushD(x); // Push double word
     }
   }
   // === Define and initialize User variables Zen pg33 see Zen pg46
@@ -2785,7 +2851,7 @@ class Forth {
   NUMBERQ() { // Same footprint as NUMBER?, this will be stored vectored from 'NUMBER
     // TODO-backport simple number conversion from Arduino
     const a = this.SPpop();
-    const w = this.countedToJS(a); // I believe this is the only place we use this.countedToJS to make JS strings outside of debugging
+    const w = this.countedToJS(a);
     const base = this.Ufetch(BASEoffset);
     const n = parseInt(w, base); // TODO-32-ERRORS handle parsing errors // Needs forth to convert word
     if (isNaN(n)) {
@@ -2880,8 +2946,7 @@ class Forth {
         this.SPpop();
       } else {
         // This is currently OK since its calling JS routines that may call Forth, there is no Forth-in-Forth
-        await this.runXT(
-          this.Ufetch(EVALoffset));
+        await this.runXT(this.Ufetch(EVALoffset));
       }
       // TODO-28-MULTITASK RP0 will move
       console.assert(this.ramSP <= this.ramSPP && (this.m.fromRamAddr(this.ramRP) <= this.Ufetch(RP0offset))); // Side effect of making SP and SPP available to debugger.
@@ -2914,9 +2979,9 @@ class Forth {
       await this.EVAL();
     }
   }
-  async interpret1(inp) {
+  interpret1(inp) { /* async by return a promise*/
     this.JStoTIB(inp);
-    await this.runXT(this.JStoXT('quit1', true));
+    return this.runXT(this.JStoXT('quit1', true)); // async
   }
   // === A group of words required for the JS interpreter redefined later
 
@@ -2973,8 +3038,10 @@ class Forth {
       this.Ustore(VPoffset, 0);
     }
   }
-  console() {
-    return this.runXT(this.JStoXT('WARM'));
+  console() { /* async via returning a promise from runXT */
+    return this.runXT(
+      this.JStoXT('WARM'),
+    ); // Async returns a promise
   }
   // ported to Arduino above L.2382-
 
