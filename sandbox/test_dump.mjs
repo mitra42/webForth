@@ -1,4 +1,4 @@
-import { Forth, ForthNodeExtensions, RP0offset, jsFunctionAttributes, Romable16_16 } from '../index.js';
+import { Forth, ForthNodeExtensions, RP0offset, jsFunctionAttributes, Flash16_16 } from '../index.js';
 
 /*
  * This is a first cut at a dictionary dumper aka cross-compiler for Arduino
@@ -16,7 +16,7 @@ const ROMSIZE = 0x1000 * CELLL; // Set to 0x2000 should cover the standard dict 
 // RAM: Used for UserVariables, stacks, TIB, PAD etc and Dictionary (code and names) after useRam() is called
 const RAMSIZE = 0x200 * CELLL; // 400 is about the maximum Ram you can use currently on e.g. an Arduino Uno
 const extensions = ForthNodeExtensions;
-const memClass = Romable16_16; // Separate Rom and Ram (like an Arduino).
+const memClass = Flash16_16; // Separate Rom and Ram (like an Arduino).
 
 class ForthDumper extends Forth {
   xcLine(s) { this.TXbangS(s); }

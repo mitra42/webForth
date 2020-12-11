@@ -57,7 +57,7 @@ Also there is some separation done to allow the lower parts
 
 #### Memory map to Javascript
 The primary memory, is a large area of (at least conceptually) contiguous memory.
-This area is conceptually split into a Rommable portion, and a Ram portion. 
+This area is conceptually split into a Rom portion, and a Ram portion. 
 
 There are two choices as to how that is used. 
 Whatever the choices, Forth addresses are always in Bytes.
@@ -78,7 +78,7 @@ The actual packing and unpacking are done by a class that can be passed to the F
 
 For example Mem16_32 is a 8 bit wide memory array for holding 32 bit cells which uses a `Uint16array`.
 
-Rommable16_16 is a newer way of handling, for now just supporting CELLL = MEM = 16, it separates
+Flash16_16 is a newer way of handling, for now just supporting CELLL = MEM = 16, it separates
 memory into two areas, so that one can be flashed on a device, and the other is fully initialized
 at start up.
 
@@ -187,7 +187,7 @@ webFORTH allows for separation between the two. The dictionary is built in an ar
 and then pointers are switched to a Ram area where further words can be built. The word `FORTH` and
 anything built with vCREATE will use memory in the Ram area, as do anything built with `VARIABLE`.
 
-This is visible currently in arduino_webforth.ino and in the Rommable16_16 class.
+This is visible currently in arduino_webforth.ino and in the Flash16_16 class.
 
 #### Portability
 The intention is to make this available for different situations, 

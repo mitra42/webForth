@@ -1,4 +1,4 @@
-import { Forth, ForthNodeExtensions, Romable16_16 } from '../index.js';
+import { Forth, ForthNodeExtensions, Flash16_16 } from '../index.js';
 // Normally this would be: import Forth from 'webforth';
 
 // Valid choices for CELL:MEM are 2:8 2:16 2:32 3:8 4:8 4:16 4:32
@@ -11,7 +11,7 @@ const ROMSIZE = 0x2000 * CELLL;
 const RAMSIZE = 0x400 * CELLL;
 const extensions = ForthNodeExtensions;
 let memClass = undefined;
-memClass = Romable16_16; // Uncomment this to simulate a chip with separate Rom and Ram (like an Arduino).
+memClass = Flash16_16; // Uncomment this to simulate a chip with separate Rom and Ram (like an Arduino).
 
 const forth = new Forth({ CELLL, ROMSIZE, RAMSIZE, MEM, extensions, memClass });
 forth.compileForthInForth()

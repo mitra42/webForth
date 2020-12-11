@@ -1839,7 +1839,7 @@ class Mem32_32 extends Mem32 {
 }
 
 // noinspection JSBitwiseOperatorUsage
-class Romable16_16 {
+class Flash16_16 {
   constructor({ romSize, ramSize, ram0 }) { // length =EM,  celll
     this.romSize = romSize;
     this.ramSize = ramSize;
@@ -3088,6 +3088,6 @@ const ForthNodeExtensions = [
 ];
 export { Forth,
   ForthNodeExtensions,  // Needed by example_node_api.js and test_dump.mjs (XC Cross compiler)
-  Mem8_16, Mem8_24, Mem8_32, Mem16_16, Mem16_32, Mem32_16, Mem32_32, Romable16_16, // Needed by console.js
+  Mem8_16, Mem8_24, Mem8_32, Mem16_16, Mem16_32, Mem32_16, Mem32_32, Flash16_16, // Needed by console.js
   jsFunctionAttributes, RP0offset, // Needed by test_dump.mjs (XC Cross compiler)
 };

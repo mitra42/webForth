@@ -1,5 +1,5 @@
 import fs from 'fs';
-import { Forth, ForthNodeExtensions, Romable16_16 } from '../index.js';
+import { Forth, ForthNodeExtensions, Flash16_16 } from '../index.js';
 // Normally this would be: import Forth from 'webforth';
 
 // Valid choices for CELL:MEM are 2:8 2:16 2:32 3:8 4:8 4:16 4:32
@@ -12,7 +12,7 @@ const ROMSIZE = 0x2000 * CELLL;
 const RAMSIZE = 0x2000 * CELLL; // Make it larger will use
 const extensions = ForthNodeExtensions;
 let memClass;
-memClass = Romable16_16; // Uncomment this to simulate a chip with separate Rom and Ram (like an Arduino).
+memClass = Flash16_16; // Uncomment this to simulate a chip with separate Rom and Ram (like an Arduino).
 
 /* Files design decisions
   At this point no local data is stored - File descriptors are returned.
