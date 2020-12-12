@@ -2083,13 +2083,19 @@ class Forth {
   buildDictionary() {
     // Define the first word in the dictionary, I'm using 'FORTH' for this because we need this variable to define everything else.
     this.CODE('FORTH');
+
+    const vp = this.Ufetch(VPoffset);
     this.DW(tokenVocabulary); // Uses assumption that tokenVocabulary is first in jsFunctionAttributes
-    const vp = this.vpFetch();
-    this.DW(this.vpFetch()); // Point to first cell in VP (data area in RAM)
+    const vocabPtr = vp || (this.cpFetch() + this.CELLL);
+    this.DW(vocabPtr); // Point to first cell in VP (data area in RAM or of not separated the next word)
+    if (vp) { // Increment VP over area
     this.Ustore(VPoffset, vp + 2 * this.CELLL); // ALLOT 2 spaces (should default to zero)
-    this.Ustore(CURRENToffset, vp); // Initialize Current. Context & Current+CELLL initialized in USER process Zen pg46
-    this.Ustore(CURRENToffset + 1, vp); // Initialize Current. Context & Current+CELLL initialized in USER process Zen pg46
-    this.Ustore(CONTEXToffset, vp); // Initialize Current. Context & Current+CELLL initialized in USER process Zen pg46
+    } else {
+      this.DW(0, 0);
+    }
+    this.Ustore(CURRENToffset, vocabPtr); // Initialize Current. Context & Current+CELLL initialized in USER process Zen pg46
+    this.Ustore(CURRENToffset + 1, vocabPtr); // Initialize Current. Context & Current+CELLL initialized in USER process Zen pg46
+    this.Ustore(CONTEXToffset, vocabPtr); // Initialize Current. Context & Current+CELLL initialized in USER process Zen pg46
     this.OVERT(); // Uses the initialization done by this.Ustore(CURRENToffset) above.
 
     // copy constants over

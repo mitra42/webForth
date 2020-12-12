@@ -6,9 +6,9 @@ const CELLL = 2; // 2 bytes for CELLL
 const MEM = 16; // Use 16 bit memory
 // Specify areas for ROM and RAM, currently they have to be specified separately as there is a bug with setting ROMSIZE = 0;
 // ROM: Used for UserVariable save area and Dictionary (code and names) until useRam() is called
-const ROMSIZE = 0x2000 * CELLL;
+const ROMSIZE = 0 * CELLL;
 // RAM: Used for UserVariables, stacks, TIB, PAD etc and Dictionary (code and names) after useRam() is called
-const RAMSIZE = 0x400 * CELLL;
+const RAMSIZE = 0x2400 * CELLL;
 const extensions = ForthNodeExtensions;
 let memClass = undefined;
 memClass = Flash16_16; // Uncomment this to simulate a chip with separate Rom and Ram (like an Arduino).
