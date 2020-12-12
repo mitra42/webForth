@@ -1838,12 +1838,12 @@ class Mem32_32 extends Mem32 {
 }
 
 class FlashXX_XX {
-  constructor({ romSize, ramSize, ram0 }) { // length =EM,  celll - note size is in bytes
+  constructor({ romSize, ramSize, ram0, littleEndian=true }) { // length =EM,  celll - note size is in bytes
     this.romSize = romSize;
     this.ramSize = ramSize;
     this.ram0 = ram0;
     this.romWritable = true; // Set to false after defined
-    this.littleEndian = true;
+    this.littleEndian = littleEndian;
   }
   cellRomFetch(cellAddr) {
     if (cellAddr >= this.romCells) {
@@ -1906,7 +1906,7 @@ class FlashXX_XX {
   buff8(byteAddr, bytes) { // TODO - backport to MemXX_XX
     const isRam = byteAddr >= this.ram0;
     const ramOrRom = isRam ? this.ram : this.rom;
-    const start = isRam ? byteAddr - this.ram0 : byteAddr; // in Cells
+    const start = isRam ? byteAddr - this.ram0 : byteAddr; // in bytes
     if (typeof bytes === 'undefined') { bytes = ramOrRom.byteLength - start; }
     return new Uint8Array(ramOrRom.buffer, start, bytes);
   }
@@ -1918,6 +1918,154 @@ class FlashXX_XX {
     for (let i = 0; i < bytes; i++) {
       dBuf[i] = sBuf[i];
     }
+  }
+}
+class Flash8_XX extends FlashXX_XX {
+  constructor({ romSize, ramSize, ram0, littleEndian=true }) { // length =EM,  celll - note size is in bytes
+    super({romSize, ramSize, ram0, littleEndian});
+    this.ram = new Uint8Array(this.ramSize); // Note its in bytes, not cells
+    this.rom = new Uint8Array(this.romSize); // Note its in bytes, not cells
+    this.romCells = romSize >> 1;
+    this.ramCells = ramSize >> 1;
+  }
+  _store16(uint8arr, byteAddr, v) {
+    if (this.littleEndian) {
+      uint8arr[byteAddr++] = v;
+      uint8arr[byteAddr] = v >> 8;
+    } else {
+      uint8arr[byteAddr++] = v >> 8;
+      uint8arr[byteAddr] = v;
+    }
+  }
+  fetch8(byteAddr) {
+    return (byteAddr >= this.ram0) ? this.ram[byteAddr - this.ram0] : this.rom[byteAddr];
+  }
+  store8(byteAddr, v) {
+    if (byteAddr >= this.ram0) {
+      this.ram[byteAddr - this.ram0] = v
+    } else {
+      this.rom[byteAddr] = v;
+    }
+  }
+
+}
+class Flash8_16 extends Flash8_XX {
+  constructor({ romSize, ramSize, ram0, littleEndian=true }) { // length =EM,  celll - note size is in bytes
+    super({romSize, ramSize, ram0, littleEndian});
+    this.romCells = romSize >> 1;
+    this.ramCells = ramSize >> 1;
+  }
+  _fetch16(uint8arr, byteAddr) {
+    return this.littleEndian
+      ? uint8arr[byteAddr++] + (uint8arr[byteAddr] << 8)
+      : uint8arr[byteAddr++] << 8 + uint8arr[byteAddr] << 8;
+  }
+  cellRomFetch(cellAddr) { // cell addresses are 16 bits on 8 bit base
+    if (cellAddr >= this.romCells) {
+      console.log('Attempt to read above top of Rom at', cellAddr);
+    } // TODO-OPTIMIZE comment out
+    return this._fetch16(this.rom, cellAddr << 1);
+  }
+  cellRamFetch(cellAddr) {
+    if (cellAddr >= this.ramCells) {
+      console.log('Attempt to read above top of Ram at', cellAddr);
+    } // TODO-OPTIMIZE comment out
+    return this._fetch16(this.ram, cellAddr << 1);
+  }
+
+  cellRamStore(cellAddr, v) {
+    if (cellAddr >= this.ramCells) {
+      console.log('Attempt to write above top of Ram at');
+    } // TODO-OPTIMIZE comment out
+    this._store16(this.ram, cellAddr << 1, v);
+  }
+  cellRomStore(cellAddr, v) {
+    if (!this.romWritable) {
+      console.log('Attempt to write to Rom after closed at', cellAddr);
+    } // TODO-OPTIMIZE comment out
+    this._store16(this.rom, cellAddr << 1, v);
+  }
+  fetchCell(byteAddr) {
+    const isRam = byteAddr >= this.ram0;
+    return this._fetch16(isRam ? this.ram : this.rom, isRam ? (byteAddr - this.ram0) : byteAddr);
+  }
+  storeCell(byteAddr, v) {
+    const isRam = byteAddr >= this.ram0;
+    this._store16(isRam ? this.ram : this.rom, isRam ? (byteAddr - this.ram0) : byteAddr, v);
+  }
+  ramAddr(byteAddr) { return ((byteAddr ^ this.ram0) >> 1); }
+  romAddr(byteAddr) { return (byteAddr >> 1); }
+  fromRamAddr(ramAddr) { return (ramAddr << 1) | this.ram0; }
+  fromRomAddr(romAddr) { return (romAddr << 1); }
+  cellAlign(byteaddr) { return align16(byteaddr); }
+  memAlign(byteaddr) { return align8(byteaddr); }
+  assertAlign(byteAddr) {
+    // Check expectation already aligned, can comment out for speed
+    console.assert(!(byteAddr & 0x01));
+  }
+}
+class Flash8_32 extends Flash8_XX { //TODO merge some of this into Flash8_XX
+  constructor({ romSize, ramSize, ram0, littleEndian=true }) { // length =EM,  celll - note size is in bytes
+    super({romSize, ramSize, ram0, littleEndian});
+    this.romCells = romSize >> 2;
+    this.ramCells = ramSize >> 2;
+  }
+  _fetch32(uint8arr, byteAddr) {
+    return this.littleEndian
+      ? (((((uint8arr[byteAddr + 3] << 8) | uint8arr[byteAddr + 2]) << 8) | uint8arr[byteAddr + 1]) << 8) | uint8arr[byteAddr]
+      : (((((uint8arr[byteAddr++] << 8) | uint8arr[byteAddr++]) << 8) | uint8arr[byteAddr++]) << 8) | uint8arr[byteAddr]; }
+
+  cellRomFetch(cellAddr) { // cell addresses are 16 bits on 8 bit base
+    if (cellAddr >= this.romCells) {
+      console.log('Attempt to read above top of Rom at', cellAddr);
+    } // TODO-OPTIMIZE comment out
+    return this._fetch32(this.rom, cellAddr << 2);
+  }
+  cellRamFetch(cellAddr) {
+    if (cellAddr >= this.ramCells) {
+      console.log('Attempt to read above top of Ram at', cellAddr);
+    } // TODO-OPTIMIZE comment out
+    return this._fetch32(this.ram, cellAddr << 2);
+  }
+
+  _store32(uint8arr, byteAddr, v) {
+    if (this.littleEndian) {
+      this._store16(uint8arr, byteAddr + 2, v >> 16);
+      this._store16(uint8arr, byteAddr, v);
+    } else {
+      this._store16(uint8arr, byteAddr, v >> 16);
+      this._store16(uint8arr, byteAddr + 2, v);
+    }
+  }
+  cellRamStore(cellAddr, v) {
+    if (cellAddr >= this.ramCells) {
+      console.log('Attempt to write above top of Ram at');
+    } // TODO-OPTIMIZE comment out
+    this._store32(this.ram, cellAddr << 2, v);
+  }
+  cellRomStore(cellAddr, v) {
+    if (!this.romWritable) {
+      console.log('Attempt to write to Rom after closed at', cellAddr);
+    } // TODO-OPTIMIZE comment out
+    this._store32(this.rom, cellAddr << 2, v);
+  }
+  fetchCell(byteAddr) {
+    const isRam = byteAddr >= this.ram0;
+    return this._fetch32(isRam ? this.ram : this.rom, isRam ? (byteAddr - this.ram0) : byteAddr);
+  }
+  storeCell(byteAddr, v) {
+    const isRam = byteAddr >= this.ram0;
+    this._store32(isRam ? this.ram : this.rom, isRam ? (byteAddr - this.ram0) : byteAddr, v);
+  }
+  ramAddr(byteAddr) { return ((byteAddr ^ this.ram0) >> 2); }
+  romAddr(byteAddr) { return (byteAddr >> 2); }
+  fromRamAddr(ramAddr) { return (ramAddr << 2) | this.ram0; }
+  fromRomAddr(romAddr) { return (romAddr << 2); }
+  cellAlign(byteaddr) { return align32(byteaddr); }
+  memAlign(byteaddr) { return align8(byteaddr); }
+  assertAlign(byteAddr) {
+    // Check expectation already aligned, can comment out for speed
+    console.assert(!(byteAddr & 0x03));
   }
 }
 
@@ -2089,7 +2237,7 @@ class Forth {
     const vocabPtr = vp || (this.cpFetch() + this.CELLL);
     this.DW(vocabPtr); // Point to first cell in VP (data area in RAM or of not separated the next word)
     if (vp) { // Increment VP over area
-    this.Ustore(VPoffset, vp + 2 * this.CELLL); // ALLOT 2 spaces (should default to zero)
+      this.Ustore(VPoffset, vp + 2 * this.CELLL); // ALLOT 2 spaces (should default to zero)
     } else {
       this.DW(0, 0);
     }
@@ -3098,6 +3246,6 @@ const ForthNodeExtensions = [
 ];
 export { Forth,
   ForthNodeExtensions,  // Needed by example_node_api.js and test_dump.mjs (XC Cross compiler)
-  Mem8_16, Mem8_24, Mem8_32, Mem16_16, Mem16_32, Mem32_16, Mem32_32, Flash16_16, Flash32_32, // Needed by console.js
+  Mem8_16, Mem8_24, Mem8_32, Mem16_16, Mem16_32, Mem32_16, Mem32_32, Flash8_16, Flash8_32, Flash16_16, Flash32_32, // Needed by console.js
   jsFunctionAttributes, RP0offset, // Needed by test_dump.mjs (XC Cross compiler)
 };
