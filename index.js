@@ -558,8 +558,7 @@ const forthInForth = `
   R> ;        ( leave only word buffer address )
 
 \\T NP @ CELL+ CELL+ COUNT NIP 5 1 TEST
-  ( TODO-11-CELLL - need these tests)
-\\T NP @ 4 + COUNT OVER PAD ROT CMOVE C@ PAD C@ 1 TEST ( Check first character copied - expect pad="PACK$"
+\\T NP @ CELL+ CELL+ COUNT OVER PAD ROT CMOVE C@ PAD C@ 1 TEST ( Check first character copied - expect pad="PACK$"
 \\T PAD 3 + 5 BL FILL PAD 7 + C@ BL 1 TEST
 \\T PAD 8 -TRAILING PAD 3 2 TEST
 
@@ -1265,7 +1264,7 @@ CREATE I/O  ' ?RX , ' TX! , ( Array to store default I/O vectors. )
 
 ( === String Literals Zen pg93: ABORT" $" ." ( ABORT" ." moved to Zen pg84 where used )
 
-: $" ( compile time: <string> --; interpet time: -- addr ; Compile an inline string literal that puts counted string on stack.)
+: $" ( compile time: <string> --; interpret time: -- addr ; Compile an inline string literal that puts counted string on stack.)
   COMPILE $"|     ( compile string runtime code)
   $," ; IMMEDIATE ( compile string itself )
 : S" ( compile time: <string> ; interpret time: -- caddr u ; ANS version puts address and length ) 
@@ -1310,7 +1309,7 @@ CREATE I/O  ' ?RX , ' TX! , ( Array to store default I/O vectors. )
     EXIT        ( done. exit )
   THEN          ( not a valid word )
   'NUMBER @EXECUTE ( convert it to a number )
-  IF [COMPILE] LITERAL ( successful. compile a literal number )
+  IF  [COMPILE] LITERAL ( successful. compile a literal number )
     EXIT        ( done )
   THEN          ( not a number either )
   THROW ;       ( generate an error condition )
@@ -1838,27 +1837,20 @@ class Mem32_32 extends Mem32 {
   cellAlign(byteaddr) { return align32(byteaddr); }
 }
 
-// noinspection JSBitwiseOperatorUsage
-class Flash16_16 {
-  constructor({ romSize, ramSize, ram0 }) { // length =EM,  celll
+class FlashXX_XX {
+  constructor({ romSize, ramSize, ram0 }) { // length =EM,  celll - note size is in bytes
     this.romSize = romSize;
     this.ramSize = ramSize;
     this.ram0 = ram0;
-    this.romCells = romSize >> 1;
-    this.ramCells = ramSize >> 1;
-    this.ram = new Uint16Array(ramSize);
-    this.rom = new Uint16Array(romSize);
     this.romWritable = true; // Set to false after defined
     this.littleEndian = true;
   }
-
   cellRomFetch(cellAddr) {
     if (cellAddr >= this.romCells) {
       console.log('Attempt to read above top of Rom at', cellAddr);
-    } // TODO-OTIMIZE comment out
+    } // TODO-OPTIMIZE comment out
     return this.rom[cellAddr];
   }
-
   cellRamFetch(cellAddr) {
     if (cellAddr >= this.ramCells) {
       console.log('Attempt to read above top of Ram at', cellAddr);
@@ -1880,11 +1872,6 @@ class Flash16_16 {
     this.rom[cellAddr] = v;
   }
 
-  ramAddr(byteAddr) { return ((byteAddr ^ this.ram0) >> 1); }
-  romAddr(byteAddr) { return (byteAddr >> 1); }
-  fromRamAddr(ramAddr) { return (ramAddr << 1) | this.ram0; }
-  fromRomAddr(romAddr) { return (romAddr << 1); }
-
   fetchCell(byteAddr) {
     return (byteAddr >= this.ram0) ? this.cellRamFetch(this.ramAddr(byteAddr)) : this.cellRomFetch(this.romAddr(byteAddr));
   }
@@ -1896,62 +1883,32 @@ class Flash16_16 {
       this.cellRomStore(this.romAddr(byteAddr), v);
     }
   }
-
-  fetch8(byteAddr) {
-    const offset = byteAddr & 0x01;
+  _fetch8(byteAddr, mask) {
+    const offset = byteAddr & mask;
+    const shiftbits = 8 * (this.littleEndian ? offset : (mask - offset));
     const cell = this.fetchCell(byteAddr); // Does not have to be aligned
-    return (this.littleEndian
-      ? (offset
-        ? (cell >> 8)
-        : (cell & 0xFF))
-      : (offset
-        ? (cell & 0xFF)
-        : (cell >> 8))
-    );
+    return (cell >> shiftbits) & 0xFF;
   }
-
-  store8(byteAddr, v) {
-    const offset = byteAddr & 0x01;
+  _store8(byteAddr, v, mask) {
+    const offset = byteAddr & mask;
+    const shiftbits = 8 * (this.littleEndian ? offset : (mask - offset));
     const cell = this.fetchCell(byteAddr);
-    if (this.littleEndian) {
-      if (offset) {
-        this.storeCell(byteAddr, (cell & 0x00FF) | (v << 8));
-      } else {
-        this.storeCell(byteAddr, (cell & 0xFF00) | v);
-      }
-    } else if (offset) {
-      this.storeCell(byteAddr, (cell & 0xFF00) | v);
-    } else {
-      this.storeCell(byteAddr, (cell & 0x00FF) | (v << 8));
-    }
-  }
-  cellAlign(byteaddr) { return align16(byteaddr); }
-  memAlign(byteaddr) { return align16(byteaddr); }
-  assertAlign(byteAddr) {
-    // Check expectation already aligned, can comment out for speed
-    console.assert(!(byteAddr & 0x01));
+    this.storeCell(byteAddr, (cell & (-1 ^ (0xFF << shiftbits)))| (v << shiftbits));
   }
   // Encode a string into an address and return the number of bytes written
   // Does not check the start address, which will most often NOT be a cell boundary as will have length first
   encodeString(byteAddr, s) {
-    const isRam = byteAddr >= this.ram0;
-    const startWriteInBuffer = isRam ? (byteAddr ^ this.ram0) : byteAddr;
-    const ramOrRom = isRam ? this.ram : this.rom;
-    const U8onM = new Uint8Array(ramOrRom.buffer, startWriteInBuffer, ramOrRom.byteLength - startWriteInBuffer);
-    return new TextEncoder().encodeInto(s, U8onM).written; // Uint8Array
+    return new TextEncoder().encodeInto(s,  this.buff8(byteAddr)).written; // Uint8Array
   }
   decodeString(byteStart, byteEnd) {
-    const isRam = byteStart >= this.ram0;
-    const buf = isRam ? this.ram.buffer : this.rom.buffer;
-    const len = byteEnd - byteStart;
-    const start = isRam ? (byteStart ^ this.ram0) : byteStart;
-    const U8onM = new Uint8Array(buf, start, len);
-    return new TextDecoder().decode(U8onM);
+    return new TextDecoder().decode(this.buff8(byteStart, byteEnd - byteStart));
   }
   buff8(byteAddr, bytes) { // TODO - backport to MemXX_XX
     const isRam = byteAddr >= this.ram0;
+    const ramOrRom = isRam ? this.ram : this.rom;
     const start = isRam ? byteAddr - this.ram0 : byteAddr; // in Cells
-    return new Uint8Array(isRam ? this.ram.buffer : this.rom.buffer, start, bytes);
+    if (typeof bytes === 'undefined') { bytes = ramOrRom.byteLength - start; }
+    return new Uint8Array(ramOrRom.buffer, start, bytes);
   }
   // Only used in token - which is bytes and never aligned
   copyWithin(byteDestn, byteSource, byteEnd) {
@@ -1961,6 +1918,53 @@ class Flash16_16 {
     for (let i = 0; i < bytes; i++) {
       dBuf[i] = sBuf[i];
     }
+  }
+}
+
+// noinspection JSBitwiseOperatorUsage
+class Flash16_16 extends FlashXX_XX {
+  constructor({ romSize, ramSize, ram0 }) { // length =EM,  celll - note size is in bytes
+    super({ romSize, ramSize, ram0 });
+    this.romCells = romSize >> 1;
+    this.ramCells = ramSize >> 1;
+    this.ram = new Uint16Array(this.ramCells);
+    this.rom = new Uint16Array(this.romCells);
+  }
+
+  ramAddr(byteAddr) { return ((byteAddr ^ this.ram0) >> 1); }
+  romAddr(byteAddr) { return (byteAddr >> 1); }
+  fromRamAddr(ramAddr) { return (ramAddr << 1) | this.ram0; }
+  fromRomAddr(romAddr) { return (romAddr << 1); }
+  fetch8(byteAddr) { return this._fetch8(byteAddr, 0x01); }
+  store8(byteAddr, v) { this._store8(byteAddr, v, 0x01); }
+  cellAlign(byteaddr) { return align16(byteaddr); }
+  memAlign(byteaddr) { return align16(byteaddr); }
+  assertAlign(byteAddr) {
+    // Check expectation already aligned, can comment out for speed
+    console.assert(!(byteAddr & 0x01));
+  }
+}
+
+// noinspection JSBitwiseOperatorUsage
+class Flash32_32 extends FlashXX_XX {
+  constructor({ romSize, ramSize, ram0 }) { // length =EM,  celll - note size is in bytes
+    super({ romSize, ramSize, ram0 });
+    this.romCells = romSize >> 2;
+    this.ramCells = ramSize >> 2;
+    this.ram = new Uint32Array(this.ramCells);
+    this.rom = new Uint32Array(this.romCells);
+  }
+  ramAddr(byteAddr) { return ((byteAddr ^ this.ram0) >> 2); }
+  romAddr(byteAddr) { return (byteAddr >> 2); }
+  fromRamAddr(ramAddr) { return (ramAddr << 2) | this.ram0; }
+  fromRomAddr(romAddr) { return (romAddr << 2); }
+  fetch8(byteAddr) { return this._fetch8(byteAddr, 0x03); }
+  store8(byteAddr, v) { this._store8(byteAddr, v, 0x03); }
+  cellAlign(byteaddr) { return align32(byteaddr); }
+  memAlign(byteaddr) { return align32(byteaddr); }
+  assertAlign(byteAddr) {
+    // Check expectation already aligned, can comment out for speed
+    console.assert(!(byteAddr & 0x03));
   }
 }
 
@@ -2104,7 +2108,7 @@ class Forth {
     console.assert(this.Ufetch(NPoffset) > 0);
   }
   extensionAddConstant(e) {
-    if (typeof e.constant === "number") {
+    if (typeof e.constant === 'number') {
       if (this.lastFetch()) {
         this.buildConstant(e.n, e.constant);
       } else {
@@ -2131,13 +2135,13 @@ class Forth {
   }
   buildUser(name, init) {
     if (this.testing & 0x01) console.log('USER>>', name, init);
-    init = typeof init === 'string'
+    const initVal = typeof init === 'string'
       ? (typeof this[init] !== 'undefined' ? this[init] : this.JStoXT(init)) // Either field of this, or function
       : typeof init === 'undefined'
         ? this.Ufetch(this._USER) // Already storing during build (e.g. NP)
         : init;
-    console.assert(typeof init !== 'undefined');
-    this.Ustore(this._USER, init);         // Initialize the variable for live compilation
+    console.assert(typeof initVal !== 'undefined');
+    this.Ustore(this._USER, initVal);         // Initialize the variable for live compilation
     const offsetInBytes = this._USER;
     //UZERO is initialized at userAreaSave
     if (name) {                       // Put into dictionary
@@ -2449,7 +2453,7 @@ class Forth {
 
   // -- a; Push a Javascript string to a temporary location as a counted string, and put its address on the stack
   JStoCounted(s) {
-    const tempBuf = this.vpFetch() + 10; // Above Data or Code below HLD which builds numbers down from PAD which is vpFetch + 80
+    const tempBuf = this.m.cellAlign(this.vpFetch() + 12); // Above Data or Code below HLD which builds numbers down from PAD which is vpFetch + 80
     // copy string to TIB, and return length in bytes (which may not be same as s.length if UTF8;
     const count = this.m.encodeString(tempBuf + 1, s);
     this.Mstore8(tempBuf, count);
@@ -3088,6 +3092,6 @@ const ForthNodeExtensions = [
 ];
 export { Forth,
   ForthNodeExtensions,  // Needed by example_node_api.js and test_dump.mjs (XC Cross compiler)
-  Mem8_16, Mem8_24, Mem8_32, Mem16_16, Mem16_32, Mem32_16, Mem32_32, Flash16_16, // Needed by console.js
+  Mem8_16, Mem8_24, Mem8_32, Mem16_16, Mem16_32, Mem32_16, Mem32_32, Flash16_16, Flash32_32, // Needed by console.js
   jsFunctionAttributes, RP0offset, // Needed by test_dump.mjs (XC Cross compiler)
 };

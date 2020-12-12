@@ -1,4 +1,4 @@
-import { Forth, ForthNodeExtensions, Flash16_16 } from '../index.js';
+import { Forth, ForthNodeExtensions, Flash16_16, Flash32_32 } from '../index.js';
 // Normally this would be: import Forth from 'webforth';
 
 // Valid choices for CELL:MEM are 2:8 2:16 2:32 3:8 4:8 4:16 4:32
