@@ -76,7 +76,7 @@ Usually an alignment is done, so that if CELLL is 2 then it always starts on an 
 but this depends on memory efficiency and (may) not be done if MEM=8.
 The actual packing and unpacking are done by a class that can be passed to the Forth constructor.
 
-For example Mem16_32 is a 8 bit wide memory array for holding 32 bit cells which uses a `Uint16array`.
+For example Flash16_32 is a 8 bit wide memory array for holding 32 bit cells which uses a `Uint16array`.
 
 Flash16_16 is a newer way of handling, for now just supporting CELLL = MEM = 16, it separates
 memory into two areas, so that one can be flashed on a device, and the other is fully initialized

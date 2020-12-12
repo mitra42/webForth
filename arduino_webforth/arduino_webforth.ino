@@ -1134,7 +1134,7 @@ const CELLTYPE forthTrue = -1; // Not quite correct, should be masked BUT when p
 //L.1823
 #define CELLbits CELLL * 8 // Number of bits in a cell - used for loops and shifts
 // mask used when masking cells in fast search for name ERRATA Zen uses this but its not defined e.g. 0x1FFFFF if CELLL = 3
-// Note - this will fail if master that dumped dictionary above is the opposite Endian. (Currently only Mem8 is little-endian; and Arduino is using Mem16).
+// Note - this will fail if master that dumped dictionary above is the opposite Endian. (Currently only Flash8_xx is little-endian; and Arduino is using Flash16_16).
 #ifdef LITTLEENDIAN
 const CELLTYPE CELLMASK = forthTrue ^ (0xFF ^ BYTEMASK);
 #else
@@ -1160,7 +1160,7 @@ static byte testing = 0;
 #define ramUP0 RAMADDR(UPP)
 
 //L.1852
-static CELLTYPE ram[RAMCELLS]; // Equivalent of Mem16_16 in webForth
+static CELLTYPE ram[RAMCELLS]; // Equivalent of Flash16_16 in webForth
 //L.1853 - jsFunctions[] is now fp[] and has to be after definition of functions in it.
 
 // Key pointers used - would ideally be registers in a register based system

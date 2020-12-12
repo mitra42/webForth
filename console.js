@@ -16,7 +16,7 @@ async function ForthLoad({ extensions = [] } = {}) {
     const module = await import('./index.js');
     Forth = module.Forth; // Make available globally to this file
     const f = new Forth({
-      CELLL, EM, MEM, memClass: module.Mem8_16, // Define memory
+      CELLL, EM, MEM, memClass: module.Flash16_16, // Define memory
       extensions,
     });         // Setup I/O (just output currently)
     fLog('\nCompiling Forth from Forth\n');
