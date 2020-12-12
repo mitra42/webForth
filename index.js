@@ -1947,7 +1947,6 @@ class Flash8_XX extends FlashXX_XX {
       this.rom[byteAddr] = v;
     }
   }
-
 }
 class Flash8_16 extends Flash8_XX {
   constructor({ romSize, ramSize, ram0, littleEndian=true }) { // length =EM,  celll - note size is in bytes
@@ -2004,6 +2003,73 @@ class Flash8_16 extends Flash8_XX {
     console.assert(!(byteAddr & 0x01));
   }
 }
+class Flash8_24 extends Flash8_XX { //TODO merge some of this into Flash8_XX
+  constructor({ romSize, ramSize, ram0, littleEndian=true }) { // length =EM,  celll - note size is in bytes
+    super({romSize, ramSize, ram0, littleEndian});
+    this.romCells = (romSize / 3) >>0;
+    this.ramCells = (ramSize / 3) >> 0;
+  }
+  _fetch24(uint8arr, byteAddr) {
+    return this.littleEndian
+      ? ((((uint8arr[byteAddr + 2] << 8) | uint8arr[byteAddr + 1]) << 8) | uint8arr[byteAddr])
+      : ((((uint8arr[byteAddr++] << 8) | uint8arr[byteAddr++]) << 8) | uint8arr[byteAddr]); }
+
+  cellRomFetch(cellAddr) { // cell addresses are 16 bits on 8 bit base
+    if (cellAddr >= this.romCells) {
+      console.log('Attempt to read above top of Rom at', cellAddr);
+    } // TODO-OPTIMIZE comment out
+    return this._fetch32(this.rom, cellAddr * 3);
+  }
+  cellRamFetch(cellAddr) {
+    if (cellAddr >= this.ramCells) {
+      console.log('Attempt to read above top of Ram at', cellAddr);
+    } // TODO-OPTIMIZE comment out
+    return this._fetch24(this.ram, cellAddr * 3);
+  }
+
+  _store24(uint8arr, byteAddr, v) {
+    if (this.littleEndian) {
+      uint8arr[byteAddr++] = v;
+      uint8arr[byteAddr++] = v >> 8;
+      uint8arr[byteAddr] = v >> 16;
+    } else {
+      uint8arr[byteAddr++] = v >> 16;
+      uint8arr[byteAddr++] = v >> 8;
+      uint8arr[byteAddr] = v;
+    }
+  }
+  cellRamStore(cellAddr, v) {
+    if (cellAddr >= this.ramCells) {
+      console.log('Attempt to write above top of Ram at');
+    } // TODO-OPTIMIZE comment out
+    this._store24(this.ram, cellAddr * 3, v);
+  }
+  cellRomStore(cellAddr, v) {
+    if (!this.romWritable) {
+      console.log('Attempt to write to Rom after closed at', cellAddr);
+    } // TODO-OPTIMIZE comment out
+    this._store24(this.rom, cellAddr * 3, v);
+  }
+  fetchCell(byteAddr) {
+    const isRam = byteAddr >= this.ram0;
+    return this._fetch24(isRam ? this.ram : this.rom, isRam ? (byteAddr - this.ram0) : byteAddr);
+  }
+  storeCell(byteAddr, v) {
+    const isRam = byteAddr >= this.ram0;
+    this._store24(isRam ? this.ram : this.rom, isRam ? (byteAddr - this.ram0) : byteAddr, v);
+  }
+  ramAddr(byteAddr) { return (((byteAddr ^ this.ram0)/3)>>0); }
+  romAddr(byteAddr) { return ((byteAddr / 3) >> 0); }
+  fromRamAddr(ramAddr) { return (ramAddr * 3) | this.ram0; }
+  fromRomAddr(romAddr) { return (romAddr * 3); }
+  cellAlign(byteaddr) { return align24(byteaddr); }
+  memAlign(byteaddr) { return align8(byteaddr); }
+  assertAlign(byteAddr) {
+    // Check expectation already aligned, can comment out for speed
+    console.assert(!(byteAddr & 0x03));
+  }
+}
+
 class Flash8_32 extends Flash8_XX { //TODO merge some of this into Flash8_XX
   constructor({ romSize, ramSize, ram0, littleEndian=true }) { // length =EM,  celll - note size is in bytes
     super({romSize, ramSize, ram0, littleEndian});
@@ -2065,7 +2131,7 @@ class Flash8_32 extends Flash8_XX { //TODO merge some of this into Flash8_XX
   memAlign(byteaddr) { return align8(byteaddr); }
   assertAlign(byteAddr) {
     // Check expectation already aligned, can comment out for speed
-    console.assert(!(byteAddr & 0x03));
+    console.assert(byteAddr === align24(byteAddr));
   }
 }
 
@@ -3246,6 +3312,6 @@ const ForthNodeExtensions = [
 ];
 export { Forth,
   ForthNodeExtensions,  // Needed by example_node_api.js and test_dump.mjs (XC Cross compiler)
-  Mem8_16, Mem8_24, Mem8_32, Mem16_16, Mem16_32, Mem32_16, Mem32_32, Flash8_16, Flash8_32, Flash16_16, Flash32_32, // Needed by console.js
+  Mem8_16, Mem8_24, Mem8_32, Mem16_16, Mem16_32, Mem32_16, Mem32_32, Flash8_16, Flash8_24, Flash8_32, Flash16_16, Flash32_32, // Needed by console.js
   jsFunctionAttributes, RP0offset, // Needed by test_dump.mjs (XC Cross compiler)
 };
