@@ -5,7 +5,7 @@
  * foo.compileForthInForth()            // Load the parts of Forth written in Forth
  * .then(() => foo.interpret("1 2 DUP .S")); // Run some Forth words in the instance
  * .then(() => forth.console());        // Go interactive
- * new Forth({ CELLL: 3, memClass: 8_32, EM: 0x4000);  // parameterizable
+ * new Forth({ CELLL: 2, MEM: 16, RAMSIZE: 0x4000);  // parameterizable
  *
  * And some ideas ... not yet implemented
  * .then(() => foo.load('foo.f'))       // TODO-34-LOAD Load file into the class
@@ -1551,11 +1551,12 @@ function align16(byteAddr) { return (((byteAddr - 1) >> 1) + 1) << 1; }
 function align24(byteAddr) { return ((((byteAddr - 1) / 3) >> 0) + 1) * 3; }
 function align32(byteAddr) { return (((byteAddr - 1) >> 2) + 1) << 2; } // 32
 
+// noinspection JSBitwiseOperatorUsage,JSBitwiseOperatorUsage
 class FlashXX_XX {
-  constructor({ romSize, ramSize, ram0, littleEndian=true }) { // length =EM,  celll - note size is in bytes
+  constructor({ romSize, ramSize, rom0, littleEndian = true }) {
     this.romSize = romSize;
     this.ramSize = ramSize;
-    this.ram0 = ram0;
+    this.rom0 = rom0;
     this.romWritable = true; // Set to false after defined
     this.littleEndian = littleEndian;
   }
@@ -1587,14 +1588,14 @@ class FlashXX_XX {
   }
 
   fetchCell(byteAddr) {
-    return (byteAddr >= this.ram0) ? this.cellRamFetch(this.ramAddr(byteAddr)) : this.cellRomFetch(this.romAddr(byteAddr));
+    return (byteAddr & this.rom0) ? this.cellRomFetch(this.romAddr(byteAddr)) : this.cellRamFetch(this.ramAddr(byteAddr));
   }
 
   storeCell(byteAddr, v) {
-    if (byteAddr >= this.ram0) {
-      this.cellRamStore(this.ramAddr(byteAddr), v);
-    } else {
+    if (byteAddr & this.rom0) {
       this.cellRomStore(this.romAddr(byteAddr), v);
+    } else {
+      this.cellRamStore(this.ramAddr(byteAddr), v);
     }
   }
   _fetch8(byteAddr, mask) {
@@ -1607,7 +1608,7 @@ class FlashXX_XX {
     const offset = byteAddr & mask;
     const shiftbits = 8 * (this.littleEndian ? offset : (mask - offset));
     const cell = this.fetchCell(byteAddr);
-    this.storeCell(byteAddr, (cell & (-1 ^ (0xFF << shiftbits)))| (v << shiftbits));
+    this.storeCell(byteAddr, (cell & (-1 ^ (0xFF << shiftbits))) | (v << shiftbits));
   }
   // Encode a string into an address and return the number of bytes written
   // Does not check the start address, which will most often NOT be a cell boundary as will have length first
@@ -1618,9 +1619,9 @@ class FlashXX_XX {
     return new TextDecoder().decode(this.buff8(byteStart, byteEnd - byteStart));
   }
   buff8(byteAddr, bytes) { // TODO - backport to MemXX_XX
-    const isRam = byteAddr >= this.ram0;
-    const ramOrRom = isRam ? this.ram : this.rom;
-    const start = isRam ? byteAddr - this.ram0 : byteAddr; // in bytes
+    const isRom = byteAddr & this.rom0;
+    const ramOrRom = isRom ? this.rom : this.ram;
+    const start = isRom ? byteAddr - this.rom0 : byteAddr; // in bytes
     if (typeof bytes === 'undefined') { bytes = ramOrRom.byteLength - start; }
     return new Uint8Array(ramOrRom.buffer, start, bytes);
   }
@@ -1634,9 +1635,10 @@ class FlashXX_XX {
     }
   }
 }
+// noinspection JSBitwiseOperatorUsage
 class Flash8_XX extends FlashXX_XX {
-  constructor({ romSize, ramSize, ram0, littleEndian=true }) { // length =EM,  celll - note size is in bytes
-    super({romSize, ramSize, ram0, littleEndian});
+  constructor({ romSize, ramSize, rom0, littleEndian = true }) {
+    super({ romSize, ramSize, rom0, littleEndian });
     this.ram = new Uint8Array(this.ramSize); // Note its in bytes, not cells
     this.rom = new Uint8Array(this.romSize); // Note its in bytes, not cells
     this.romCells = romSize >> 1;
@@ -1652,19 +1654,20 @@ class Flash8_XX extends FlashXX_XX {
     }
   }
   fetch8(byteAddr) {
-    return (byteAddr >= this.ram0) ? this.ram[byteAddr - this.ram0] : this.rom[byteAddr];
+    return (byteAddr & this.rom0) ? this.rom[byteAddr - this.rom0] : this.ram[byteAddr];
   }
   store8(byteAddr, v) {
-    if (byteAddr >= this.ram0) {
-      this.ram[byteAddr - this.ram0] = v
+    if (byteAddr & this.rom0) {
+      this.rom[byteAddr - this.rom0] = v;
     } else {
-      this.rom[byteAddr] = v;
+      this.ram[byteAddr] = v;
     }
   }
 }
+// noinspection JSBitwiseOperatorUsage
 class Flash8_16 extends Flash8_XX {
-  constructor({ romSize, ramSize, ram0, littleEndian=true }) { // length =EM,  celll - note size is in bytes
-    super({romSize, ramSize, ram0, littleEndian});
+  constructor({ romSize, ramSize, rom0, littleEndian = true }) {
+    super({ romSize, ramSize, rom0, littleEndian });
     this.romCells = romSize >> 1;
     this.ramCells = ramSize >> 1;
   }
@@ -1699,17 +1702,17 @@ class Flash8_16 extends Flash8_XX {
     this._store16(this.rom, cellAddr << 1, v);
   }
   fetchCell(byteAddr) {
-    const isRam = byteAddr >= this.ram0;
-    return this._fetch16(isRam ? this.ram : this.rom, isRam ? (byteAddr - this.ram0) : byteAddr);
+    const isRom = byteAddr & this.rom0;
+    return this._fetch16(isRom ? this.rom : this.ram, isRom ? (byteAddr - this.rom0) : byteAddr);
   }
   storeCell(byteAddr, v) {
-    const isRam = byteAddr >= this.ram0;
-    this._store16(isRam ? this.ram : this.rom, isRam ? (byteAddr - this.ram0) : byteAddr, v);
+    const isRom = byteAddr & this.rom0;
+    this._store16(isRom ? this.rom : this.ram, isRom ? (byteAddr - this.rom0) : byteAddr, v);
   }
-  ramAddr(byteAddr) { return ((byteAddr ^ this.ram0) >> 1); }
-  romAddr(byteAddr) { return (byteAddr >> 1); }
-  fromRamAddr(ramAddr) { return (ramAddr << 1) | this.ram0; }
-  fromRomAddr(romAddr) { return (romAddr << 1); }
+  //romAddr(byteAddr) { return ((byteAddr ^ this.rom0) >> 1); }
+  ramAddr(byteAddr) { return (byteAddr >> 1); }
+  //fromRomAddr(romAddr) { return (romAddr << 1) | this.rom0; }
+  fromRamAddr(ramAddr) { return (ramAddr << 1); }
   cellAlign(byteaddr) { return align16(byteaddr); }
   memAlign(byteaddr) { return align8(byteaddr); }
   assertAlign(byteAddr) {
@@ -1717,10 +1720,11 @@ class Flash8_16 extends Flash8_XX {
     console.assert(!(byteAddr & 0x01));
   }
 }
-class Flash8_24 extends Flash8_XX { //TODO merge some of this into Flash8_XX
-  constructor({ romSize, ramSize, ram0, littleEndian=true }) { // length =EM,  celll - note size is in bytes
-    super({romSize, ramSize, ram0, littleEndian});
-    this.romCells = (romSize / 3) >>0;
+// noinspection JSBitwiseOperatorUsage
+class Flash8_24 extends Flash8_XX {
+  constructor({ romSize, ramSize, rom0, littleEndian = true }) {
+    super({ romSize, ramSize, rom0, littleEndian });
+    this.romCells = (romSize / 3) >> 0;
     this.ramCells = (ramSize / 3) >> 0;
   }
   _fetch24(uint8arr, byteAddr) {
@@ -1732,7 +1736,7 @@ class Flash8_24 extends Flash8_XX { //TODO merge some of this into Flash8_XX
     if (cellAddr >= this.romCells) {
       console.log('Attempt to read above top of Rom at', cellAddr);
     } // TODO-OPTIMIZE comment out
-    return this._fetch32(this.rom, cellAddr * 3);
+    return this._fetch24(this.rom, cellAddr * 3);
   }
   cellRamFetch(cellAddr) {
     if (cellAddr >= this.ramCells) {
@@ -1765,17 +1769,18 @@ class Flash8_24 extends Flash8_XX { //TODO merge some of this into Flash8_XX
     this._store24(this.rom, cellAddr * 3, v);
   }
   fetchCell(byteAddr) {
-    const isRam = byteAddr >= this.ram0;
-    return this._fetch24(isRam ? this.ram : this.rom, isRam ? (byteAddr - this.ram0) : byteAddr);
+    const isRom = byteAddr & this.rom0;
+    return this._fetch24(isRom ? this.rom : this.ram, isRom ? (byteAddr - this.rom0) : byteAddr);
   }
   storeCell(byteAddr, v) {
-    const isRam = byteAddr >= this.ram0;
-    this._store24(isRam ? this.ram : this.rom, isRam ? (byteAddr - this.ram0) : byteAddr, v);
+    const isRom = byteAddr & this.rom0;
+    this._store24(isRom ? this.rom : this.ram, isRom ? (byteAddr - this.rom0) : byteAddr, v);
   }
-  ramAddr(byteAddr) { return (((byteAddr ^ this.ram0)/3)>>0); }
-  romAddr(byteAddr) { return ((byteAddr / 3) >> 0); }
-  fromRamAddr(ramAddr) { return (ramAddr * 3) | this.ram0; }
-  fromRomAddr(romAddr) { return (romAddr * 3); }
+  //romAddr(byteAddr) { return (((byteAddr ^ this.rom0) / 3) >> 0); }
+  ramAddr(byteAddr) {
+    return ((byteAddr / 3) >> 0); }
+  //fromRomAddr(romAddr) { return (romAddr * 3) | this.rom0; }
+  fromRamAddr(ramAddr) { return (ramAddr * 3); }
   cellAlign(byteaddr) { return align24(byteaddr); }
   memAlign(byteaddr) { return align8(byteaddr); }
   assertAlign(byteAddr) {
@@ -1784,9 +1789,9 @@ class Flash8_24 extends Flash8_XX { //TODO merge some of this into Flash8_XX
   }
 }
 
-class Flash8_32 extends Flash8_XX { //TODO merge some of this into Flash8_XX
-  constructor({ romSize, ramSize, ram0, littleEndian=true }) { // length =EM,  celll - note size is in bytes
-    super({romSize, ramSize, ram0, littleEndian});
+class Flash8_32 extends Flash8_XX {
+  constructor({ romSize, ramSize, rom0, littleEndian = true }) {
+    super({ romSize, ramSize, rom0, littleEndian });
     this.romCells = romSize >> 2;
     this.ramCells = ramSize >> 2;
   }
@@ -1830,17 +1835,17 @@ class Flash8_32 extends Flash8_XX { //TODO merge some of this into Flash8_XX
     this._store32(this.rom, cellAddr << 2, v);
   }
   fetchCell(byteAddr) {
-    const isRam = byteAddr >= this.ram0;
-    return this._fetch32(isRam ? this.ram : this.rom, isRam ? (byteAddr - this.ram0) : byteAddr);
+    const isRom = byteAddr & this.rom0;
+    return this._fetch32(isRom ? this.rom : this.ram, isRom ? (byteAddr - this.rom0) : byteAddr);
   }
   storeCell(byteAddr, v) {
-    const isRam = byteAddr >= this.ram0;
-    this._store32(isRam ? this.ram : this.rom, isRam ? (byteAddr - this.ram0) : byteAddr, v);
+    const isRom = byteAddr & this.rom0;
+    this._store32(isRom ? this.rom : this.ram, isRom ? (byteAddr - this.rom0) : byteAddr, v);
   }
-  ramAddr(byteAddr) { return ((byteAddr ^ this.ram0) >> 2); }
-  romAddr(byteAddr) { return (byteAddr >> 2); }
-  fromRamAddr(ramAddr) { return (ramAddr << 2) | this.ram0; }
-  fromRomAddr(romAddr) { return (romAddr << 2); }
+  //romAddr(byteAddr) { return ((byteAddr ^ this.rom0) >> 2); }
+  ramAddr(byteAddr) { return (byteAddr >> 2); }
+  //fromRomAddr(romAddr) { return (romAddr << 2) | this.rom0; }
+  fromRamAddr(ramAddr) { return (ramAddr << 2); }
   cellAlign(byteaddr) { return align32(byteaddr); }
   memAlign(byteaddr) { return align8(byteaddr); }
   assertAlign(byteAddr) {
@@ -1851,18 +1856,18 @@ class Flash8_32 extends Flash8_XX { //TODO merge some of this into Flash8_XX
 
 // noinspection JSBitwiseOperatorUsage
 class Flash16_16 extends FlashXX_XX {
-  constructor({ romSize, ramSize, ram0 }) { // length =EM,  celll - note size is in bytes
-    super({ romSize, ramSize, ram0 });
+  constructor({ romSize, ramSize, rom0 }) {
+    super({ romSize, ramSize, rom0 });
     this.romCells = romSize >> 1;
     this.ramCells = ramSize >> 1;
     this.ram = new Uint16Array(this.ramCells);
     this.rom = new Uint16Array(this.romCells);
   }
 
-  ramAddr(byteAddr) { return ((byteAddr ^ this.ram0) >> 1); }
-  romAddr(byteAddr) { return (byteAddr >> 1); }
-  fromRamAddr(ramAddr) { return (ramAddr << 1) | this.ram0; }
-  fromRomAddr(romAddr) { return (romAddr << 1); }
+  romAddr(byteAddr) { return ((byteAddr ^ this.rom0) >> 1); }
+  ramAddr(byteAddr) { return (byteAddr >> 1); }
+  //fromRomAddr(romAddr) { return (romAddr << 1) | this.rom0; }
+  fromRamAddr(ramAddr) { return (ramAddr << 1); }
   fetch8(byteAddr) { return this._fetch8(byteAddr, 0x01); }
   store8(byteAddr, v) { this._store8(byteAddr, v, 0x01); }
   cellAlign(byteaddr) { return align16(byteaddr); }
@@ -1875,17 +1880,17 @@ class Flash16_16 extends FlashXX_XX {
 
 // noinspection JSBitwiseOperatorUsage
 class Flash32_32 extends FlashXX_XX {
-  constructor({ romSize, ramSize, ram0 }) { // length =EM,  celll - note size is in bytes
-    super({ romSize, ramSize, ram0 });
+  constructor({ romSize, ramSize, rom0 }) {
+    super({ romSize, ramSize, rom0 });
     this.romCells = romSize >> 2;
     this.ramCells = ramSize >> 2;
     this.ram = new Uint32Array(this.ramCells);
     this.rom = new Uint32Array(this.romCells);
   }
-  ramAddr(byteAddr) { return ((byteAddr ^ this.ram0) >> 2); }
-  romAddr(byteAddr) { return (byteAddr >> 2); }
-  fromRamAddr(ramAddr) { return (ramAddr << 2) | this.ram0; }
-  fromRomAddr(romAddr) { return (romAddr << 2); }
+  romAddr(byteAddr) { return ((byteAddr ^ this.rom0) >> 2); }
+  ramAddr(byteAddr) { return (byteAddr >> 2); }
+  //fromRomAddr(romAddr) { return (romAddr << 2) | this.rom0; }
+  fromRamAddr(ramAddr) { return (ramAddr << 2); }
   fetch8(byteAddr) { return this._fetch8(byteAddr, 0x03); }
   store8(byteAddr, v) { this._store8(byteAddr, v, 0x03); }
   cellAlign(byteaddr) { return align32(byteaddr); }
@@ -1927,7 +1932,7 @@ class Forth {
     // ported to Arduino below here to L.1831
     this.testing = 0x0; // 0x01 display words passed to interpreters; 0x02 each word in tokenthread - typically set by 'testing3'
     // ported to Arduino above
-    this.testingDepth = 9;
+    this.testingDepth = 1;
     this.padTestLength = 0; // Display pad length
     // === Javascript structures - implement the memory map and record the full state.
 
@@ -1937,10 +1942,11 @@ class Forth {
     // Now the memory map itself, starting at the top of memory.
     // ERRATA In Zen the definitions on Zen pg26 dont come close to matching the addresses given as the example below. In particular UPP and RPP(RP0) overlap !
     // Arbitrary address to use for RAM - but must be power of 2 and note avoiding 0x80000000 for CELLL=4 as hits math issues in JS with negative addresses
-    this.RAM0 = ROMSIZE ? (CELLL === 4 ? 0x40000000 : CELLL === 3 ? 0x800000 : 0x8000) : 0 ;
-    const EM = this.RAM0 + RAMSIZE; // top of memory default to 4K cells
+    this.RAM0 = 0;
+    this.ROM0 = ROMSIZE ? (CELLL === 4 ? 0x40000000 : CELLL === 3 ? 0x800000 : 0x8000) : 0;
+    const RAMTOP = this.RAM0 + RAMSIZE; // top of memory default to 4K cells
     const US = 0x40 * this.CELLL;  // user area size in cells i.e. 64 variables - standard usage below is using about 37
-    this.UPP = EM - US; // start of user area // TODO-28-MULTI UP should be a variable, and used in most places UPP is
+    this.UPP = RAMTOP - US; // start of user area // TODO-28-MULTI UP should be a variable, and used in most places UPP is
     // 8 cell buffer between RP0 and UPP
     const RP0 = this.UPP - (8 * this.CELLL);  // top of return stack RP0
     const RTS = 0x80 * this.CELLL; // return stack/TIB size // eFORTH-DIFF was 64 which is tiny for any kind of string handling
@@ -1950,27 +1956,24 @@ class Forth {
     const SPS = 0x80 * this.CELLL; // Size of data stack 256 bytes for now
     // Start of Ram (Below here should only be changed during compilation),
     // PAD is 80 bytes above the current top of Data space or Code directory, and HLD (where numbers are build for output) is a few bytes growing down from PAD.
-    this.NAMEE = this.SPP - SPS; // name dictionary in Ram (there may be another in Rom)
-    // And then building from the bottom up. The gap in middle is code directory
-    // cold start vector - its unclear if these bottom 0x100 are useful outside of the DOS context and for DOS it would need code at this address I think?
-    // const COLDD = 0x100;
+    this.RAMNAMEE = this.SPP - SPS; // name dictionary in Ram (there may be another in Rom)
 
-    this.UZERO = 0;
+    // And then building ROM from the bottom up. The gap in middle is code directory
+    // const COLDD = 0x100; // cold start vector - is only relevant to DOS
+    this.UZERO = ROMSIZE ? this.ROM0 : 0;
     // Above UZERO is a store of initial values for User variables
-    // cold start vector - its unclear if these bottom 0x100 are useful outside of the DOS context and for DOS it would need code at this address I think?
-    // const COLDD = 0x100;
-    this.CODEE = ROMSIZE ?  this.RAM0 : (this.UZERO + US); // code dictionary grows up from here towards NAME dictionary.
+    this.RAMCODEE = ROMSIZE ? this.RAM0 : (this.UZERO + US); // In Flashable - RAM code dictionary is at start of RAM, in single memspace it grows up from top of US to NAMEE
     // PAD is 80 bytes above the current top of Data space or Code directory, and HLD (where numbers are build for output) is a few bytes growing down from PAD.
-    console.log('Space for', this.NAMEE - this.CODEE, 'bytes for code and names');
+    console.log('Space for', this.RAMNAMEE - this.RAMCODEE, 'bytes for code and names');
 
     // Memory definition in ROM area - during startup
     if (ROMSIZE) {
-      this.ROMNAMEE = ROMSIZE;
+      this.ROMNAMEE = this.ROM0 + ROMSIZE;
       this.ROMCODEE = this.UZERO + US;
     }
 
     // Get a instance of a class to store in
-    this.m = new (memClass || MemClasses[`${MEM}_${this.CELLbits}`])({ length: EM, celll: this.CELLL, ramSize: RAMSIZE, romSize: ROMSIZE, ram0: this.RAM0 });
+    this.m = new (memClass || MemClasses[`${MEM}_${this.CELLbits}`])({ ramSize: RAMSIZE, romSize: ROMSIZE, rom0: this.ROM0 });
     this.jsFunctions = [];  // Maps tokens to executable functions - first is zero as a invalid token
 
     // Needs to be after the call to create this.m, its endian dependent as lowest address byte is always the count
@@ -1993,9 +1996,9 @@ class Forth {
     // Ported to Android below to L.1898
     // create data structures
     // Setup pointers for first dictionary entries.
-    this.Ustore(CPoffset, this.ROMCODEE || this.CODEE); // Pointer to where compiling into dic
-    this.Ustore(NPoffset, this.ROMNAMEE || this.NAMEE); // Pointer to where writing name stack
-    this.Ustore(VPoffset, this.ROMCODEE ? this.CODEE : 0); // Pointer to start of writing variables, might be 0 if using code space like eForth does
+    this.Ustore(CPoffset, this.ROMCODEE || this.RAMCODEE); // Pointer to where compiling into dic
+    this.Ustore(NPoffset, this.ROMNAMEE || this.RAMNAMEE); // Pointer to where writing name stack
+    this.Ustore(VPoffset, this.ROMCODEE ? this.RAMCODEE : 0); // Pointer to start of writing variables, might be 0 if using code space like eForth does
     //console.assert(this.npFetch() > 0); // Quick test that above worked - should be commented out
     this.Ustore(RP0offset, RP0);
     this.Ustore(SP0offset, this.m.fromRamAddr(this.ramSPP));
@@ -2013,12 +2016,12 @@ class Forth {
     // Define the first word in the dictionary, I'm using 'FORTH' for this because we need this variable to define everything else.
     this.CODE('FORTH');
 
-    const vp = this.Ufetch(VPoffset);
     this.DW(tokenVocabulary); // Uses assumption that tokenVocabulary is first in jsFunctionAttributes
-    const vocabPtr = vp || (this.cpFetch() + this.CELLL);
+    // Complicated: If there is ROM then point at RAM (VP) but if its zero skip a CELL as vocab ptr of 0 assumed empty
+    const vocabPtr = (this.ROM0 ? (this.Ufetch(VPoffset) || this.CELLL) : (this.cpFetch() + this.CELLL));
     this.DW(vocabPtr); // Point to first cell in VP (data area in RAM or of not separated the next word)
-    if (vp) { // Increment VP over area
-      this.Ustore(VPoffset, vp + 2 * this.CELLL); // ALLOT 2 spaces (should default to zero)
+    if (this.ROM0) { // Increment VP over area
+      this.Ustore(VPoffset, vocabPtr + 2 * this.CELLL); // ALLOT 2 spaces (should default to zero)
     } else {
       this.DW(0, 0);
     }
@@ -2077,11 +2080,11 @@ class Forth {
         : init;
     console.assert(typeof initVal !== 'undefined');
     this.Ustore(this._USER, initVal);         // Initialize the variable for live compilation
-    const offsetInBytes = this._USER;
+    const offsetInCells = this._USER;
     //UZERO is initialized at userAreaSave
     if (name) {                       // Put into dictionary
       this.CODE(name);
-      this.DW(tokenUser, offsetInBytes);
+      this.DW(tokenUser, offsetInCells);
       this.OVERT();
     }
     this._USER++; // Need to skip to next _USER
@@ -2482,8 +2485,7 @@ class Forth {
     // <NP-after>CPh CPl <_LINK> LINKh LINKl count name... <NP-BEFORE>
     this.cpAlign(); // If required by memory store, align to boundary.
     // Note this is going to give the name string an integral number of cells.
-    const len = (((name.length / this.CELLL) >> 0) + 1) * this.CELLL;
-    const a = this.npFetch() - len;
+    const a = this.m.cellAlign(this.npFetch() - name.length - this.CELLL);
     this.Ustore(NPoffset, a);
     this.SPpush(a); // so this.dollarCommaN can find it
     // This byte will be updated by this.IMMEDIATE() IMMEDIATE or COMPILE-ONLY
@@ -2972,9 +2974,9 @@ class Forth {
     if (this.ROMCODEE) {
       this.romCodeTop = this.cpFetch();
       this.romNameBottom = this.npFetch();
-      this.Ustore(NPoffset, this.NAMEE);
+      this.Ustore(NPoffset, this.RAMNAMEE);
       this.Ustore(CPoffset, this.Ufetch(VPoffset)); // Started at CODEE then moved up as vALLOT or v,
-      this.Ustore(VPoffset, 0);
+      this.Ustore(VPoffset, 0); // Once set to 0 routines will use CPoffset
     }
   }
   console() { /* async via returning a promise from runXT */
