@@ -8,13 +8,13 @@ import { Forth, ForthNodeExtensions, RP0offset, jsFunctionAttributes } from '../
  */
 
 // Valid choices for CELL:MEM are 2:8 2:16 2:32 3:8 4:8 4:16 4:32 - Arduino is 2:16 and memClass = ROmable16_16
-const CELLL = 4; // Must use 2 for Arduino On ESP8266 better to use 4
-const MEM = 32; // Must use 16 for Arduino On ESP8266 better to use 4
+const CELLL = 2; // Must use 2 for Arduino On ESP8266 better to use 4
+const MEM = 16; // Must use 16 for Arduino On ESP8266 better to use 4
 // Specify areas for ROM and RAM, currently they have to be specified separately as there is a bug with setting ROMSIZE = 0;
 // ROM: Used for UserVariable save area and Dictionary (code and names) until useRam() is called
 const ROMSIZE = 0x1000 * CELLL; // Set to 0x2000 should cover the standard dict plus a few extensions.
 // RAM: Used for UserVariables, stacks, TIB, PAD etc and Dictionary (code and names) after useRam() is called
-const RAMSIZE = 0x4000 * CELLL; // 200x2 is about the maximum Ram you can use currently on e.g. an Arduino Uno MUCH larger on ESP8266
+const RAMSIZE = 0x200 * CELLL; // 200x2 is about the maximum Ram you can use currently on e.g. an Arduino Uno MUCH larger on ESP8266
 const extensions = ForthNodeExtensions;
 const memClass = undefined; // Flash16_16; // Can override default memory class for esoteric or experimental requirements
 
@@ -41,21 +41,21 @@ class ForthDumper extends Forth {
     return v < 10 ? v.toString(10) : `0x${v.toString(16)}`;
   }
   xcConstants() {
-    ['RAM0', 'CELLL', 'ROMCELLS', 'TIB0', 'UPP', 'UZERO'].forEach((k) => {
+    ['RAM0', 'ROM0', 'CELLL', 'TIB0', 'UPP', 'UZERO'].forEach((k) => {
       const val = this[k];
-      this.xcLine(`\n#define ${k} ${val}`);
+      this.xcLine(`\n#define ${k} ${this.xcNum(val)}`);
     });
     this.xcLine(`\n#define CELLTYPE ${this.CELLL === 2 ? 'uint16_t' : 'uint32_t'}`);
     this.xcLine(`\n#define SIGNEDCELLTYPE ${this.CELLL === 2 ? 'int16_t' : 'int32_t'}`);
     this.xcLine(`\n#define DOUBLECELLTYPE ${this.CELLL === 2 ? 'uint32_t' : 'uint64_t'}`); // TODO-ARDUINO-32
     this.xcLine(`\n#define CELLSHIFT ${this.CELLL === 2 ? 1 : 2}`);
     this.xcLine('\n#define LITTLEENDIAN true');
-    this.xcLine(`\n#define ROMCELLS ${ROMSIZE / this.CELLL}`);
-    this.xcLine(`\n#define RAMCELLS ${RAMSIZE / this.CELLL}`);
-    this.xcLine(`\n#define SPP ${this.SPP}`);
-    this.xcLine(`\n#define RP0 ${this.Ufetch(RP0offset)}`);
-    this.xcLine(`\n#define NAMEE ${this.NAMEE}`);
-    this.xcLine(`\n#define CODEE ${this.CODEE}`);
+    this.xcLine(`\n#define ROMCELLS ${this.xcNum(ROMSIZE / this.CELLL)}`);
+    this.xcLine(`\n#define RAMCELLS ${this.xcNum(RAMSIZE / this.CELLL)}`);
+    this.xcLine(`\n#define SPP ${this.xcNum(this.SPP)}`);
+    this.xcLine(`\n#define RP0 ${this.xcNum(this.Ufetch(RP0offset))}`);
+    this.xcLine(`\n#define RAMNAMEE ${this.xcNum(this.RAMNAMEE)}`);
+    this.xcLine(`\n#define RAMCODEE ${this.xcNum(this.RAMCODEE)}`);
   }
   xcNames() {
     this.xcLine('\n/* === Dumping Arduino source from names === */');
@@ -75,8 +75,9 @@ class ForthDumper extends Forth {
   xcTokens() {
     this.xcLine('\n/* === Function tokens === */');
     this.jsFunctions.forEach((func, token) => {
-      if (!func) { return; } // 0
-      this.xcLine(`#define ${this.xcFuncIdentifier(func, token)} ${token}\n`);
+      if (func)
+      //if (func && !jsFunctionAttributes[token].replaced) // TODO only output non-replaced tokens, but then have to catch in CODE DICT and callers of those
+        this.xcLine(`\n#define ${this.xcFuncIdentifier(func, token)} ${token}`);
     });
   }
   xcFunctions() {
@@ -89,7 +90,7 @@ class ForthDumper extends Forth {
     });
     // This is the actual array of functions - will have 0 for replaced ones
     // On Arduino uno `const void (*f[62])() = {` worked, but ESP8266 rquired `void (* const f[])() PROGMEM = {`
-    this.xcLine(`#define FUNCTIONSLENGTH ${this.jsFunctions.length + 1}`);
+    this.xcLine(`\n#define FUNCTIONSLENGTH ${this.jsFunctions.length + 1}`);
     this.xcLine(`\nvoid (* const f[FUNCTIONSLENGTH])() PROGMEM = {`);
     const itemsPerLine = 4;
     let itemsToGoOnLine = 0;
@@ -109,16 +110,16 @@ class ForthDumper extends Forth {
     this.xcLine(' 0 };');
   }
   xcCode() {
-    this.xcLine(`\nconst CELLTYPE rom[ROMCELLS] PROGMEM = {`);
+    this.xcLine('\nconst CELLTYPE rom[ROMCELLS] PROGMEM = {');
     const boundaries = {};
     const itemsPerLine = 16;
     let itemsAlreadyOnLine = 0;
-    boundaries[0] = "USER VARIABLE SAVE AREA";
-    boundaries[this.ROMCODEE] = "CODE DICTIONARY";
-    boundaries[this.romCodeTop] = "CURRENT TOP OF CODE DICTIONARY";
-    boundaries[this.romNameBottom] = "CURRENT BOTTOM OF NAME DICTIONARY";
-    boundaries[this.ROMNAMEE] = "TOP OF NAME DICTIONARY";
-    let CP = 0; // Start at bottom of m
+    boundaries[this.UZERO] = 'USER VARIABLE SAVE AREA';
+    boundaries[this.ROMCODEE] = 'CODE DICTIONARY';
+    boundaries[this.romCodeTop] = 'CURRENT TOP OF CODE DICTIONARY';
+    boundaries[this.romNameBottom] = 'CURRENT BOTTOM OF NAME DICTIONARY';
+    boundaries[this.ROMNAMEE] = 'TOP OF NAME DICTIONARY';
+    let CP = this.ROM0; // Start at bottom of m
     const romTop = this.ROMNAMEE;
     //const romTop = 100;
     let definitionXT = this.ROMCODEE;

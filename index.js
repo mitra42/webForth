@@ -2749,7 +2749,7 @@ class Forth {
   userAreaSave() {
     this.useRam(); // If were using ROM then switch
     for (let a = 0; a < this._USER; a++) {
-      this.m.cellRomStore(this.UZERO / this.CELLL + a, this.Ufetch(a));
+      this.Mstore(this.UZERO + (this.CELLL * a), this.Ufetch(a));
     }
   }
 
