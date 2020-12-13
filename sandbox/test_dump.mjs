@@ -1,4 +1,4 @@
-import { Forth, ForthNodeExtensions, RP0offset, jsFunctionAttributes, Flash16_16 } from '../index.js';
+import { Forth, ForthNodeExtensions, RP0offset, jsFunctionAttributes } from '../index.js';
 
 /*
  * This is a first cut at a dictionary dumper aka cross-compiler for Arduino
@@ -8,16 +8,17 @@ import { Forth, ForthNodeExtensions, RP0offset, jsFunctionAttributes, Flash16_16
  */
 
 // Valid choices for CELL:MEM are 2:8 2:16 2:32 3:8 4:8 4:16 4:32 - Arduino is 2:16 and memClass = ROmable16_16
-const CELLL = 2; // Must use 2 for Arduino
-const MEM = 16; // Must use 16 for Arduino
+const CELLL = 4; // Must use 2 for Arduino On ESP8266 better to use 4
+const MEM = 32; // Must use 16 for Arduino On ESP8266 better to use 4
 // Specify areas for ROM and RAM, currently they have to be specified separately as there is a bug with setting ROMSIZE = 0;
 // ROM: Used for UserVariable save area and Dictionary (code and names) until useRam() is called
 const ROMSIZE = 0x1000 * CELLL; // Set to 0x2000 should cover the standard dict plus a few extensions.
 // RAM: Used for UserVariables, stacks, TIB, PAD etc and Dictionary (code and names) after useRam() is called
-const RAMSIZE = 0x200 * CELLL; // 400 is about the maximum Ram you can use currently on e.g. an Arduino Uno
+const RAMSIZE = 0x4000 * CELLL; // 200x2 is about the maximum Ram you can use currently on e.g. an Arduino Uno MUCH larger on ESP8266
 const extensions = ForthNodeExtensions;
-const memClass = Flash16_16; // Separate Rom and Ram (like an Arduino).
+const memClass = undefined; // Flash16_16; // Can override default memory class for esoteric or experimental requirements
 
+//TODO-DUMP should refuse to dump any code fields to non existent routines
 class ForthDumper extends Forth {
   xcLine(s) { this.TXbangS(s); }
   xcNameEncode(s) { return escape(s) // C identifiers are alphanumeric and _
@@ -88,7 +89,8 @@ class ForthDumper extends Forth {
     });
     // This is the actual array of functions - will have 0 for replaced ones
     // On Arduino uno `const void (*f[62])() = {` worked, but ESP8266 rquired `void (* const f[])() PROGMEM = {`
-    this.xcLine(`\nvoid (* const f[${this.jsFunctions.length + 1}])() PROGMEM = {`);
+    this.xcLine(`#define FUNCTIONSLENGTH ${this.jsFunctions.length + 1}`);
+    this.xcLine(`\nvoid (* const f[FUNCTIONSLENGTH])() PROGMEM = {`);
     const itemsPerLine = 4;
     let itemsToGoOnLine = 0;
     this.jsFunctions.forEach((func, token) => {

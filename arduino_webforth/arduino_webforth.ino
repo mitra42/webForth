@@ -17,6 +17,7 @@
 #define RP0 33648
 #define NAMEE 33120
 #define CODEE 32768
+#define FUNCTIONSLENGTH 61
 /* === Dumping Arduino source from names === */
 #define XT_WARM 0x123e /* WARM*/
 #define XT_COLD 0x1226 /* COLD*/
@@ -1253,7 +1254,7 @@ void Mstore(const CELLTYPE byteAddr, const CELLTYPE v) {
   if (byteAddr < RAM0) { Serial.print(F("Attempt to write to Rom at ")); Serial.print(byteAddr); Serial.print(F(" v=")); Serial.println(v); debugStack(); delay(10000); } // TODO-OPTIMIZE comment out
   cellRamStore(RAMADDR(byteAddr), v); }
 #endif
-// 8 bit equivalents
+// 8 bit equivalents TODO-ESP8266 fix 
 byte Mfetch8(const CELLTYPE byteAddr) {
   const bool offset = byteAddr & 0x01;
   const CELLTYPE cell = Mfetch(byteAddr); // Does not have to be aligned
@@ -1264,7 +1265,7 @@ byte Mfetch8(const CELLTYPE byteAddr) {
 #endif
 }; // Returns byte at a
 
-void Mstore8(const CELLTYPE byteAddr, byte v) {
+void Mstore8(const CELLTYPE byteAddr, byte v) {  // TODO-ESP8266 fix 
   //Serial.print("Mstore8 a="); Serial.print(byteAddr); Serial.print(" v="); Serial.println(v);
   const bool offset = byteAddr & 0x01;
   const CELLTYPE cell = Mfetch(byteAddr);
@@ -1338,8 +1339,7 @@ CELLTYPE na2xt(const CELLTYPE na) {
 // xt     if present we are looking for name pointing at this executable (for decompiler)
 // returns 0 or na
 bool _sameq(const CELLTYPE na1, const CELLTYPE na2, const byte cells) {
-  // Note this is similar to SAME? but takes a count (not count of cells, and returns boolean
-  // Note this is similar to SAME? but takes a count (not count of cells, and returns boolean
+  // Note this is similar to SAME? except via parameters and return rather than stack
   for (byte i = 0; i < cells; i++) {
       if ( Mfetch(na1 + (i<<CELLSHIFT)) != Mfetch(na2 + (i<<CELLSHIFT))) {
         return false;
@@ -1539,7 +1539,7 @@ void threadtoken(const CELLTYPE xt) {
   const CELLTYPE tok = Mfetch(xt);
   PAYLOAD = xt + CELLL;
   // console.assert(tok < jsFunctions.length); // commented out for efficiency, a fail will just break in the next line anyway.
-  if ((tok < 61) && f[tok]) {
+  if ((tok < FUNCTIONSLENGTH) && f[tok]) {
     if (testing) { debugThreadToken(tok); }
     f[tok](); // Run the token function - like tokenDoList or tokenVar - doesnt return - (JS returns null or a Promise)
   } else {
@@ -1698,7 +1698,7 @@ void OVER() {
 
   // Logical Words eForthAndZen43
   // noinspection JSBitwiseOperatorUsage
-void less0() { SPpush((SPpop() & (1 << (CELLbits - 1))) ? -1 : 0); } //0<  e.g. 0x8000 for CELLL=2
+void less0() { SPpush((SPpop() & (1 << (CELLbits - 1))) ? forthTrue : 0); } //0<  e.g. 0x8000 for CELLL=2
 void AND() { SPpush(SPpop() & SPpop()); }
 void OR() { SPpush(SPpop() | SPpop()); }
 void XOR() { SPpush(SPpop() ^ SPpop()); }
