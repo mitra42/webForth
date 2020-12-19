@@ -1,4 +1,4 @@
-import { Forth, ForthNodeExtensions, RP0offset, jsFunctionAttributes } from '../index.js';
+import { Forth, ForthNodeExtensions, jsUsers, RP0offset, jsFunctionAttributes } from '../index.js';
 
 /*
  * This is a first cut at a dictionary dumper aka cross-compiler for Arduino
@@ -8,16 +8,16 @@ import { Forth, ForthNodeExtensions, RP0offset, jsFunctionAttributes } from '../
  */
 
 // Valid choices for CELL:MEM are 2:8 2:16 2:32 3:8 4:8 4:16 4:32 - Arduino is 2:16 and memClass = ROmable16_16
-const CELLL = 2; // Must use 2 for Arduino On ESP8266 better to use 4
-const MEM = 16; // Must use 16 for Arduino On ESP8266 better to use 4
+const CELLL = 4; // Must use 2 for Arduino On ESP8266 better to use 4
+const MEM = 32; // Must use 16 for Arduino On ESP8266 better to use 4
 // Specify areas for ROM and RAM, currently they have to be specified separately as there is a bug with setting ROMSIZE = 0;
 // ROM: Used for UserVariable save area and Dictionary (code and names) until useRam() is called
 const ROMSIZE = 0x1000 * CELLL; // Set to 0x2000 should cover the standard dict plus a few extensions.
 // RAM: Used for UserVariables, stacks, TIB, PAD etc and Dictionary (code and names) after useRam() is called
-const RAMSIZE = 0x200 * CELLL; // 200x2 is about the maximum Ram you can use currently on e.g. an Arduino Uno MUCH larger on ESP8266
+const RAMSIZE = 0x2800 * CELLL; // 200x2 is about the maximum Ram you can use currently on e.g. an Arduino Uno; ESP8266 seems to be ok (untested) at 0x2800 x 4
 const extensions = ForthNodeExtensions;
 const memClass = undefined; // Flash16_16; // Can override default memory class for esoteric or experimental requirements
-
+const xcRevDefines = {}; // Extra defines to check for values in
 //TODO-DUMP should refuse to dump any code fields to non existent routines
 class ForthDumper extends Forth {
   xcLine(s) { this.TXbangS(s); }
@@ -41,14 +41,17 @@ class ForthDumper extends Forth {
     return v < 10 ? v.toString(10) : `0x${v.toString(16)}`;
   }
   xcConstants() {
+    console.assert(this.UZERO === this.ROM0, "UZERO=ROM0 assumed by userAreaInit in .ino");
     ['RAM0', 'ROM0', 'CELLL', 'TIB0', 'UPP', 'UZERO'].forEach((k) => {
       const val = this[k];
+      xcRevDefines[val] = k;
       this.xcLine(`\n#define ${k} ${this.xcNum(val)}`);
     });
     this.xcLine(`\n#define CELLTYPE ${this.CELLL === 2 ? 'uint16_t' : 'uint32_t'}`);
     this.xcLine(`\n#define SIGNEDCELLTYPE ${this.CELLL === 2 ? 'int16_t' : 'int32_t'}`);
     this.xcLine(`\n#define DOUBLECELLTYPE ${this.CELLL === 2 ? 'uint32_t' : 'uint64_t'}`); // TODO-ARDUINO-32
     this.xcLine(`\n#define CELLSHIFT ${this.CELLL === 2 ? 1 : 2}`);
+    this.xcLine(`\n#define CELLOFFSETMASK ${this.CELLL === 2 ? 0x01 : 0x03}`);
     this.xcLine('\n#define LITTLEENDIAN true');
     this.xcLine(`\n#define ROMCELLS ${this.xcNum(ROMSIZE / this.CELLL)}`);
     this.xcLine(`\n#define RAMCELLS ${this.xcNum(RAMSIZE / this.CELLL)}`);
@@ -56,6 +59,8 @@ class ForthDumper extends Forth {
     this.xcLine(`\n#define RP0 ${this.xcNum(this.Ufetch(RP0offset))}`);
     this.xcLine(`\n#define RAMNAMEE ${this.xcNum(this.RAMNAMEE)}`);
     this.xcLine(`\n#define RAMCODEE ${this.xcNum(this.RAMCODEE)}`);
+    // #if CELLL == 4
+    this.xcLine(`\n#define ROM(cellAddr) pgm_read_${CELLL === 2 ? 'word' : 'dword'}_near(&rom[cellAddr])`);
   }
   xcNames() {
     this.xcLine('\n/* === Dumping Arduino source from names === */');
@@ -135,14 +140,16 @@ class ForthDumper extends Forth {
         ? this.xcXTIdentifier(this.countedToJS(na))
         : (definitionName && (definitionXT < val) && (val < (definitionXT + longestDef)))
           ? `${this.xcXTIdentifier(definitionName)} + ${this.xcNum(val-definitionXT)}`
-          : this.xcNum(val);
+          : (xcRevDefines[val] && (val > 0x10)) // Arbitrary distinction that small numbers probably coincidental
+            ? xcRevDefines[val]
+            : this.xcNum(val);
 
       if (CP in boundaries) {
         this.xcLine(`\n/* ==== ${boundaries[CP]} ==== */`);
       }
       if (CP < this.ROMCODEE) { // User save area
         //TODO-XC maybe reverse User offset into name and comment listings
-        this.xcLine(`\n/* ${this.xcNum(CP)} */ ${value},`);
+        this.xcLine(`\n/* ${this.xcNum(CP)} ${jsUsers[(CP-this.ROM0)/this.CELLL] ? jsUsers[(CP-this.ROM0)/this.CELLL][0] : "unused"} */ ${value},`);
       // Code definitions area
       } else if (CP < this.romCodeTop) {
         const defNa = this.xt2na(CP);

@@ -3028,7 +3028,7 @@ const ForthNodeExtensions = [
     } },
 ];
 export { Forth,
-  ForthNodeExtensions,  // Needed by example_node_api.js and test_dump.mjs (XC Cross compiler)
+  ForthNodeExtensions, jsUsers, // Needed by example_node_api.js and test_dump.mjs (XC Cross compiler)
   Flash8_16, Flash8_24, Flash8_32, Flash16_16, Flash32_32, // Needed by console.js
   jsFunctionAttributes, RP0offset, // Needed by test_dump.mjs (XC Cross compiler)
 };
