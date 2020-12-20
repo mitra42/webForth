@@ -1943,8 +1943,10 @@ class Forth {
     // ERRATA In Zen the definitions on Zen pg26 dont come close to matching the addresses given as the example below. In particular UPP and RPP(RP0) overlap !
     // Arbitrary address to use for RAM - but must be power of 2 and note avoiding 0x80000000 for CELLL=4 as hits math issues in JS with negative addresses
     this.RAM0 = 0;
-    this.ROM0 = ROMSIZE ? (CELLL === 4 ? 0x40000000 : CELLL === 3 ? 0x800000 : 0x8000) : 0;
-    const RAMTOP = this.RAM0 + RAMSIZE; // top of memory default to 4K cells
+    this.ROMSIZE = ROMSIZE;
+    this.RAMSIZE = RAMSIZE;
+    this.ROM0 = this.ROMSIZE ? (CELLL === 4 ? 0x40000000 : CELLL === 3 ? 0x800000 : 0x8000) : 0;
+    const RAMTOP = this.RAM0 + this.RAMSIZE; // top of memory default to 4K cells
     const US = 0x40 * this.CELLL;  // user area size in cells i.e. 64 variables - standard usage below is using about 37
     this.UPP = RAMTOP - US; // start of user area // TODO-28-MULTI UP should be a variable, and used in most places UPP is
     // 8 cell buffer between RP0 and UPP
@@ -1973,7 +1975,7 @@ class Forth {
     }
 
     // Get a instance of a class to store in
-    this.m = new (memClass || MemClasses[`${MEM}_${this.CELLbits}`])({ ramSize: RAMSIZE, romSize: ROMSIZE, rom0: this.ROM0 });
+    this.m = new (memClass || MemClasses[`${MEM}_${this.CELLbits}`])({ ramSize: this.RAMSIZE, romSize: this.ROMSIZE, rom0: this.ROM0 });
     this.jsFunctions = [];  // Maps tokens to executable functions - first is zero as a invalid token
 
     // Needs to be after the call to create this.m, its endian dependent as lowest address byte is always the count
