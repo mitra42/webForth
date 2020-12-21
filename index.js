@@ -1945,6 +1945,7 @@ class Forth {
     this.RAM0 = 0;
     this.ROMSIZE = ROMSIZE;
     this.RAMSIZE = RAMSIZE;
+    //TODO there is bad code in the Arduino that does wrong compares on 0x8000 or 0x80000000 fix it !
     this.ROM0 = this.ROMSIZE ? (CELLL === 4 ? 0x40000000 : CELLL === 3 ? 0x800000 : 0x8000) : 0;
     const RAMTOP = this.RAM0 + this.RAMSIZE; // top of memory default to 4K cells
     const US = 0x40 * this.CELLL;  // user area size in cells i.e. 64 variables - standard usage below is using about 37

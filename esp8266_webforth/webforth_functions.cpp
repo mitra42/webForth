@@ -1,4 +1,4 @@
-#include "arduino_functions.h"
+#include "webforth_functions.h"
 
 // Forward definitions
 extern void debugStack();
@@ -58,7 +58,7 @@ const CELLTYPE CELLMASK = forthTrue ^ ((0xFF ^ BYTEMASK) << (CELLbits - 8));
 #endif
 
 //L.1831
-static uint8 testing = 0;
+static uint8_t testing = 0;
 
 //L.1840
 // === Memory layout
@@ -130,24 +130,24 @@ void Mstore(const CELLTYPE byteAddr, const CELLTYPE v) {
   cellRamStore(RAMADDR(byteAddr), v); }
 #endif
 // 8 bit equivalents
-uint8 Mfetch8(const CELLTYPE byteAddr) {
-  const uint8 offset = byteAddr & CELLOFFSETMASK;
+uint8_t Mfetch8(const CELLTYPE byteAddr) {
+  const uint8_t offset = byteAddr & CELLOFFSETMASK;
 #ifdef LITTLEENDIAN
-  const uint8 shiftbits = offset << 3;
+  const uint8_t shiftbits = offset << 3;
 #else
-  const uint8 shiftbits = (CELLOFFSETMASK - offset) << 3;
+  const uint8_t shiftbits = (CELLOFFSETMASK - offset) << 3;
 #endif
   const CELLTYPE cell = Mfetch(byteAddr); // Does not have to be aligned
   return (cell >> shiftbits) & 0xff; // Can prob remove '&0xff'
 }; // Returns byte at a
 
-void Mstore8(const CELLTYPE byteAddr, uint8 v) {
+void Mstore8(const CELLTYPE byteAddr, uint8_t v) {
   //Serial.print("Mstore8 a="); Serial.print(byteAddr); Serial.print(" v="); Serial.println(v);
-    const uint8 offset = byteAddr & CELLOFFSETMASK;
+    const uint8_t offset = byteAddr & CELLOFFSETMASK;
 #ifdef LITTLEENDIAN
-    const uint8 shiftbits = 8 * offset ;
+    const uint8_t shiftbits = 8 * offset ;
 #else
-    const uint8 shiftbits = 8 * (CELLOFFSETMASK - offset);
+    const uint8_t shiftbits = 8 * (CELLOFFSETMASK - offset);
 #endif
     const CELLTYPE cell = Mfetch(byteAddr);
     Mstore(byteAddr, (cell & (-1 ^ (0xFF << shiftbits))) | (v << shiftbits));
@@ -172,8 +172,8 @@ CELLTYPE IPnext() {
   const CELLTYPE v = Mfetch(IP);
   IP += CELLL;
   return v; }
-CELLTYPE Ufetch(const uint8 userindex) { return ram[ramUP + userindex]; } // userindex is a cell index, not a byte index
-void Ustore(const uint8 userindex, const CELLTYPE w) { ram[ramUP + userindex] = w; } // userindex is a cell index not a byte index
+CELLTYPE Ufetch(const uint8_t userindex) { return ram[ramUP + userindex]; } // userindex is a cell index, not a byte index
+void Ustore(const uint8_t userindex, const CELLTYPE w) { ram[ramUP + userindex] = w; } // userindex is a cell index not a byte index
 // === Access to the USER variables before they are defined
 CELLTYPE currentFetch() { return Ufetch(CURRENToffset); }
 CELLTYPE cpFetch() { return Ufetch(CPoffset); }
@@ -191,7 +191,7 @@ void ALIGNED() { SPpush(align(SPpop())); }
 //L.2096-
 // Convert a name address to the code dictionary definition.
 CELLTYPE na2xt(const CELLTYPE na) {
-    return Mfetch(na - uint8(2 << CELLSHIFT));
+    return Mfetch(na - uint8_t(2 << CELLSHIFT));
 }
 
 // Inner function of find, traverses a linked list Name dictionary.
@@ -200,9 +200,9 @@ CELLTYPE na2xt(const CELLTYPE na) {
 // cell1  if present, gives it a quick first-cell test to apply.
 // xt     if present we are looking for name pointing at this executable (for decompiler)
 // returns 0 or na
-bool _sameq(const CELLTYPE na1, const CELLTYPE na2, const uint8 cells) {
+bool _sameq(const CELLTYPE na1, const CELLTYPE na2, const uint8_t cells) {
   // Note this is similar to SAME? except via parameters and return rather than stack
-  for (uint8 i = 0; i < cells; i++) {
+  for (uint8_t i = 0; i < cells; i++) {
       if ( Mfetch(na1 + (i<<CELLSHIFT)) != Mfetch(na2 + (i<<CELLSHIFT))) {
         return false;
       }
@@ -211,7 +211,7 @@ bool _sameq(const CELLTYPE na1, const CELLTYPE na2, const uint8 cells) {
 }
 CELLTYPE _find(const CELLTYPE va, const CELLTYPE na) { // return na that matches or 0
   //Serial.print(F("XXX _find looking for:")); printCounted(na);
-  const uint8 cellCount = (Mfetch8(na) & BYTEMASK)  >> CELLSHIFT; // Count of cells after first one (formula is not as obvious as you think)
+  const uint8_t cellCount = (Mfetch8(na) & BYTEMASK)  >> CELLSHIFT; // Count of cells after first one (formula is not as obvious as you think)
   const CELLTYPE cell1 = Mfetch(na);  // Could be little or big-endian
   CELLTYPE p = va;
   while (p = Mfetch(p)) {
@@ -480,8 +480,8 @@ void TXbang() {
 void bangIO() {
 //Serial.begin(57600); // DONE IN SETUP
 } // !IO: Initialize IO port
-void TXbangS(CELLTYPE byteaddr, const uint8 len) {
-  for (uint8 i=len; i > 0; i--) {
+void TXbangS(CELLTYPE byteaddr, const uint8_t len) {
+  for (uint8_t i=len; i > 0; i--) {
   Serial.write(Mfetch8(byteaddr++));
   }
  }
@@ -500,7 +500,7 @@ void doLIT() { SPpush(IPnext()); }
 // : DOES> R> LAST @ 2 CELLS - @ CELLL + ! ; // Untested Forth version, note side effect of the R> of doing an exit.
 void DOES() {
   Mstore(
-    Mfetch(Ufetch(LASToffset) - uint8(2 << CELLSHIFT) ) + CELLL, // field after tokenVar compile by CREATE
+    Mfetch(Ufetch(LASToffset) - uint8_t(2 << CELLSHIFT) ) + CELLL, // field after tokenVar compile by CREATE
     IP // The address after the doDOES
   );
   EXIT(); // Exit the CREATE part
@@ -533,7 +533,7 @@ void branch() { IP = IPnext(); }
 // Memory access eForthAndZen#39
 void store() { const CELLTYPE a = SPpop(); const CELLTYPE v = SPpop(); Mstore(a, v); } //!  w a -- , Store
 void fetch() { SPpush(Mfetch(SPpop())); } //@ a -- w, fetch
-void cStore() { const CELLTYPE a = SPpop(); const uint8 v = SPpop(); Mstore8(a, v); } //C! c a -- , Store character
+void cStore() { const CELLTYPE a = SPpop(); const uint8_t v = SPpop(); Mstore8(a, v); } //C! c a -- , Store character
 void cFetch() { SPpush(Mfetch8(SPpop())); } //C@ a -- c, Fetch character
 
 
@@ -596,7 +596,7 @@ void UMplus() { /* UM+ */
   // TODO-28-MULTITASK will need to think carefully about how to move all, or part of the USER space to task-specific space.
   // TODO-28-MULTITASK this is non-trivial since somethings are clearly across all tasks (e.g. CP and NP)
 void userAreaInit() {
-  for (uint8 a = 0; a < _USER; a++) {
+  for (uint8_t a = 0; a < _USER; a++) {
     Ustore(a, cellRomFetch(a)); // Actually `UZERO/CELLL + a` but UZERO==ROM0 (checked in xc)
   }
   //testing3();
@@ -604,7 +604,7 @@ void userAreaInit() {
 
 void userAreaSave() {
   #ifdef WRITEROM
-    for (uint8 a = 0; a < _USER; a++) {
+    for (uint8_t a = 0; a < _USER; a++) {
       cellRomStore(a, Ufetch(a)); // Actually `UZERO/CELLL + a` but UZERO==ROM0 (checked in xc)
     }
   #else
@@ -639,11 +639,11 @@ void debugPrintTIB() {
 // TEST will (destructively) check the stack matches expected result, used for testing the compiler.
 // e.g. this.interpret(`10 DUP 10 10 2 TEST`); // Confirm stack finishes with 2 items (10 10)
 void TEST() { //  a1 a2 a3 b1 b2 b3 n -- ; Check n parameters on stack
-  const uint8 stackDepth = SPpop();
-  if ((ramSPP - ramSP) != uint8(stackDepth << 1)) {
+  const uint8_t stackDepth = SPpop();
+  if ((ramSPP - ramSP) != uint8_t(stackDepth << 1)) {
     Serial.println(F("Stack depth wrong"));
   } else {
-    for (uint8 i = 0; i < stackDepth; i++) {
+    for (uint8_t i = 0; i < stackDepth; i++) {
       const CELLTYPE onStack = cellRamFetch(ramSP + i);
       const CELLTYPE expected = SPpop(); // What we expect to see
       if (onStack != expected) {
@@ -664,8 +664,8 @@ void TEST() { //  a1 a2 a3 b1 b2 b3 n -- ; Check n parameters on stack
 void PARSE() { // returns b (address) and u (length)
   const char delimiter = SPpop(); // delimiter
   const CELLTYPE tib = Ufetch(TIBoffset);
-  const uint8 ntib = Ufetch(nTIBoffset);
-  uint8 inoffset = Ufetch(INoffset);
+  const uint8_t ntib = Ufetch(nTIBoffset);
+  uint8_t inoffset = Ufetch(INoffset);
   if (delimiter == BL) {
     while ((inoffset < ntib) && (Mfetch8(tib + inoffset) <= BL)) {
       inoffset++;
@@ -687,7 +687,7 @@ void PARSE() { // returns b (address) and u (length)
 void TOKEN() { // -- a; <string>; copy blank delimited string to name buffer, immediately below name dictionary (location is important as ':' take a shortcut in eForth.
   SPpush(BL);
   PARSE();   // b u (counted string, adjusts >IN)
-  const uint8 u = min(SPpop(), nameMaxLength); // length of string
+  const uint8_t u = min(SPpop(), nameMaxLength); // length of string
   const CELLTYPE b = SPpop(); // start of string
   const CELLTYPE np = align(npFetch() - u - CELLL); // Enough space in Name Directory to copy string optionally with one zero after
   // Careful if edit next formula, align doesnt change if mem=8, AND in this case np may not be on a cell boundary
@@ -703,10 +703,10 @@ void TOKEN() { // -- a; <string>; copy blank delimited string to name buffer, im
 void NUMBERQ() {
   CELLTYPE a = SPpop();
   const CELLTYPE aa = a;
-  const uint8 radix = Ufetch(BASEoffset); //TODO-ANDROID handle base other than 10 BUT maybe not needed as switch to Forth version before ever use non-decimal
+  const uint8_t radix = Ufetch(BASEoffset); //TODO-ANDROID handle base other than 10 BUT maybe not needed as switch to Forth version before ever use non-decimal
   bool neg = false;
   CELLTYPE acc = 0;
-  for (uint8 i = Mfetch8(a++); i > 0; i--) {
+  for (uint8_t i = Mfetch8(a++); i > 0; i--) {
     char c = Mfetch8(a++);
     if (c == '-') {
        neg = true;
@@ -743,7 +743,7 @@ void dCOMPILE() { // a -- ...; same signature as to $COMPILE at Zen pg96
     const CELLTYPE na = SPpop();
     if (na) { // ca
       const CELLTYPE xt = SPpop();
-      const uint8 ch = Mfetch8(na);
+      const uint8_t ch = Mfetch8(na);
       // noinspection JSBitwiseOperatorUsage
       if (ch & IMED) {
         runXT(xt);

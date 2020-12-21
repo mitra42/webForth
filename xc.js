@@ -14,7 +14,7 @@ const extensions = ForthNodeExtensions;
 const xcRevDefines = {}; // Extra defines to check for values in
 
 //TODO-DUMP should refuse to dump any code fields to non existent routines
-class ForthDumper extends Forth {
+class ForthXC extends Forth {
   xcLine(s, fd) { // asynchronous if passed fd
     if (fd) {
       return fd.write(s); // Current position, utf8, return a promise { bytesWritten, buffer }
@@ -93,7 +93,7 @@ class ForthDumper extends Forth {
       }
     }
   }
-  async xcFunctions(fd) {
+  async xcFunctions({ processor }, fd) {
     await this.xcLine('\n/* === Function table - maps tokens to functions === */', fd);
     for (let token = 0; token < this.jsFunctions.length; token++) {
       const func = this.jsFunctions[token];
@@ -104,7 +104,7 @@ class ForthDumper extends Forth {
     }
     // This is the actual array of functions - will have 0 for replaced ones
     // On Arduino uno `const void (*f[62])() = {` worked, but ESP8266 required `void (* const f[])() PROGMEM = {`
-    await this.xcLine('\nvoid (* const f[FUNCTIONSLENGTH])() PROGMEM = {', fd);
+    await this.xcLine(`\nvoid (* const f[FUNCTIONSLENGTH])()${processor === "esp8266" ? ' PROGMEM' : ''} = {`, fd);
     const itemsPerLine = 4;
     let itemsToGoOnLine = 0;
     for (let token = 0; token < this.jsFunctions.length; token++) {
@@ -191,30 +191,30 @@ class ForthDumper extends Forth {
     }
     await this.xcLine('\n};', fd);
   }
-  async xcDictionary({ folder }) {
-    await this.xcHeaderFile({ folder });
-    await this.xcDictionaryFile({ folder });
+  async xcDictionary({ processor, folder }) {
+    await this.xcHeaderFile({ processor, folder });
+    await this.xcDictionaryFile({ processor, folder });
   }
-  async xcDictionaryFile({ folder }) {
-    const fd = await fs.open(`${folder}/arduino_dictionary.cpp`, fs_constants.O_WRONLY | fs_constants.O_CREAT);
-    await this.xcLine('#include "arduino_functions.h"', fd);
+  async xcDictionaryFile({ processor, folder }) {
+    const fd = await fs.open(`${folder}/webforth_dictionary.cpp`, fs_constants.O_WRONLY | fs_constants.O_CREAT | fs_constants.O_TRUNC);
+    await this.xcLine('#include "webforth_functions.h"', fd);
     await this.xcLine('\n// === Arduino source built directly from dictionary - edit at your own risk ! === ', fd);
     await this.xcNames(fd);
     await this.xcTokens(fd);
-    await this.xcFunctions(fd);
+    await this.xcFunctions({ processor }, fd);
     await this.xcCode(fd);
     await this.xcLine('\n// === End of Arduino source from dictionary === \n', fd);
     await fd.close();
   }
-  async xcHeaderFile({ folder }) {
-    const fd = await fs.open(`${folder}/arduino_functions.h`, fs_constants.O_WRONLY | fs_constants.O_CREAT);
-    await this.xcLine('#ifndef ARDUINO_WEBFORTH_H_\n#define ARDUINO_WEBFORTH_H_\n#include <c_types.h>\n#include <Arduino.h>', fd);
+  async xcHeaderFile({ processor, folder }) {
+    const fd = await fs.open(`${folder}/webforth_functions.h`, fs_constants.O_WRONLY | fs_constants.O_CREAT | fs_constants.O_TRUNC);
+    await this.xcLine('#ifndef ARDUINO_WEBFORTH_H_\n#define ARDUINO_WEBFORTH_H_\n#include <Arduino.h>', fd);
     await this.xcConstants(fd);
     await this.xcLine(`
-// Data defined currently in arduino_webforth.ino but used in arduino_functions.cpp
+// Data defined currently in arduino_webforth.ino but used in webforth_functions.cpp
 extern const CELLTYPE rom[ROMCELLS] PROGMEM;
-extern void (* const f[FUNCTIONSLENGTH])() PROGMEM;
-// Needed by setup or loop defined in arduino_functions.cpp
+extern void (* const f[FUNCTIONSLENGTH])()${processor === "esp8266" ? ' PROGMEM' : ''};
+// Needed by setup or loop defined in webforth_functions.cpp
 extern CELLTYPE IP;
 extern CELLTYPE IPnext();
 extern void threadtoken(const CELLTYPE xt);
@@ -223,4 +223,4 @@ extern void threadtoken(const CELLTYPE xt);
     await fd.close();
   }
 }
-export { ForthDumper, extensions };
+export { ForthXC, extensions };

@@ -74,7 +74,7 @@ const fsExtensions = [
  */
   { n: 'CREATE-FILE', // c-addr u fam -- fileid ior ; https://forth-standard.org/standard/file/CREATE-FILE)
     f() {
-      const fam = this.SPpop() | fs.constants.O_CREAT; const filepath = this.SPpopString();
+      const fam = this.SPpop() | fs.constants.O_CREAT | fs_constants.O_TRUNC; const filepath = this.SPpopString();
       return new Promise((resolve) => fs.open(filepath, fam, 0o666,
         (err, fd) => {
           fsDescriptors[fd] = { filepath, fam, position: 0 };
