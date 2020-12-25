@@ -120,3 +120,11 @@ Please introduce yourself on [issue#1](https://github.com/mitra42/webforth/issue
 
 Pull requests are welcome, and even quite significant changes at this stage, 
 but lets discuss first (open a new issue in GIT). 
+
+## Cutting a release 
+* Update CHANGELOG.md
+* Update VER in index.js and version in package.json to next even number
+* `npm publish`
+* push to git on master branch
+* Update VER in index.js and version in package.json to next odd number
+* npm update; npm install

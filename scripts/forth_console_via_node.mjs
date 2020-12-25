@@ -1,4 +1,4 @@
-import { Forth, ForthNodeExtensions, Flash8_16, Flash8_24, Flash8_32, Flash16_16, Flash32_32 } from '../index.js';
+import { Forth, ForthNodeExtensions } from '../index.js';
 // Normally this would be: import Forth from 'webforth';
 
 // Valid choices for CELL:MEM are 2:8 2:16 2:32 3:8 4:8 4:16 4:32
@@ -10,7 +10,7 @@ const ROMSIZE = 0x1000 * CELLL;
 // RAM: Used for UserVariables, stacks, TIB, PAD etc and Dictionary (code and names) after useRam() is called
 const RAMSIZE = 0x2000 * CELLL;
 const extensions = ForthNodeExtensions; // especially IO while in node
-let memClass = undefined;
+const memClass = undefined; // Usually undefined nad handled automagically by `new Forth`, override for experimentation
 
 const forth = new Forth({ CELLL, ROMSIZE, RAMSIZE, MEM, extensions, memClass });
 forth.compileForthInForth()
@@ -19,4 +19,3 @@ forth.compileForthInForth()
   //.then(() => forth.interpret("WARM"));
   .then(() => forth.console()) // Interactive console
   .then(() => console.log('\nconsole exited'));
-

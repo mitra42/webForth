@@ -105,7 +105,7 @@ We are using Token threading
 because we can't easily mix javascript code into the byte-array of Forth.
 The first word of each definition contains an index into a table of code. 
 This code table is used for both defining words (colon, constant etc) 
-and for any word implemented in pure javacript (would be CODE words in most Forths).
+and for any word implemented in pure javascript (would be CODE words in most Forths).
 
 ### Integrating Javascript into Forth 
 
@@ -129,7 +129,7 @@ There will definitely be divergences from ANS Forth,
 but while that is the only "standard" it doesnt seem to be in wide use. 
 See [issue#12](https://github.com/mitra42/webForth/issues/12)
 
-I envision compatability vocabularies, so at the top of a file or extension one could 
+I envision compatibility vocabularies, so at the top of a file or extension one could 
 put e.g. `ANS : foo xxx ; FORTH` and know that foo used the ANS dialect.
 
 #### Module wish list
@@ -245,8 +245,8 @@ loop-sys|limit i|doDO|doLOOP I J
 
 ### Possible architecture
 
-#### Bottom layer - compatability
-Seperate files for e.g. in JS, WASM, PIC-C, ESP ASM etc
+#### Bottom layer - compatibility
+Separate files for e.g. in JS, WASM, PIC-C, ESP ASM etc
 Minimal 30-ish words potentially using eForth, or inspired by it.
 
 #### Optimisation layer
@@ -256,7 +256,7 @@ to underlying platform
 #### Forth in Forth 
 The rest of Forth in Forth 
 
-#### Compatability layer 
+#### Compatibility layer 
 Dictionaries for F83, ANSI etc 
 
 #### Optional Extensions layer
@@ -264,7 +264,7 @@ Ideally builds on ForthInForth layer, but could build on specific dialects
 e.g. Blocks, Serial, Web Server, Web fetcher, Files, etc
 
 #### Integration layer
-Integrate code from other places, especially for example a JS compatability layer to call code from node. 
+Integrate code from other places, especially for example a JS compatibility layer to call code from node. 
 
 ### Possible Projects
 This list will end up on GIT at some point

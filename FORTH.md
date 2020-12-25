@@ -5,7 +5,7 @@ There are also not many people using it, and the ANSI standard is pretty poor
 (for example it doesn't appear to define counted strings).
 
 These are the links I found useful developing this. 
-* https://www.taygeta.com/forth/ is a 1994 draft of the ANSI spec which is apparantly 
+* https://www.taygeta.com/forth/ is a 1994 draft of the ANSI spec which is apparently 
 the same as the final version.
 * http://forth.org/ Forth Interest Group - now defunct 
 * https://www.forth.com/ Forth Inc - 

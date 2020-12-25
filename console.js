@@ -8,7 +8,7 @@ let Forth; // Will hold class when loaded
 let forth; // Will hold instance
 
 async function ForthLoad({ extensions = [] } = {}) {
-  const fLog = extensions.map(x=>x.f).find(f => f.name === "bound TXbangS") || console.log;
+  const fLog = extensions.map((x) => x.f).find((f) => f.name === 'bound TXbangS') || console.log;
   const CELLL = 2;
   const MEM = 8;
   const EM = 0x2000 * CELLL; // default is 0x2000 * CELLL
@@ -38,7 +38,7 @@ function EL(tag, attributes = {}, children) {
   const el = document.createElement(tag);
   Object.entries(attributes)
     .forEach((kv) => {
-      if (['textContent', 'onsubmit'].includes(kv[0]) || (typeof(kv[1]) === "object")) {
+      if (['textContent', 'onsubmit'].includes(kv[0]) || (typeof kv[1]  === 'object')) {
         el[kv[0]] = kv[1];
       } else {
         el.setAttribute(kv[0], kv[1]);
@@ -90,17 +90,17 @@ class ForthConsole extends HTMLElement {
         this.output = EL('forth-output'),
       ]),
       EL('div', { class: 'grid-under' }, [
-        EL('div',{style: 'grid-column-start: 1;grid-column-end: 2;'}, [
+        EL('div', { style: 'grid-column-start: 1;grid-column-end: 2;' },  [
           EL('a', {  href: 'https://github.com/mitra42/webForth' }, [
             EL('span', { textContent: 'help' }),
           ]),
         ]),
-        EL('div',{ style: 'grid-column-start: 2;grid-column-end: 3;'}, [
+        EL('div', { style: 'grid-column-start: 2;grid-column-end: 3;' }, [
           EL('a', { href: 'https://mitra.biz' }, [
             EL('span', { textContent: 'mitra ardron 2020' }),
           ]),
         ]),
-        EL('div',{ style: 'grid-column-start: 3;grid-column-end: 4;'}, [
+        EL('div', { style: 'grid-column-start: 3;grid-column-end: 4;' }, [
           EL('a', { href: 'https://github.com/mitra42/webForth' }, [
             EL('span', { textContent: 'git repo' }),
           ]),
@@ -179,7 +179,7 @@ class ForthStack extends HTMLElement {
       ]),
     );
   }
-  render(res) {
+  render(unusedRes) {
     if (this.sul) this.sul.remove();
     this.sdiv.append(
       this.sul = EL('ul', { },

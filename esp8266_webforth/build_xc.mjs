@@ -8,7 +8,7 @@ import { ForthXC, extensions } from '../xc.js';
  */
 
 // CELLL - size of one Forth cell. Should use 2 for Arduino, or 4 for ESP8266 for efficiency.
-// MEM - size of a slot in memory. Should be CELLL * 8 bits for efficiency and may not work if missmatched.
+// MEM - size of a slot in memory. Should be CELLL * 8 bits for efficiency and may not work if mismatched.
 // For Javascript, valid choices for CELL:MEM are 2:8 2:16 2:32 3:8 4:8 4:16 4:32 Arduino is 2:16 ESP8266 is 4:32
 
 /*
@@ -33,7 +33,7 @@ async function build({
   });
   await forth.compileForthInForth();
   console.log(`=== forthInForth for ${processor} compiled`);
-  await forth.xcDictionary({ processor, folder: `./` }); // Dump to files in folder
+  await forth.xcDictionary({ processor, folder: './' }); // Dump to files in folder
   console.log(`\n// ${processor} dump complete`);
 }
 

@@ -14,6 +14,7 @@ const extensions = ForthNodeExtensions;
 const xcRevDefines = {}; // Extra defines to check for values in
 
 //TODO-DUMP should refuse to dump any code fields to non existent routines
+// noinspection JSCheckFunctionSignatures
 class ForthXC extends Forth {
   xcLine(s, fd) { // asynchronous if passed fd
     if (fd) {
@@ -32,7 +33,7 @@ class ForthXC extends Forth {
     .replace(/_/g, '%5F')
     .replace(/%/g, '_');
   }
-  xcFuncIdentifier(func, token) {
+  xcFuncIdentifier(func, unusedToken) {
     return `F_${this.xcNameEncode(func.name)}`;
   }
   xcXTIdentifier(name) {
@@ -104,7 +105,7 @@ class ForthXC extends Forth {
     }
     // This is the actual array of functions - will have 0 for replaced ones
     // On Arduino uno `const void (*f[62])() = {` worked, but ESP8266 required `void (* const f[])() PROGMEM = {`
-    await this.xcLine(`\nvoid (* const f[FUNCTIONSLENGTH])()${processor === "esp8266" ? ' PROGMEM' : ''} = {`, fd);
+    await this.xcLine(`\nvoid (* const f[FUNCTIONSLENGTH])()${processor === 'esp8266' ? ' PROGMEM' : ''} = {`, fd);
     const itemsPerLine = 4;
     let itemsToGoOnLine = 0;
     for (let token = 0; token < this.jsFunctions.length; token++) {
@@ -213,7 +214,7 @@ class ForthXC extends Forth {
     await this.xcLine(`
 // Data defined currently in arduino_webforth.ino but used in webforth_functions.cpp
 extern const CELLTYPE rom[ROMCELLS] PROGMEM;
-extern void (* const f[FUNCTIONSLENGTH])()${processor === "esp8266" ? ' PROGMEM' : ''};
+extern void (* const f[FUNCTIONSLENGTH])()${processor === 'esp8266' ? ' PROGMEM' : ''};
 // Needed by setup or loop defined in webforth_functions.cpp
 extern CELLTYPE IP;
 extern CELLTYPE IPnext();

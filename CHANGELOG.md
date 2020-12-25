@@ -2,7 +2,7 @@
   * ESP8266 sketch
   * Reorganize folders for sketches etc and build process
   * Build FlashXX_XX classes 8_16, 8_32, 16_16. 32_32 - flips Rom to high addresses
-  * Complete comparisom of eForth Zen, v5 and Staapl variants
+  * Complete comparison of eForth Zen, v5 and Staapl variants
   * Fix tests commented out
   * Refactor extensions - mechanism; support constants; 
   * Bugs in EXECUTE; 
@@ -19,7 +19,7 @@
   * Fix some bugs with division by CELLL leaving floating point numbers
   * Find etc
     * Optimize _sameq to use cells rather than bytes
-    * Seperate out xt2na from _find
+    * Separate out xt2na from _find
     * Handle some bugs with not padding strings we are searching for
   * Support port to Arduino
     * Change names of a few functions (`find` `jsFind`; `$INTERPRET` `dINTERPRET`; `$COMPILE` `dCOMPILE`; 

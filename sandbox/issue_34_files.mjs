@@ -1,5 +1,5 @@
 import fs from 'fs';
-import { Forth, ForthNodeExtensions, Flash16_16 } from '../index.js';
+import { Forth, ForthNodeExtensions } from '../index.js';
 // Normally this would be: import Forth from 'webforth';
 
 // Valid choices for CELL:MEM are 2:8 2:16 2:32 3:8 4:8 4:16 4:32
@@ -11,8 +11,7 @@ const ROMSIZE = 0x2000 * CELLL;
 // RAM: Used for UserVariables, stacks, TIB, PAD etc and Dictionary (code and names) after useRam() is called
 const RAMSIZE = 0x2000 * CELLL; // Make it larger will use
 const extensions = ForthNodeExtensions;
-let memClass;
-memClass = Flash16_16; // Uncomment this to simulate a chip with separate Rom and Ram (like an Arduino).
+const memClass = undefined; // Define to override default based on CELLL and MEM
 
 /* Files design decisions
   At this point no local data is stored - File descriptors are returned.
@@ -55,14 +54,14 @@ const fsExtensions = [
         (err) => {
           delete fsDescriptors[fd];
           this.JSerrToCounted(err);
-          resolve(); })
+          resolve(); });
     }); },
   },
   { n: 'DELETE-FILE', // c-addr u -- ior ; https://forth-standard.org/standard/file/DELETE-FILE
     f() { return new Promise((resolve) => {
       const filename = this.SPpopString();
       fs.unlink(filename,
-        (err) => { this.JSerrToCounted(err); resolve(); })
+        (err) => { this.JSerrToCounted(err); resolve(); });
     }); },
   },
   /*
@@ -74,7 +73,7 @@ const fsExtensions = [
  */
   { n: 'CREATE-FILE', // c-addr u fam -- fileid ior ; https://forth-standard.org/standard/file/CREATE-FILE)
     f() {
-      const fam = this.SPpop() | fs.constants.O_CREAT | fs_constants.O_TRUNC; const filepath = this.SPpopString();
+      const fam = this.SPpop() | fs.constants.O_CREAT | fs.constants.O_TRUNC; const filepath = this.SPpopString();
       return new Promise((resolve) => fs.open(filepath, fam, 0o666,
         (err, fd) => {
           fsDescriptors[fd] = { filepath, fam, position: 0 };
@@ -141,7 +140,9 @@ const fsExtensions = [
   },
   { n: 'REPOSITION-FILE', // ud fileid -- ior ; https://forth-standard.org/standard/file/REPOSITION-FILE )
     f() {
-      const fd = this.SPpop(); const pos = this.SPpopD();
+      const fd = this.SPpop();
+      // noinspection UnnecessaryLocalVariableJS
+      const pos = this.SPpopD();
       // Cant reposition in node so set internal position which is used on each read/write
       fsDescriptors[fd].position = pos;
       this.SPpush(0);
