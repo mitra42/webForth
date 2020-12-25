@@ -1,3 +1,14 @@
+* 2020-12-25: v0.0.14
+  * ESP8266 sketch
+  * Reorganize folders for sketches etc and build process
+  * Build FlashXX_XX classes 8_16, 8_32, 16_16. 32_32 - flips Rom to high addresses
+  * Complete comparisom of eForth Zen, v5 and Staapl variants
+  * Fix tests commented out
+  * Refactor extensions - mechanism; support constants; 
+  * Bugs in EXECUTE; 
+  * Add words: SPpushD SPpopD SPpopString FlashXX_XX.buff8 ud< S"| S" crlf?
+  * File support (experimental) CREATE|WRITE|READ|OPEN|DELETE|RENAME-FILE FILE-SIZE FLUSH-FILE READ|WRITE-LINE
+  * Error string handling
 * 2020-11-28: v0.0.12
   * Flash-able memory storage class (backports concept from Arduino to JS)
 * 2020-11-23: v0.0.11
