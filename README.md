@@ -122,6 +122,7 @@ Pull requests are welcome, and even quite significant changes at this stage,
 but lets discuss first (open a new issue in GIT). 
 
 ## Cutting a release 
+* Run a code inspection - surprising how many bugs this ESLint or most IDE's catch ! 
 * Update CHANGELOG.md
 * Update VER in index.js and version in package.json to next even number
 * `npm publish`

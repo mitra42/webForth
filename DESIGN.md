@@ -1,11 +1,10 @@
 # Forth for Javascript - Design criteria
-Mitra Ardron <mitra@mitra.biz> 1 December 2020
+Mitra Ardron <mitra@mitra.biz> 27 December 2020
 
 Welcome to my basic design document for WebForth.  
 
 Currently it is not in a particularly useful order, in part because I haven't found an easy way to 
 provide a linear reading order without needing to look ahead.  
-Also at the end are some remnants of an earlier design doc that need updating. 
 
 ## Key Concepts
 
@@ -52,8 +51,22 @@ As an alternative this system bootstraps in Javascript,
 The memory map almost follows the eForth model as defined on page 27 of eForth,
 Note that page 27 doesn't quite match the supplied code on page 26!
 The code that defines these is well commented inline.
-Also there is some separation done to allow the lower parts 
-(User Save; Code Dictionary; Name dictionary) to be Rom-able.
+In Javascript, its in a pair of UintXXarray structures. In C, its a pair of arrays.
+
+## Epromability
+One challenge with eForth is that it puts data and code in the same space,
+meaning that to Eprom it requires copying the Eprom to Ram,
+and given that small chips have limited Ram that isn't smart.
+
+webFORTH allows for separation between the two. The dictionary is built in an area to be flashed,
+and then pointers are switched to a Ram area where further words can be built. The word `FORTH` and
+anything built with vCREATE will use memory in the Ram area, as do anything built with `VARIABLE`.
+
+In ROM goes: User Save; Code Dictionary; Name dictionary
+and in RAM (Stacks, TIB, PAD, User variables; data parts of CREATE DOES> words).
+
+A word "useRam" does the correct manipluation of pointers 
+so that the Flashed dictionaries point to Ram for a continuation. 
 
 #### Memory map to Javascript
 The primary memory, is a large area of (at least conceptually) contiguous memory.
@@ -76,19 +89,13 @@ Usually an alignment is done, so that if CELLL is 2 then it always starts on an 
 but this depends on memory efficiency and (may) not be done if MEM=8.
 The actual packing and unpacking are done by a class that can be passed to the Forth constructor.
 
-For example Flash16_32 is a 8 bit wide memory array for holding 32 bit cells which uses a `Uint16array`.
-
-Flash16_16 is a newer way of handling, for now just supporting CELLL = MEM = 16, it separates
-memory into two areas, so that one can be flashed on a device, and the other is fully initialized
-at start up.
+For example Flash8_32 is a 8 bit wide memory array for holding 32 bit cells which uses a `Uint8array`.
+It splits memory into two areas as described above, so that one can be flashed on a device, 
+and the other is fully initialized at start up.
 
 There may be future experimentation to experiment with different ways of handling memory,
 or managing a large virtual memory space on a smaller device.
 This would be mediated by the memory class.
-
-### Colon, Code and other words
-### I/O
-### Async
 
 ### Token Threaded
 The key to Forth is a threaded interpreter. 
@@ -107,6 +114,23 @@ The first word of each definition contains an index into a table of code.
 This code table is used for both defining words (colon, constant etc) 
 and for any word implemented in pure javascript (would be CODE words in most Forths).
 
+#### Threaded Interpreter - detail
+
+* The Program space stores as the first cell of a function:
+* an index into an array of functions,
+  for a (JS or C) function to execute to interpret the function.
+* That function gets can access a pointer `PAYLOAD` to the next cell after the initial cell.
+* And IP which points to the next cell after the
+
+```
+Caller: 100: | tokenDoList | foo (108) | bar | EXIT 
+Foo: 108: | tokenXxx | data ; 
+tokenXxx gets PAYLOAD=110, IP=104
+```
+
+So tokenDoList is essentially `RPpush(IP); IP=PAYLOAD`
+
+
 ### Integrating Javascript into Forth 
 
 Code words are defined as methods on the Forth class,
@@ -116,7 +140,12 @@ That table is read during dictionary building.
 To extend with more JS, a similar table of functions can be passed in as an extension, 
 or a caller can subclass "Forth"
 
-### Orthogonality and likely changes
+### Integrating C into Forth
+For the C version for Arduino and ESP8266 the code words are defined as functions, 
+accessed via the JSfunctions table. 
+
+The dictionaries are then built by defining addresses (XT_abcd) and using them to initialize
+a table in ROM. 
 
 #### Sync/Async/Event Driven
 TODO write up Async
@@ -178,97 +207,17 @@ Dictionary: 110 | icolon | sq2 | ;
 It pushes the pointer to the data `120` onto the stack and acts like `tokenDoList` to run the code,
 which leaves 4 on the stack.
 
-## Epromability
-One challenge with eForth is that it puts data and code in the same space, 
-meaning that to Eprom it requires copying the Eprom to Ram, 
-and given that small chips have limited Ram that isn't smart.
-
-webFORTH allows for separation between the two. The dictionary is built in an area to be flashed,
-and then pointers are switched to a Ram area where further words can be built. The word `FORTH` and
-anything built with vCREATE will use memory in the Ram area, as do anything built with `VARIABLE`.
-
-This is visible currently in arduino_webforth.ino and in the Flash16_16 class.
-
-#### Portability
+### Portability
 The intention is to make this available for different situations, 
 to date there is a Javascript and a C (for Arduino) version.
 
-## Earlier version - pretty much everything below here was for a version now deleted
-Mitra Ardron <mitra@mitra.biz> 8 Aug 2020
+## Write More about
 
-This doc may or may not match the code, 
-and is being randomly written as I come up with ideas,
-(mostly) newer ideas at the bottom.
-
-### Threaded Interpreter - v1
-
-* The Program space stores as the first value of a function: 
-* a pointer to the Javascript function to execute to interpret the function.
-* That function gets past (index in program space of first value, context).
-* Where the context is { program, stack, variables .... }
-
-The context should always be read only, if it needs changing copy it and edit the values. 
-
-Forth needs at least the following ...
-* Code is just a pointer to a javascript function. TODO how does it return?
-* Colon is a pointer to the Colon function which iterates over the functions 
-  it is ended by a semicolon
-* Variable the data holds an index into the variable space
-* Constant the data is the value to push on the stack
-* Builds-Does the data is the pointer to the Colon function to execute for the "Does" part
-
--|PC|Z|Prog Stack|Reg stack
-----|----|---|---|----
-Before call|A| |0|
-After call|A+1|B+1|0|
-After Colon|B+1| |A+1,0|
-After Semicolon|A+1| |0| |
-After Const|A+1| | |@B+1
-After Lit|A+2| | |@A+1
-After Var|A+1| | |variables[@B+1]
-After run call|0|B+1| |
-
-## Documentation
-
-* Word definitions https://www.taygeta.com/forth/dpans6.htm 
-
-## Implementation decisions and details
-
-### Implementation dependent choices for data saved
-
-define|as|created|consumed
-----|----|---|---
-colon-sys|definitionStart name|: initiateDoes|; DOES>
-next-sys|programCounter|initiateColon|runSemicolon DOES>
-do-sys|dicPointer (to initiate field)|DO|LOOP
-loop-sys|limit i|doDO|doLOOP I J
-
-### Possible architecture
-
-#### Bottom layer - compatibility
-Separate files for e.g. in JS, WASM, PIC-C, ESP ASM etc
-Minimal 30-ish words potentially using eForth, or inspired by it.
-
-#### Optimisation layer
-Not sure how to fit this in yet, but it would be words optimized from Forth
-to underlying platform
-
-#### Forth in Forth 
-The rest of Forth in Forth 
-
-#### Compatibility layer 
-Dictionaries for F83, ANSI etc 
-
-#### Optional Extensions layer
-Ideally builds on ForthInForth layer, but could build on specific dialects
-e.g. Blocks, Serial, Web Server, Web fetcher, Files, etc
-
-#### Integration layer
-Integrate code from other places, especially for example a JS compatibility layer to call code from node. 
-
-### Possible Projects
-This list will end up on GIT at some point
-
-* Module handling 
-* http(s) fetching (including for modules)
-* DOM integration
+### Orthogonality and likely changes
+### Colon, Code and other words
+### I/O
+### Async
+### Cross compiling
+### Extensions
+### Endian
+### Anything else in https://github.com/mitra42/webForth/issues/25
