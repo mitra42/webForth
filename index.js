@@ -2287,7 +2287,7 @@ class Forth {
   vpFetch() { return this.Ufetch(VPoffset) || this.Ufetch(CPoffset); }
   cpAlign() { this.Ustore(CPoffset, this.m.cellAlign(this.cpFetch())); }
   vpAlign() { this.Ustore(VPoffset, this.m.cellAlign(this.vpFetch())); }
-  npFetch() { return this.Ufetch(NPoffset); }
+  npFetch() { return this.Ufetch(NPoffset) || this.ROMNAMEE; } // If ROMNAMEE is top of memory it will be 0, leading to negative results
   lastFetch() { return this.Ufetch(LASToffset); }
   padPtr() { return this.vpFetch() + 80; } // Sometimes JS needs the pad pointer
 
@@ -2977,8 +2977,8 @@ class Forth {
     // Move CP and NP pointers to ram dictionary
     // LAST points to entry in ROM which first word in RAM should link to
     if (this.ROMCODEE) {
-      this.romCodeTop = this.cpFetch();
-      this.romNameBottom = this.npFetch();
+      this.romCodeTop = this.cpFetch(); // For XC
+      this.romNameBottom = this.npFetch(); // For XC
       this.Ustore(NPoffset, this.RAMNAMEE);
       this.Ustore(CPoffset, this.Ufetch(VPoffset)); // Started at CODEE then moved up as vALLOT or v,
       this.Ustore(VPoffset, 0); // Once set to 0 routines will use CPoffset
