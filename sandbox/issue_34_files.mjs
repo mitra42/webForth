@@ -154,6 +154,7 @@ const fsExtensions = [
 
 ];
 const filesExtension = `
+testing3
 : WRITE-LINE ( c-addr u fileid -- ior ; https://forth-standard.org/standard/file/WRITE-LINE )
   DUP >R WRITE-FILE R> SWAP ?DUP 0= IF write-cr ELSE DROP THEN ;
 
@@ -198,18 +199,72 @@ const filesExtension = `
   >R NIP -1 R> ( u~ T ior )
 ;
 
+VARIABLE sourceBuff ( TODO-MULTI make this a user variable)
+VARIABLE SOURCE-ID
+: sourcePush R> SOURCE-ID @ >R SPAN @ >R >IN @ >R >R ; ( TODO-NEST needs to reposition existing file  )
+: sourcePop R> R> >IN ! R> SPAN ! R> SOURCE-ID ! >R ;
+: EVALUATE ( xxx caddr u -- yyy;  https://forth-standard.org/standard/core/EVALUATE )
+  sourcePush SPAN ! sourceBuff ! -1 SOURCE-ID ! 0 >IN ! ;
+: SOURCE SOURCE-ID @
+  IF sourceBuff @ SPAN @ ( String or FD )
+  ELSE TIB #TIB @
+  THEN ;
+( almost nothing )
+: xPARSE >R SOURCE (a u) SWAP >IN @ + >IN @ - R> parse >IN +! ; ( TODO replace in index.js )
+( nothing )
+: REFILL ( https://forth-standard.org/standard/core/REFILL )
+  0 >IN !
+  SOURCE-ID @
+  ?DUP IF
+    DUP -1 =
+    IF 0 // Always false
+    ELSE BUF 1024 ROT READ-LINE ( u2 flag ior ) ( TODO check if need sourceBuff )
+      THROW SWAP SPAN ! // True if more
+    THEN
+  ELSE
+    TIB 80 'EXPECT @EXECUTE ( caddr u ;  vectors to accept)
+    #TIB ! DROP -1
+  THEN
+;
+: QUERY REFILL 0= IF sourcePop THEN ; ( Read from current source, on fail go back to previous reseting >IN )
+
+: INCLUDE-FILE ( i * x fileid -- j * x ; https://forth-standard.org/standard/file/INCLUDE-FILE )
+  sourcePush SOURCE-ID ! 0 >IN ! ;
+: INCLUDED ( caddr u -- ; https://forth-standard.org/standard/file/INCLUDED e.g. $" filename" INCLUDED )
+  R/O OPEN-FILE ( fileid ior ) THROW INCLUDE-FILE ;
+: PARSE-NAME 34 WORD COUNT ; ( TODO look in index.js for other places it does part of this - 34 WORD)
+: INCLUDE PARSE-NAME INCLUDED ; ( i*x "name" -- j*x ; https://forth-standard.org/standard/file/INCLUDE )
+
+( TODO Maybe retire 'EXPECT and EXPECT and rename accept to EXPECT, retire SPAN as not used )
+( TODO blocks - this would be handled in SOURCE I think https://forth-standard.org/standard/block)
+
+( Redefining for testing purposes )
+: que ( -- )
+  QUERY ( get a line of commands from )
+  EVAL ; ( Evaluate it)
+
+: QUIT ( -- )
+  ( Reset return stack pointer and start text interpreter. )
+  RP0 @ RP!           ( initialize the return stack )
+  BEGIN
+    [COMPILE] [       ( start text interpreter )
+  BEGIN
+    [ ' que ] LITERAL ( get a line and evaluate it)
+  CATCH             ( execute commands with error handler)
+    ?DUP
+    UNTIL ( a)          ( exit if an error occurred )
+  ( 'PROMPT @ SWAP )  ( EFORTH-ZEN and EFORTH-V5 save current prompt address, Staapl doesnt)
+  CONSOLE             ( Initialize for terminal interaction)
+  quitError           ( Report error and reset data stack)
+  ( V5 and ZEN also send "ERR" to file handler if prompt is not OK which is a little off )
+  AGAIN ;               ( go back get another command line )
+
+
+
 
 ( ==== BELOW HERE STILL NEED DEFINING ==== )
-( USER SOURCE-ID ... but needs a stack as nested - 0 Terminal -1 STRING evaluate or fileid )
-( PARSE-NAME ( needed INCLUDED )
-( Modifications and extensions )
 ( : S\\" ( "ccc<quote>" -- c-addr u ; read and translate escape chars )
 ( : ( ( needs to skip till gets to end of file )
-( Work with above and >IN SOURCE-FILE etc)
-( REFILL ( -- flag ; https://forth-standard.org/standard/file/REFILL )
-( INCLUDE-FILE ( i * x fileid -- j * x ; https://forth-standard.org/standard/file/INCLUDE-FILE - needed by INCLUDED
-( : INCLUDED ( caddr u -- ; https://forth-standard.org/standard/file/INCLUDED e.g. $" filename" INCLUDED -- needs INCLUDE-FILE needed REQUIRED )
-( : INCLUDE PARSE-NAME INCLUDED ; ( i*x "name" -- j*x ; https://forth-standard.org/standard/file/INCLUDE )
 ( Need some other ANS words here esp ALLOCATED )
 ( : REQUIRED XXX ; ( https://forth-standard.org/standard/file/REQUIRED -- needs INCLUDED needed REQUIRE )
 ( : REQUIRE [COMPILE] S" REQUIRED ; )
@@ -252,5 +307,6 @@ forth.compileForthInForth()
   //.then(() => forth.interpret("WARM"));
   .then(() => fsExtensions.forEach((e) => forth.extensionAdd(e)))
   .then(() => forth.interpret(filesExtension))
-  .then(() => forth.console()) // Interactive console
+  .then(() => forth.console()) // Old Interactive console
+  //.then(() => forth.interpret("QUIT")) // New interactive console
   .then(() => console.log('\nconsole exited'));

@@ -145,7 +145,7 @@ USER("'ECHO", 'TX!');  // Execution vector of ECHO. Default to tx! but changed t
 const PROMPToffset = USER("'PROMPT", 0);    // Execution vector of PROMPT.  Default to '.ok'. TODO-23-COLD needs to be in UZERO
 const BASEoffset = USER('BASE', 10);
 USER('temp', 0);       // A temporary storage location used in parse and find. EFORTH-ZEN-ERRATA its uses as 'temp', listing says 'tmp'
-USER('SPAN', 0);       // Hold character count received by EXPECT (strangely it is stored, but not accessed)
+USER('SPAN', 0);       // Hold character count received by EXPECT (TODO strangely it is stored, but not accessed and EXPECT never used )
 const INoffset = USER('>IN', 0);        // Hold the character pointer while parsing input stream.
 const nTIBoffset = USER('#TIB', 0);       // Hold the current count of the terminal input buffer.
 const TIBoffset = USER(undefined, 'TIB0');  // Hold current address of Terminal Input Buffer (must be cell after #TIB.)
@@ -786,7 +786,7 @@ const forthInForth = `
 ( This version is based on v5, Staapl is significantly different )
 
 : parse ( b u c -- b u delta ; <string> ) ( TODO evaluate control structures here)
-  ( Scan string delimited by this. Return found string and its offset. )
+  ( Scan string delimited by c. Return found string and its offset. )
   ( EFORTH-ZEN-ERRATA - delta appears to be to end of string, not start )
   temp !            ( save delimiter in temp )
   OVER >R DUP       ( b u u)
@@ -981,31 +981,33 @@ const forthInForth = `
 ( Diff - Staapl doesnt check for 10 - crlf? split out as used by READ-LINE )
 : crlf? ( c -- f; is key a return or line feed?)
   DUP 10 = SWAP 13 = OR ;
+
+( ERRATA - Zen & V5 just check 13 and Ctrl-H, backspace can also be DEL and end of line can be 10 )
 : kTAP ( bot eot cur key -- bot eot cur )
   ( Process a key stroke, CR or backspace.)
   DUP crlf? 0= 
-  IF
-    [ CTRL H ] LITERAL = OVER 127 = OR ( is key a backspace or DEL ? )
-    IF BL TAP   ( none of above, replace by space )
-    ELSE ^H         ( backup current pointer )
+  IF ( bot eot cur key )
+    DUP [ CTRL H ] LITERAL = SWAP 127 = OR 0= ( bot eot cur f ; is key a backspace or DEL ? )
+    IF BL TAP   ( bot eot cur' ; none of above, replace by space )
+    ELSE ^H         ( bot eot cur' ; backup current pointer )
     THEN
     EXIT            ( done this part )
   THEN              ( key is a return)
   DROP              ( discard bot and eot )
-  NIP DUP ;         ( duplicate cur )
+  NIP DUP ;         ( bot cur cur;  duplicate cur to force accept to exit, Key not stored )
 
 ( Errata Zen doesnt match the signature) 
 : accept ( b u -- b u )
   ( Accept characters to input buffer. Return with actual count.)
   OVER + OVER       ( b b+u b;  EFORTH-ZEN-ERRATA fixed in v5 and STAAPL)
   BEGIN
-    2DUP XOR        ( b b+u b b=b+u = current pointer? )
+    2DUP XOR        ( b b+u b' b'=b+u = current pointer? )
   WHILE
     KEY             ( b b+u b c; get one more character )
     DUP BL - 95 U<  ( b b+u b c f; is it printable? )
     IF TAP          ( b b+u b+1 ; yes, accept and echo it )
     ELSE 'TAP @EXECUTE ( no, process control code )
-    THEN
+    THEN            ( kludge! if was a crlf then will have b+u replaced by b' causing the WHILE to trigger )
   REPEAT            ( b b+u b'; repeat until buffer full )
   DROP              ( b b+u ; drop current pointer
   OVER - ;          ( b u; leave actual count)
@@ -2223,7 +2225,7 @@ class Forth {
   // Put debugNA in a definition to print a counted string on the console
   debugNA() { console.log('NAME=', this.countedToJS(this.SPfetch())); } // Print the NA on console
   // Put testing3 in a definition to start outputing stack trace on console.
-  testing3() { this.testing |= 3; }
+  testing3() { this.testing |= 1; }
   // Put Fbreak in a definition.
   Fbreak() {
     console.log('\nbreak in a FORTH word'); } // Put a breakpoint in your IDE at this line
