@@ -8,8 +8,8 @@
  * new Forth({ CELLL: 2, MEM: 16, RAMSIZE: 0x4000);  // parameterizable
  *
  * And some ideas ... not yet implemented
- * .then(() => foo.load('foo.f'))       // TODO-34-LOAD Load file into the class
- * .then(() => foo.load('https://....')) // TODO-34-LOAD remote file it into the instance
+ * .then(() => foo.load('foo.f'))       // TODO-34-FILES Load file into the class
+ * .then(() => foo.load('https://....')) // TODO-34-FILES remote file it into the instance
  * boo = forth.rot([1,2,3]);  // Returns [2,3,1] - will depend what can do with JS API
  */
 
@@ -139,10 +139,12 @@ const SP0offset = USER('SP0', undefined);      // (--a) Pointer to bottom of the
 const RP0offset = USER('RP0', undefined);      // (--a) Pointer to bottom of the return stack.
 USER("'?KEY", '?RX');    // Execution vector of ?KEY. Default to ?rx.
 USER("'EMIT", 'TX!');  // Execution vector of EMIT. Default to TX!
-USER("'EXPECT", 0);    // Execution vector of EXPECT. Default to 'accept' - initialized when accept defined TODO-23-COLD needs to be in UZERO
-USER("'TAP", 0);       // Execution vector of TAP. Default to kTAP. TODO-23-COLD needs to be in UZERO
+// eForth difference - this next one is 'EXPECT in EFORTH )
+USER("'READ-LINE", 0);    // Execution vector of READ-LINE - needed as forward definition only present on systems with file
+// TODO-34-FILES consider if still want vectored I/O or prefer decision based on SOURCE-ID
+USER("'TAP", 0);       // Execution vector of TAP. Default to kTAP.
 USER("'ECHO", 'TX!');  // Execution vector of ECHO. Default to tx! but changed to ' EMIT later.
-const PROMPToffset = USER("'PROMPT", 0);    // Execution vector of PROMPT.  Default to '.ok'. TODO-23-COLD needs to be in UZERO
+const PROMPToffset = USER("'PROMPT", 0);    // Execution vector of PROMPT.  Default to '.ok'.
 const BASEoffset = USER('BASE', 10);
 USER('temp', 0);       // A temporary storage location used in parse and find. EFORTH-ZEN-ERRATA its uses as 'temp', listing says 'tmp'
 USER('SPAN', 0);       // Hold character count received by EXPECT (TODO strangely it is stored, but not accessed and EXPECT never used )
@@ -151,7 +153,7 @@ const nTIBoffset = USER('#TIB', 0);       // Hold the current count of the termi
 const TIBoffset = USER(undefined, 'TIB0');  // Hold current address of Terminal Input Buffer (must be cell after #TIB.)
 USER('CSP', 0);        // Hold the stack pointer for error checking.
 const EVALoffset = USER("'EVAL", 0);      // Initialized when have JS $INTERPRET, this switches between $INTERPRET and $COMPILE
-const NUMBERoffset = USER("'NUMBER", 'NUMBER?');    // Execution vector of number conversion. Default to NUMBER?. TODO-23-COLD needs to be in UZERO
+const NUMBERoffset = USER("'NUMBER", 'NUMBER?');    // Execution vector of number conversion. Default to NUMBER?.
 USER('HLD', 0);        // Hold a pointer in building a numeric output string.
 USER('HANDLER', 0);    // Hold the return stack pointer for error handling.
 // this is set to result of currentFetch
@@ -172,6 +174,8 @@ const CPoffset = USER('CP', undefined);  // eForth initializes to CTOP but we ha
 const NPoffset = USER('NP', undefined);  // normally set on Zen pg106 but we are using it live. Its the bottom of what compiled in name space.
 const LASToffset = USER('LAST', undefined); // normally set on Zen pg106 but using live
 const VPoffset = USER('VP', undefined);  // not part of eForth, pointer into Data space for EPROMability
+USER('SOURCE-ID', 0);  // 0 for terminal, -1 for string, fd for files
+USER("'unreadFile", 0); // TODO-34-FILES temporary till have files compilation choice
 // ported to Arduino above
 
 const forthInForth = `
@@ -298,14 +302,16 @@ const forthInForth = `
 \\T 1 2 3 ROT 2 3 1 3 TEST
 \\T 1 2 2DUP 1 2 1 2 4 TEST
 
-( === More Arithmetic operators Zen pg50 )
+( === More Arithmetic operators Zen pg50 and a few not in eForth but widely used )
 : + UM+ DROP ; ( w1 w2 -- w1+w2)
 : D+ >R SWAP >R UM+ R> R> + + ; ( d1 d2 -- d1+d2)
 : INVERT -1 XOR ; ( w -- w; 1's compliment)
 ( NOT's meaning is deprecated use 0= logical or INVERT bitwise see http://lars.nocrew.org/forth2012/core/INVERT.html)
-: NEGATE INVERT  1 + ; ( w -- w; 2's complement)
+: 1+ 1 + ; 
+: NEGATE INVERT  1+ ; ( w -- w; 2's complement)
 : DNEGATE INVERT >R INVERT  1 UM+ R> + ;
 : - NEGATE + ; ( n1 n2 -- n1-n2)
+: 1- 1 - ; 
 : ABS DUP 0< IF NEGATE THEN ; ( n -- n; Absolute value of w)
 : 0= IF 0 ELSE -1 THEN ;
 
@@ -349,7 +355,7 @@ const forthInForth = `
         >R UM+        ( subtract u from udh)
         R> OR         ( a borrow?)
         IF >R DROP    ( yes add a bit to quotient)
-          1 + R>
+          1+ R>
         ELSE DROP     ( no borrow)
         THEN R>       ( retrieve -u)
       THEN
@@ -470,7 +476,7 @@ const forthInForth = `
 
 : PICK ( ... +n -- ... w)
   ( Copy the nth stack item to tos)
-  1 + CELLS     ( bytes below tos)
+  1+ CELLS     ( bytes below tos)
   SP@ + @ ;     ( fetch directly from stack)
 
 \\T 1 2 3 DEPTH 1 2 3 3 4 TEST
@@ -481,6 +487,8 @@ const forthInForth = `
 
 : +! ( n a -- ; Add n to the contents at address a)
   SWAP OVER @ + SWAP ! ;
+: ++ 1 SWAP +! ;
+: -- -1 SWAP +! ;
 : 2! ( d a -- ; Store double integer to address a, high part at low address)
   SWAP OVER ! CELL+ ! ;
 : 2@ ( a -- d; Fetch double integer from address a, high part from low address)
@@ -500,9 +508,7 @@ const forthInForth = `
 : TIB ( -- a; Return address of terminal input buffer)
   #TIB CELL+ @ ; ( 1 cell after #TIB)
 : @EXECUTE ( a -- ; execute vector -if any- stored in address a)
-  @ ?DUP IF EXECUTE
-  ELSE Fbreak
-  THEN ;
+  @ ?DUP IF EXECUTE THEN ;
 
 \\T HLD @ 2 HLD +! HLD @ SWAP - 2 1 TEST
 \\T 1 2 3 SP@ 4 5 ROT 2! 1 4 5 3 TEST
@@ -512,15 +518,15 @@ const forthInForth = `
 ( === Memory Array and String Zen pg61-62: COUNT CMOVE FILL -TRAILING PACK$ )
 
 : COUNT ( b -- b+1 +n; return count byte of string and add 1 to byte address)
-  DUP 1 + SWAP C@ ;
+  DUP 1+ SWAP C@ ;
 
 : CMOVE ( b1 b2 u -- ; Copy u bytes from b1 to b2)
   FOR             ( repeat u+1 times)
     AFT           ( skip to THEN first time)
       >R DUP C@   ( fetch from source )
       R@ C!       ( store to destination)
-      1 +         ( increment source address)
-      R> 1 +      ( increment destination address)
+      1+         ( increment source address)
+      R> 1+      ( increment destination address)
     THEN
   NEXT 2DROP ;    ( done discard addresses)
 
@@ -530,7 +536,7 @@ const forthInForth = `
     SWAP          ( c b )
     AFT           ( skip to THEN)
       2DUP C!     ( c b; store c to b)
-      1 +         ( c b+1; increment b)
+      1+         ( c b+1; increment b)
     THEN
   NEXT 2DROP ;    ( done, discard c and b)
 
@@ -540,7 +546,7 @@ const forthInForth = `
     AFT               ( skip the first loop)
       BL              ( blank for comparison)
       OVER R@ + C@ <  ( compare char at the end)
-      IF R> 1 +       ( non-white space, exit loop)
+      IF R> 1+       ( non-white space, exit loop)
         EXIT          ( with adjusted count)
       THEN
     THEN              ( else continue scanning)
@@ -554,7 +560,7 @@ const forthInForth = `
   DUP 0 CELLL UM/MOD DROP ( b y a u r; find remainder of chars if not exact number of cells)
   - OVER + 0 SWAP !   ( b y a ; Store 0 in last cell)
   2DUP C!             ( store the character count first )
-  1 + SWAP CMOVE      ( ; store characters in cells - 0 padded to end of cell)
+  1+ SWAP CMOVE      ( ; store characters in cells - 0 padded to end of cell)
   R> ;        ( leave only word buffer address )
 
 \\T NP @ CELL+ CELL+ COUNT NIP 5 1 TEST
@@ -582,7 +588,7 @@ const forthInForth = `
 
 : HOLD ( c -- ; Insert a character into the numeric output string.)
      HLD @          ( get the digit pointer in HLD)
-     1 - DUP HLD !  ( decrement HLD)
+     1- DUP HLD !  ( decrement HLD)
      C! ;           ( store c where HLD pointed to)
 
 : # ( u -- u; Extract one digit from u and append the digit to output string.)
@@ -619,7 +625,7 @@ const forthInForth = `
 : SPACES ( n -- ; Send n spaces to the output device. Zen pg70) ( ERRATA Zen has bad initial SWAP)
   BL CHARS ;
 : TYPE ( b u -- ; Output u characters from b)
-  FOR AFT DUP C@ EMIT 1 + THEN NEXT DROP ;
+  FOR AFT DUP C@ EMIT 1+ THEN NEXT DROP ;
 : .$ ( a -- ) COUNT TYPE ; ( from Staapl, not in eForth)
 
 \\T 60 EMIT SPACE 2 SPACES 61 EMIT 0 TEST
@@ -688,8 +694,8 @@ const forthInForth = `
   36                ( [ CHAR $ ] LITERAL )
   =                 ( is it a $ for hexadecimal base?)
   IF HEX            ( use hexadecimal base and adjust string )
-    SWAP 1 +        ( a 0 n a+2 )
-    SWAP 1 -        ( a 0 a+2 n-1 )
+    SWAP 1+        ( a 0 n a+2 )
+    SWAP 1-        ( a 0 a+2 n-1 )
   THEN OVER C@      ( get the next digit )
   45                ( [ CHAR - ] LITERAL )
   =                 ( is it a - sign? )
@@ -698,13 +704,13 @@ const forthInForth = `
   SWAP R@ +         ( a 0 b" n") ( adjust count n)
   ?DUP              ( do we still have digits left? )
   IF                ( yes. do conversion )
-    1 - ( a 0 b" n"-1) ( adjust loop count for FOR-NEXT loop )
+    1- ( a 0 b" n"-1) ( adjust loop count for FOR-NEXT loop )
     FOR DUP >R      ( save address b )
       C@            ( get one digit )
       BASE @ DIGIT? ( convert it according to current radix )
     WHILE SWAP      ( it is a valid digit )
       BASE @ * +    ( multiply it by radix and add to sum )
-      R> 1 +        ( increment b, pointing to next digit )
+      R> 1+        ( increment b, pointing to next digit )
     NEXT            ( loop back to convert the next digit )
       DROP ( a sum ) ( discard string address b )
       R@ ( b ?sign)  ( completely convert the string.get sign )
@@ -791,7 +797,7 @@ const forthInForth = `
   temp !            ( save delimiter in temp )
   OVER >R DUP       ( b u u)
   IF                ( if string length u=0, nothing to parse )
-    1 -             ( u>0, decrement it for FOR-NEXT loop )
+    1-             ( u>0, decrement it for FOR-NEXT loop )
     temp @ BL =     ( is delimiter a space? )
     IF              ( b u' --, skip over leading spaces )
       FOR BL        ( EFORTH-ZEN-ERRATA says BLANK )
@@ -799,7 +805,7 @@ const forthInForth = `
         - 0<          ( is it a space? )
         INVERT
       WHILE
-        1 +           ( EFORTH-ZEN-ERRATA - correct in eForthOverviewv5.pdf )
+        1+           ( EFORTH-ZEN-ERRATA - correct in eForthOverviewv5.pdf )
       NEXT            ( b -- , if space, loop back and scan further)
         R> DROP       ( end of buffer, discard count )
         0 DUP EXIT    ( exit with -- b 0 0, end of line)
@@ -816,12 +822,12 @@ const forthInForth = `
       ( EFORTH-ZEN-ERRATA ELSE 1 + )
       THEN
     WHILE               ( if delimiter, exit the loop )
-      1 +
+      1+
     NEXT                ( not delimiter, keep on scanning )
       DUP >R            ( save a copy of b at the end of the loop)
     ELSE                ( early exit, discard the loop count )
       R> DROP           ( discard count )
-      DUP 1 + >R        ( save a copy of b'+1)
+      DUP 1+ >R        ( save a copy of b'+1)
     THEN
     OVER -              ( length of the parsed string )
     R> R> -             ( and its offset in the buffer )
@@ -830,12 +836,15 @@ const forthInForth = `
   OVER                  ( buffer length is 0 )
   R> - ;                ( the offset is 0 also )
 
+: SOURCE TIB #TIB @ ; ( Repurposing TIB and #TIB for the pointer to buffer and length whatever input source )
+
 : PARSE ( c -- b u ; <string> ) ( Scan input stream and return counted string delimited by c.)
   >R              ( save the delimiting character )
-  TIB >IN @ +     ( address in TIB to start parsing )
-  #TIB @ >IN @ -  ( length of remaining string in TIB )
-  R> parse        ( parse the desired string )
-  >IN +! ;        ( move parser pointer to end of string )
+  SOURCE          ( a u )
+  SWAP >IN @ +    ( u a' ; address in TIB to start parsing )
+  SWAP >IN @ -    ( a' u' ; length of remaining string in TIB )
+  R> parse        ( a" u" delta ; parse the desired string )
+  >IN +! ;        ( a" u" ; move parser pointer to end of string )
 
 ( === Parsing Words Zen pg74 .( ( \\ CHAR TOKEN WORD )
 
@@ -949,88 +958,14 @@ const forthInForth = `
   0 ;           ( exit with a false flag )
 
 ( NAME> implicitly tested by find )
-\\T BL WORD xxx DUP C@ 1 + PAD SWAP CMOVE PAD BL WORD xxx 4 SAME? >R 2DROP R> 0 1 TEST
-\\T BL WORD xxx DUP C@ 1 + PAD SWAP CMOVE PAD BL WORD xzx 4 SAME? >R 2DROP R> 0= 0 1 TEST
+\\T BL WORD xxx DUP C@ 1+ PAD SWAP CMOVE PAD BL WORD xxx 4 SAME? >R 2DROP R> 0 1 TEST
+\\T BL WORD xxx DUP C@ 1+ PAD SWAP CMOVE PAD BL WORD xzx 4 SAME? >R 2DROP R> 0= 0 1 TEST
 \\T FORTH 0 TEST
 
 \\T BL WORD TOKEN CONTEXT @ find BL WORD TOKEN CONTEXT @ FORTHfind 2 TEST
 \\T BL WORD TOKEN CONTEXT @ find BL WORD TOKEN NAME? 2 TEST ( Name searches all vocabs )
 
-( === Text input from terminal Zen pg 78: ^H TAP kTAP accept EXPECT QUERY )
-( EFORTH-ZEN-ERRATA CTRL used here but not defined. )
-
-: ^H ( bot eot cur -- bot eot cur)
-  ( Backup the cursor by one character.)
-  >R OVER     ( bot eot bot --)
-  R@ < DUP    ( bot<cur ? )
-  IF
-    ( This should probably be vectored , on JS it needs BS BL BS to erase a char and position cursor )
-    [ CTRL H ] LITERAL 'ECHO @EXECUTE
-    BL 'ECHO @EXECUTE
-    [ CTRL H ] LITERAL 'ECHO @EXECUTE
-  THEN        ( bot eot cur 0|-1 -- )
-  R> + ;      ( decrement cur, but not passing bot )
-
-: TAP ( bottom eot current key -- bottom eot current )
-  ( Accept and echo the key stroke and bump the cursor.)
-  DUP         ( duplicate character )
-  'ECHO @EXECUTE ( echo it to display )
-  OVER C!     ( store at current location )
-  1 + ;       ( increment current pointer )
-
-( Diff - Staapl doesnt check for 10 - crlf? split out as used by READ-LINE )
-: crlf? ( c -- f; is key a return or line feed?)
-  DUP 10 = SWAP 13 = OR ;
-
-( ERRATA - Zen & V5 just check 13 and Ctrl-H, backspace can also be DEL and end of line can be 10 )
-: kTAP ( bot eot cur key -- bot eot cur )
-  ( Process a key stroke, CR or backspace.)
-  DUP crlf? 0= 
-  IF ( bot eot cur key )
-    DUP [ CTRL H ] LITERAL = SWAP 127 = OR 0= ( bot eot cur f ; is key a backspace or DEL ? )
-    IF BL TAP   ( bot eot cur' ; none of above, replace by space )
-    ELSE ^H         ( bot eot cur' ; backup current pointer )
-    THEN
-    EXIT            ( done this part )
-  THEN              ( key is a return)
-  DROP              ( discard bot and eot )
-  NIP DUP ;         ( bot cur cur;  duplicate cur to force accept to exit, Key not stored )
-
-( Errata Zen doesnt match the signature) 
-: accept ( b u -- b u )
-  ( Accept characters to input buffer. Return with actual count.)
-  OVER + OVER       ( b b+u b;  EFORTH-ZEN-ERRATA fixed in v5 and STAAPL)
-  BEGIN
-    2DUP XOR        ( b b+u b' b'=b+u = current pointer? )
-  WHILE
-    KEY             ( b b+u b c; get one more character )
-    DUP BL - 95 U<  ( b b+u b c f; is it printable? )
-    IF TAP          ( b b+u b+1 ; yes, accept and echo it )
-    ELSE 'TAP @EXECUTE ( no, process control code )
-    THEN            ( kludge! if was a crlf then will have b+u replaced by b' causing the WHILE to trigger )
-  REPEAT            ( b b+u b'; repeat until buffer full )
-  DROP              ( b b+u ; drop current pointer
-  OVER - ;          ( b u; leave actual count)
-
-' accept 'EXPECT ! ( TODO needs to also be in UZERO area for COLD )
-
-: EXPECT ( b u -- )
-  ( Accept input stream and store count in SPAN.)
-  'EXPECT @EXECUTE  ( execute accept )
-  SPAN !            ( store character count in SPAN )
-  DROP ;            ( discard eot address )
-
-: QUERY ( -- )
-  ( Accept input stream to terminal input buffer.)
-  TIB 80          ( addr and size of terminal input buffer)
-  'EXPECT @EXECUTE ( execute 'accept' )
-  #TIB !          ( store number of characters received )
-  DROP            ( discard buffer address )
-  0 >IN !         ( initialized parsing pointer )
-  ( debugPrintTIB )
-  ;
-
-( === Error Handling Zen pg80-82 CATCH THROW NULL$ ABORT abort" ?STACK )
+( === Error Handling Zen pg80-82 CATCH THROW = moved in front of Text input )
 
 : CATCH ( ca -- err#/0 )
   ( Execute word at ca and set up an error frame for it.)
@@ -1055,6 +990,63 @@ const forthInForth = `
     DROP
     R> 
   THEN ;          ( retrieved err# )
+
+
+( === Text input from terminal Zen pg 78: ^H TAP kTAP )
+( EFORTH-ZEN-ERRATA CTRL used here but not defined. )
+
+: ^H ( bot eot cur -- bot eot cur)
+  ( Backup the cursor by one character.)
+  >R OVER     ( bot eot bot --)
+  R@ < DUP    ( bot<cur ? )
+  IF
+    ( This should probably be vectored , on JS it needs BS BL BS to erase a char and position cursor )
+    [ CTRL H ] LITERAL 'ECHO @EXECUTE
+    BL 'ECHO @EXECUTE
+    [ CTRL H ] LITERAL 'ECHO @EXECUTE
+  THEN        ( bot eot cur 0|-1 -- )
+  R> + ;      ( decrement cur, but not passing bot )
+
+: TAP ( bottom eot current key -- bottom eot current )
+  ( Accept and echo the key stroke and bump the cursor.)
+  DUP         ( duplicate character )
+  'ECHO @EXECUTE ( echo it to display )
+  OVER C!     ( store at current location )
+  1+ ;       ( increment current pointer )
+
+( Diff - Staapl doesnt check for 10 - crlf? split out as used by READ-LINE )
+: crlf? ( c -- f; is key a return or line feed?)
+  DUP 10 = SWAP 13 = OR ;
+: skipCRLF ( caddr u -- caddr' u' )
+  BEGIN
+    DUP IF OVER C@ crlf? ELSE 0 THEN ( caddr u bool)
+  WHILE ( caddr u )
+    1- SWAP 1+ SWAP ( caddr' u')
+  REPEAT
+;
+: skipToCRLF ( caddr u -- caddr' u' ; caddr should point at first crlf and u' is size removed from end ) 
+  BEGIN
+    DUP IF OVER C@ crlf? 0= ELSE 0 THEN ( caddr u bool)
+  WHILE ( caddr u )
+    1- SWAP 1+ SWAP ( caddr' u')
+  REPEAT
+;
+
+( ERRATA - Zen & V5 just check 13 and Ctrl-H, backspace can also be DEL and end of line can be 10 )
+: kTAP ( bot eot cur key -- bot eot cur )
+  ( Process a key stroke, CR or backspace.)
+  DUP crlf? 0= 
+  IF ( bot eot cur key )
+    DUP [ CTRL H ] LITERAL = SWAP 127 = OR 0= ( bot eot cur f ; is key a backspace or DEL ? )
+    IF BL TAP   ( bot eot cur' ; none of above, replace by space )
+    ELSE ^H         ( bot eot cur' ; backup current pointer )
+    THEN
+    EXIT            ( done this part )
+  THEN              ( key is a return)
+  DROP              ( discard bot and eot )
+  NIP DUP ;         ( bot cur cur;  duplicate cur to force accept to exit, Key not stored )
+
+( === Error Handling Zen pg80-82 NULL$ ABORT abort" ?STACK )
 
 CREATE NULL$ 0 , ( EFORTH-ZEN-ERRATA inserts a string "coyote" after this, no idea why! )
 
@@ -1155,7 +1147,7 @@ CREATE NULL$ 0 , ( EFORTH-ZEN-ERRATA inserts a string "coyote" after this, no id
 
 \\T [ 1 2 3 ROT 2 3 1 3 TEST
 
-( === Operating System Zen pg85-86 PRESET XIO FILE HAND I/O CONSOLE QUIT)
+( === Operating System Zen pg85-86 PRESET XIO FILE HAND I/O CONSOLE )
 
 ( EFORTH-V5-ERRATA uses TIB #TIB CELL+ ! which since ' TIB #TIB CELL+ @' is a NOOP )
 ( EFORTH-ZEN-ERRATA uses =TIB but doesnt define =TIB which is TIB0)
@@ -1166,14 +1158,15 @@ CREATE NULL$ 0 , ( EFORTH-ZEN-ERRATA inserts a string "coyote" after this, no id
 
 : XIO ( prompt echo tap -- )
   ( Reset the I/O vectors 'EXPECT, 'TAP, 'ECHO and 'PROMPT.)
-  [ ' accept ] LITERAL 'EXPECT !  ( vector EXPECT )
+\\  [ ' accept ] LITERAL 'EXPECT !  ( eFORTH diff - not vectoring, using SOURCE instead )
   'TAP !                          ( init kTAP )
   'ECHO !                         ( init ECHO )
   'PROMPT ! ;                     ( init system prompt )
 
 : FILE ( -- )
   ( Select I/O vectors for file download.)
-  [ ' PACE ] LITERAL  ( send 11 for acknowledge )
+  \\ [ ' PACE ] LITERAL  ( send 11 for acknowledge - eForth difference - this is only meaningful if feeding through serial )
+  0 ( No prompt while on File )
   [ ' DROP ] LITERAL  ( do not echo characters )
   [ ' kTAP ] LITERAL  ( ignore control characters )
   XIO ;
@@ -1197,46 +1190,6 @@ CREATE I/O  ' ?RX , ' TX! , ( Array to store default I/O vectors. )
   I/O 2@ '?KEY 2!   ( get defaults from I/O ) ( EFORTH-STAAPL EFORTH-ZEN errata has 'KEY?. V5 fixes )
   HAND ;            ( keyboard input )
 
-: que ( -- )
-  QUERY ( get a line of commands from )
-  EVAL ; ( Evaluate it)
-
-: quitError ( f -- )
-  ( Handle a possible error returned by EVAL - common to QUIT and quit1 )
-      NULL$ OVER XOR      ( is error address=NULL$ ? )
-    ( V5, ZEN and Staapl differ, prefer Staapl I think)
-    IF                  ( its not NULL$ )
-      CR TIB #TIB @ TYPE ( Display line in TIB )
-      CR >IN @ [ CHAR ^ ] LITERAL CHARS ( ^ under offending word )
-      CR .$ ."  ? "     ( followed by error message and "?" )
-    THEN
-    PRESET ;             ( reset the data stack )
-
-: QUIT ( -- )
- ( Reset return stack pointer and start text interpreter. )
-  RP0 @ RP!           ( initialize the return stack )
-  BEGIN
-    [COMPILE] [       ( start text interpreter )
-    BEGIN
-      [ ' que ] LITERAL ( get a line and evaluate it)
-      CATCH             ( execute commands with error handler)
-      ?DUP
-    UNTIL ( a)          ( exit if an error occurred )
-    ( 'PROMPT @ SWAP )  ( EFORTH-ZEN and EFORTH-V5 save current prompt address, Staapl doesnt)
-    CONSOLE             ( Initialize for terminal interaction)
-    quitError           ( Report error and reset data stack) 
-    ( V5 and ZEN also send "ERR" to file handler if prompt is not OK which is a little off )
-  AGAIN ;               ( go back get another command line )
-
-: quit1 ( -- )
-  ( Evaluate a line that is already in TIB - could be compiling or interpreting, if error then report it)
-  [ ' EVAL ] LITERAL ( evaluate one line)
-  CATCH             ( execute commands with error handler)
-  ?DUP
-  IF ( Its an error )
-    quitError           ( Report error and reset data stack) 
-    [COMPILE] [       ( Exit compiling e.g. if error in a definition )
-  THEN ;
 
 ( TODO-IO test PRESET HAND CONSOLE QUIT )
 
@@ -1258,7 +1211,7 @@ CREATE I/O  ' ?RX , ' TX! , ( Array to store default I/O vectors. )
 \\T 1 ' DUP EXECUTE 1 1 2 TEST
 \\T HERE 2 ALLOT HERE SWAP - 2 1 TEST
 \\T : foo [COMPILE] ( ; foo 2 ) 0 TEST
-\\T : foo ?DUP IF DUP 1 - RECURSE THEN ; 3 foo 3 2 1 3 TEST
+\\T : foo ?DUP IF DUP 1- RECURSE THEN ; 3 foo 3 2 1 3 TEST
 
 ( === Control Structures Zen pg91-92: FOR BEGIN NEXT UNTIL AGAIN IF AHEAD REPEAT THEN AFT ELSE WHILE )
 ( All moved earlier )
@@ -1367,7 +1320,116 @@ CREATE I/O  ' ?RX , ' TX! , ( Array to store default I/O vectors. )
 \\T 12 foo ! 0 TEST
 \\ TEST-15-EPROM test failing: foo @ 12 1 TEST
 
-( === Utilities Zen pg98 )
+( === Text input from terminal Zen pg 78: ^H TAP kTAP accept EXPECT QUERY )
+
+( Errata Zen doesnt match the signature) 
+: accept ( b u -- b u )
+  ( Accept characters to input buffer. Return with actual count.)
+  OVER + OVER       ( b b+u b;  EFORTH-ZEN-ERRATA fixed in v5 and STAAPL)
+  BEGIN
+    2DUP XOR        ( b b+u b' b'=b+u = current pointer? )
+  WHILE
+    KEY             ( b b+u b c; get one more character )
+    DUP BL - 95 U<  ( b b+u b c f; is it printable? )
+    IF TAP          ( b b+u b+1 ; yes, accept and echo it )
+    ELSE 'TAP @EXECUTE ( no, process control code )
+    THEN            ( kludge! if was a crlf then will have b+u replaced by b' causing the WHILE to trigger )
+  REPEAT            ( b b+u b'; repeat until buffer full )
+  DROP              ( b b+u ; drop current pointer
+  OVER - ;          ( b u; leave actual count)
+
+\\ ' accept 'EXPECT ! ( eFORTH diff not stored in 'EXPECT )
+
+: EXPECT ( b u -- )
+  ( Accept input stream and store count in SPAN.)
+  accept            ( eFORTH DIFF - uses 'EXPECT EXECUTE but we prefer Standard "REFILL" approach rather than vectoring )
+  SPAN !            ( store character count in SPAN )
+  DROP ;            ( discard eot address )
+
+( Generic stack 
+: stack CREATE HERE 0 , OVER , vHERE SWAP ! 0 v, CELLS vALLOT ;
+: spop @ DUP @ CELLS OVER + @ SWAP --  ;
+: spush @ DUP @ 1+ 2DUP SWAP ! CELLS + ! ;
+
+8 4 * stack sourceStack ( sourceStack holds 8 * [ SOURCE-ID buff len >IN ] )
+
+: 0> DUP 0= SWAP 0< OR 0= ;
+: sourcePush sourceStack >R 
+  SOURCE-ID @ DUP 0> 
+  IF SOURCE-ID @ 'unreadFile @EXECUTE THROW THEN  
+  SOURCE >IN @ R@ spush R@ spush R@ spush R> spush ; ( TODO-NEST needs to reposition existing file  )
+: source! ( source-id buff len in ) 
+  >IN ! #TIB ! #TIB CELL+ ! DUP SOURCE-ID ! 
+  IF FILE ELSE HAND THEN ; ( Set prompt - same for String or File )
+: sourcePop sourceStack >R R@ spop R@ spop R@ spop R> spop ( source-id buff len in ) source! ; 
+
+: REFILL ( https://forth-standard.org/standard/core/REFILL )
+  0 >IN ! ( initialized parsing pointer )
+  SOURCE-ID @
+  ?DUP IF
+    DUP -1 =
+    IF 0 ( String - Always false )
+    ELSE ( File )
+      TIB 1024 ROT 'READ-LINE @EXECUTE ( u2 flag ior )
+      THROW SWAP #TIB ! ( flag ; True if more )
+    THEN
+  ELSE
+    ( Accept input stream to terminal input buffer.)
+    TIB 80 ( addr and size of terminal input buffer)
+    accept ( caddr u ; )
+    #TIB !  ( store number of characters received )
+    DROP ( discard buffer address )
+    -1    ( return true, never unwind from termial )
+  THEN
+;
+: QUERY REFILL 0= IF sourcePop THEN ; ( Read from current source, on fail go back to previous reseting >IN )
+
+( === Operating System Zen pg85-86 PRESET XIO FILE HAND I/O CONSOLE QUIT)
+
+: que ( -- )
+  QUERY ( get a line of commands from )
+  EVAL ; ( Evaluate it)
+
+: quitError ( f -- )
+  ( Handle a possible error returned by EVAL - common to QUIT and quit1 )
+      NULL$ OVER XOR      ( is error address=NULL$ ? )
+    ( V5, ZEN and Staapl differ, prefer Staapl I think)
+    IF                  ( its not NULL$ )
+      CR TIB #TIB @ TYPE ( Display line in TIB )
+      CR >IN @ [ CHAR ^ ] LITERAL CHARS ( ^ under offending word )
+      CR .$ ."  ? "     ( followed by error message and "?" )
+    THEN
+    PRESET ;             ( reset the data stack )
+
+: QUIT ( -- )
+ ( Reset return stack pointer and start text interpreter. )
+  RP0 @ RP!           ( initialize the return stack )
+  BEGIN
+    [COMPILE] [       ( start text interpreter )
+    BEGIN
+      [ ' que ] LITERAL ( get a line and evaluate it)
+      CATCH             ( execute commands with error handler)
+      ?DUP
+    UNTIL ( a)          ( exit if an error occurred )
+    ( 'PROMPT @ SWAP )  ( EFORTH-ZEN and EFORTH-V5 save current prompt address, Staapl doesnt)
+    CONSOLE             ( Initialize for terminal interaction)
+    quitError           ( Report error and reset data stack) 
+    ( V5 and ZEN also send "ERR" to file handler if prompt is not OK which is a little off )
+  AGAIN ;               ( go back get another command line )
+
+: quit1 ( -- ) ( TODO-34-FILES maybe move as was near QUIT 
+  ( Evaluate a line that is already in TIB - could be compiling or interpreting, if error then report it)
+  [ ' EVAL ] LITERAL ( evaluate one line)
+  CATCH             ( execute commands with error handler)
+  ?DUP
+  IF ( Its an error )
+    quitError           ( Report error and reset data stack) 
+    [COMPILE] [       ( Exit compiling e.g. if error in a definition )
+  THEN ;
+
+
+( === Utilities Zen pg98  - looks like all moved )
+
 ( === Memory Dump Zen pg99 _TYPE do+ DUMP )
 
 ( ERRATA Staapl - uses COUNT which is technically correct but poor typing )
@@ -1378,7 +1440,7 @@ CREATE I/O  ' ?RX , ' TX! , ( Array to store default I/O vectors. )
     AFT         (  skip to THEN the first time )
     DUP C@      ( get one character from b )
     >CHAR EMIT  ( display only printable char )
-    1 +
+    1+
   THEN NEXT     ( repeat u times )
   DROP ;        ( discard b address )
 
@@ -1387,7 +1449,7 @@ CREATE I/O  ' ?RX , ' TX! , ( Array to store default I/O vectors. )
   OVER 4 U.R SPACE  ( print address first )
   FOR AFT           ( repeat u times )
   DUP C@ 3 U.R      ( display bytes in 3 columns )
-  1 + THEN NEXT ;   ( repeat u times )
+  1+ THEN NEXT ;   ( repeat u times )
 
 ( ERRATA Staapl & Zen - uses -ROT which is not defined (its ROT ROT)
 : DUMP ( b u -- )
@@ -1418,7 +1480,7 @@ CREATE I/O  ' ?RX , ' TX! , ( Array to store default I/O vectors. )
       R@ PICK . ( print one item in stack )
     THEN
   NEXT          ( repeat until done )
-  ."  <sp" ;    ( print stack pointer )
+  ."  <sp " ;    ( print stack pointer )
 
 \\T 1 2 .S 1 2 2 TEST
 
@@ -2225,7 +2287,7 @@ class Forth {
   // Put debugNA in a definition to print a counted string on the console
   debugNA() { console.log('NAME=', this.countedToJS(this.SPfetch())); } // Print the NA on console
   // Put testing3 in a definition to start outputing stack trace on console.
-  testing3() { this.testing |= 1; }
+  testing3() { this.testing |= 3; }
   // Put Fbreak in a definition.
   Fbreak() {
     console.log('\nbreak in a FORTH word'); } // Put a breakpoint in your IDE at this line

@@ -7,7 +7,7 @@ const CELLL = 2; // 2 bytes for CELLL
 const MEM = 16; // Use 16 bit memory
 // Specify areas for ROM and RAM, currently they have to be specified separately as there is a bug with setting ROMSIZE = 0;
 // ROM: Used for UserVariable save area and Dictionary (code and names) until useRam() is called
-const ROMSIZE = 0x2000 * CELLL;
+const ROMSIZE = 0x4000 * CELLL;
 // RAM: Used for UserVariables, stacks, TIB, PAD etc and Dictionary (code and names) after useRam() is called
 const RAMSIZE = 0x2000 * CELLL; // Make it larger will use
 const extensions = ForthNodeExtensions;
@@ -145,6 +145,7 @@ const fsExtensions = [
       const pos = this.SPpopD();
       // Cant reposition in node so set internal position which is used on each read/write
       fsDescriptors[fd].position = pos;
+      // console.log("Setting fd:", fd,"to pos", pos, "#TIB=", this.Ufetch(16));
       this.SPpush(0);
     },
   },
@@ -154,7 +155,6 @@ const fsExtensions = [
 
 ];
 const filesExtension = `
-testing3
 : WRITE-LINE ( c-addr u fileid -- ior ; https://forth-standard.org/standard/file/WRITE-LINE )
   DUP >R WRITE-FILE R> SWAP ?DUP 0= IF write-cr ELSE DROP THEN ;
 
@@ -163,26 +163,21 @@ testing3
   ROT FILE-SIZE THROW ( udouble udouble )
   ud< 0= ;
 
-: skipCRLF ( caddr u -- caddr u )
-  BEGIN
-    DUP IF OVER C@ crlf? ELSE 0 THEN ( caddr u bool)
-  WHILE ( caddr u )
-    1 - SWAP 1 + SWAP ( caddr' u')
-  REPEAT
-;
-: skipToCRLF ( caddr u -- caddr' u' )
-  BEGIN
-    DUP IF OVER C@ crlf? 0= ELSE 0 THEN ( caddr u bool)
-  WHILE ( caddr u )
-    1 - SWAP 1 + SWAP ( caddr' u')
-  REPEAT
-;
 : reposRelativeFile ( ud fd - ior )
   DUP >R FILE-POSITION ( ud ud' ior ^ fd )
   ?DUP IF R> DROP >R 2DROP 2DROP R> EXIT THEN
   ( ud ud' ^ fd )
   D+ R> REPOSITION-FILE ( ior )
 ;
+: unreadFile ( fd - ior; Move fd back to >IN, so reading will start where left off  )
+  SOURCE + 1024 SOURCE NIP - ( fd TIB+#TIB 1024-#TIB)
+  skipCRLF ( ptr after crlf, number to end of buf)
+  NIP 1024 SWAP - >IN @ - 0 DNEGATE ROT  ( ud fd ; size of remaining buf + crlf* ) 
+  0 >IN ! 0 #TIB ! ( Reset pointers so dont try and read it)
+  reposRelativeFile ( ior )
+;
+' unreadFile 'unreadFile ! ( vector forward reference ) 
+
 : READ-LINE ( caddr umax fd -- u2 flag ior ; https://forth-standard.org/standard/file/READ-LINE)
   DUP eof? IF DROP 2DROP 0 0 0 EXIT THEN
   ( caddr umax fd )
@@ -192,74 +187,26 @@ testing3
   ?DUP IF R> DROP EXIT THEN ( caddr u ^ fd )
   2DUP skipToCRLF  ( c u c' u' ^  fd )
   DUP >R SWAP >R - R> R>
-  ( caddr u~ caddr' u' ^ fd)
-  skipCRLF
-  ( caddr u~ caddr" u" ^ fd )
-  NIP 0 DNEGATE R> reposRelativeFile ( )
+  ( caddr u~ caddr' u' ^ fd ; u~ is size up to but excluding first crlf u' is amount from crlf to end )
+  skipCRLF ( caddr u~ caddr" u" ^ fd ; u" is size from first after CRLF to end)
+  NIP 0 DNEGATE R> reposRelativeFile ( position file to after crlf )
   >R NIP -1 R> ( u~ T ior )
 ;
+' READ-LINE 'READ-LINE ! 
+   
+vCREATE buf 1024 vALLOT
 
-VARIABLE sourceBuff ( TODO-MULTI make this a user variable)
-VARIABLE SOURCE-ID
-: sourcePush R> SOURCE-ID @ >R SPAN @ >R >IN @ >R >R ; ( TODO-NEST needs to reposition existing file  )
-: sourcePop R> R> >IN ! R> SPAN ! R> SOURCE-ID ! >R ;
 : EVALUATE ( xxx caddr u -- yyy;  https://forth-standard.org/standard/core/EVALUATE )
-  sourcePush SPAN ! sourceBuff ! -1 SOURCE-ID ! 0 >IN ! ;
-: SOURCE SOURCE-ID @
-  IF sourceBuff @ SPAN @ ( String or FD )
-  ELSE TIB #TIB @
-  THEN ;
-( almost nothing )
-: xPARSE >R SOURCE (a u) SWAP >IN @ + >IN @ - R> parse >IN +! ; ( TODO replace in index.js )
-( nothing )
-: REFILL ( https://forth-standard.org/standard/core/REFILL )
-  0 >IN !
-  SOURCE-ID @
-  ?DUP IF
-    DUP -1 =
-    IF 0 // Always false
-    ELSE BUF 1024 ROT READ-LINE ( u2 flag ior ) ( TODO check if need sourceBuff )
-      THROW SWAP SPAN ! // True if more
-    THEN
-  ELSE
-    TIB 80 'EXPECT @EXECUTE ( caddr u ;  vectors to accept)
-    #TIB ! DROP -1
-  THEN
-;
-: QUERY REFILL 0= IF sourcePop THEN ; ( Read from current source, on fail go back to previous reseting >IN )
-
+  sourcePush -1 -ROT 0 source! ;
 : INCLUDE-FILE ( i * x fileid -- j * x ; https://forth-standard.org/standard/file/INCLUDE-FILE )
-  sourcePush SOURCE-ID ! 0 >IN ! ;
+  sourcePush buf 0 0 source! ; ( currently empty )
 : INCLUDED ( caddr u -- ; https://forth-standard.org/standard/file/INCLUDED e.g. $" filename" INCLUDED )
   R/O OPEN-FILE ( fileid ior ) THROW INCLUDE-FILE ;
-: PARSE-NAME 34 WORD COUNT ; ( TODO look in index.js for other places it does part of this - 34 WORD)
+: PARSE-NAME BL WORD COUNT ; ( TODO look in index.js for other places it does part of this - 34 WORD)
 : INCLUDE PARSE-NAME INCLUDED ; ( i*x "name" -- j*x ; https://forth-standard.org/standard/file/INCLUDE )
 
 ( TODO Maybe retire 'EXPECT and EXPECT and rename accept to EXPECT, retire SPAN as not used )
 ( TODO blocks - this would be handled in SOURCE I think https://forth-standard.org/standard/block)
-
-( Redefining for testing purposes )
-: que ( -- )
-  QUERY ( get a line of commands from )
-  EVAL ; ( Evaluate it)
-
-: QUIT ( -- )
-  ( Reset return stack pointer and start text interpreter. )
-  RP0 @ RP!           ( initialize the return stack )
-  BEGIN
-    [COMPILE] [       ( start text interpreter )
-  BEGIN
-    [ ' que ] LITERAL ( get a line and evaluate it)
-  CATCH             ( execute commands with error handler)
-    ?DUP
-    UNTIL ( a)          ( exit if an error occurred )
-  ( 'PROMPT @ SWAP )  ( EFORTH-ZEN and EFORTH-V5 save current prompt address, Staapl doesnt)
-  CONSOLE             ( Initialize for terminal interaction)
-  quitError           ( Report error and reset data stack)
-  ( V5 and ZEN also send "ERR" to file handler if prompt is not OK which is a little off )
-  AGAIN ;               ( go back get another command line )
-
-
 
 
 ( ==== BELOW HERE STILL NEED DEFINING ==== )
@@ -269,7 +216,6 @@ VARIABLE SOURCE-ID
 ( : REQUIRED XXX ; ( https://forth-standard.org/standard/file/REQUIRED -- needs INCLUDED needed REQUIRE )
 ( : REQUIRE [COMPILE] S" REQUIRED ; )
 
-CREATE BUF 1024 ALLOT
 : TESTFILES
   S" TEST.FTH" W/O CREATE-FILE THROW ( fd )
   DUP S" Hello world" ROT WRITE-LINE THROW ( fd )
@@ -280,20 +226,20 @@ CREATE BUF 1024 ALLOT
   CLOSE-FILE THROW ( )
   S" TEST.FTH" S" TEST2.FTH" RENAME-FILE THROW ( )
   S" TEST2.FTH" R/W OPEN-FILE THROW ( fd )
-  DUP BUF 1024 ROT READ-FILE THROW ( fd u )
-  BUF SWAP TYPE ( fd )
+  DUP buf 1024 ROT READ-FILE THROW ( fd u )
+  buf SWAP TYPE ( fd )
   DUP FILE-POSITION THROW DROP . ."  of " ( fd)
   DUP FILE-SIZE THROW DROP . ."  bytes " ( fd)
   DUP 6 0 ROT REPOSITION-FILE THROW ( fd)
   DUP FILE-POSITION THROW DROP ."  repositioned to " . ( fd -- reposition to "world" )
-  DUP BUF 1024 ROT READ-FILE THROW ( fd u )
-  BUF SWAP TYPE ( fd )
+  DUP buf 1024 ROT READ-FILE THROW ( fd u )
+  buf SWAP TYPE ( fd )
   CLOSE-FILE THROW ( )
   S" TEST2.FTH" R/O OPEN-FILE THROW
   BEGIN
-    DUP BUF 1024 ROT READ-LINE THROW ( fd u T|F )
+    DUP buf 1024 ROT READ-LINE THROW ( fd u T|F )
   WHILE
-    BUF SWAP TYPE CR
+    buf SWAP TYPE CR
   REPEAT DROP ( fd )
   CLOSE-FILE THROW ( )
   S" TEST2.FTH" DELETE-FILE THROW
@@ -301,12 +247,14 @@ CREATE BUF 1024 ALLOT
 : TESTER ." starting test" doLIT TESTFILES CATCH ?DUP .$ ."  After " ;
 `;
 const forth = new Forth({ CELLL, ROMSIZE, RAMSIZE, MEM, extensions, memClass });
+// Has to be before compileForthInForth as uses READ-LINE
+fsExtensions.forEach((e) => forth.extensionAdd(e));
 forth.compileForthInForth()
   .then(() => console.log('===forthInForth compiled'))
   //.then(() => forth.cleanupBootstrap()).then(() => console.log('===forthInForth cleaned up'))
   //.then(() => forth.interpret("WARM"));
-  .then(() => fsExtensions.forEach((e) => forth.extensionAdd(e)))
+  // TODO-34-FILES can we use EVALUATE or similar for filesExtension or is that self-reference
   .then(() => forth.interpret(filesExtension))
-  .then(() => forth.console()) // Old Interactive console
-  //.then(() => forth.interpret("QUIT")) // New interactive console
+  //.then(() => forth.console()) // Old Interactive console
+  .then(() => forth.interpret("WARM")) // New interactive console
   .then(() => console.log('\nconsole exited'));

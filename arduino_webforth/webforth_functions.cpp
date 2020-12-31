@@ -45,7 +45,8 @@ const CELLTYPE forthTrue = -1; // Not quite correct, should be masked BUT when p
 #define NPoffset 35
 #define LASToffset 36
 #define VPoffset 37
-#define _USER 38
+#define SOURCEIDoffset 38
+#define _USER 39
 
 //L.1823
 #define CELLbits CELLL * 8 // Number of bits in a cell - used for loops and shifts
