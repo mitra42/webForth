@@ -37,7 +37,7 @@ const CELLTYPE forthTrue = -1; // Not quite correct, should be masked BUT when p
 #define INoffset 15
 #define nTIBoffset 16
 #define TIBoffset 17
-#define EVALoffset 19
+#define STATEoffset 19
 #define NUMBERoffset 20
 #define CONTEXToffset 23
 #define CURRENToffset 32
@@ -387,11 +387,11 @@ void tokenVar() {
 void debugThreadToken(const CELLTYPE tok) {
   const CELLTYPE xt = PAYLOAD-CELLL;
   Serial.print(IP-CELLL); Serial.print(F(":"));
-  if (CELLTYPE p = xt2na(xt)) {
-    printCounted(p);
-  } else {
+  //if (CELLTYPE p = xt2na(xt)) {
+  //  printCounted(p);
+  //} else {
     Serial.print(xt);
-  }
+  //}
   Serial.print(F(":")); Serial.print(tok); Serial.print(F("  "));
 }
 
@@ -399,9 +399,9 @@ void threadtoken(const CELLTYPE xt) {
   // console.assert(xt >= CODEE && xt < NAMEE); // Uncomment to catch bizarre xt values earlier
   // This next section is only done while testing, and outputs a trace, so set it on (with testing3) immediately before a likely error.
   //debugThread(xt);
-  //Serial.print(" XXX threading token at XT="); Serial.println(xt);
+  //Serial.print("Threading token at XT="); Serial.println(xt); delay(1000);
   const CELLTYPE tok = Mfetch(xt);
-  //Serial.print(" XXX tok="); Serial.println(tok);
+  //Serial.print("XXX tok="); Serial.println(tok); delay(1000);
   PAYLOAD = xt + CELLL;
   // console.assert(tok < jsFunctions.length); // commented out for efficiency, a fail will just break in the next line anyway.
   if ((tok < FUNCTIONSLENGTH) && f[tok]) {
@@ -790,7 +790,7 @@ void EVAL() { // Same signature as Forth EVAL, reads tokens from TIB and interpr
       SPpop();
     } else {
       // This is currently OK since its calling JS routines that may call Forth, there is no Forth-in-Forth
-      runXT(Ufetch(EVALoffset));
+      if ( Ufetch(STATEoffset))  { dCOMPILE(); } else { dINTERPRET(); }
     }
     // TODO-28-MULTITASK RP0 will move
     //console.assert(cellSP <= cellSPP && (cellRP * CELLL) <= Ufetch(RP0offset)); // Side effect of making SP and SPP available to debugger.
@@ -838,7 +838,7 @@ async interpret1(inp) {
 // : [  doLIT $INTERPRET 'EVAL ! ; IMMEDIATE
 //Zen pg84 and Zen pg88  redefined below to use FORTH $INTERPRET
 void openBracket() {
-  Ustore(EVALoffset, XT__24INTERPRET); // uses JS $INTERPRET
+  Ustore(STATEoffset, 0); } // uses JS dINTERPRET
 }
 */
 
@@ -846,7 +846,7 @@ void openBracket() {
 // : ] doLIT $COMPILE 'EVAL ! ;
 //Zen pg84 and Zen pg95  redefined below to use FORTH $COMPILE
 void closeBracket() {
-  Ustore(EVALoffset, XT__24COMPILE);
+  Ustore(STATEoffset, -1); } // uses JS dINTERPRET
 }
 */
 

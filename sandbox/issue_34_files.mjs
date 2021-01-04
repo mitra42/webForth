@@ -205,9 +205,8 @@ vCREATE buf 1024 vALLOT
 : PARSE-NAME BL WORD COUNT ; ( TODO look in index.js for other places it does part of this - 34 WORD)
 : INCLUDE PARSE-NAME INCLUDED ; ( i*x "name" -- j*x ; https://forth-standard.org/standard/file/INCLUDE )
 
-( TODO Maybe retire 'EXPECT and EXPECT and rename accept to EXPECT, retire SPAN as not used )
-( TODO blocks - this would be handled in SOURCE I think https://forth-standard.org/standard/block)
-
+( TODO-34-FILES Maybe retire 'EXPECT and EXPECT and rename accept to EXPECT, retire SPAN as not used )
+( TODO-34-FILES blocks - this would be handled in SOURCE I think https://forth-standard.org/standard/block)
 
 ( ==== BELOW HERE STILL NEED DEFINING ==== )
 ( : S\\" ( "ccc<quote>" -- c-addr u ; read and translate escape chars )
@@ -215,6 +214,7 @@ vCREATE buf 1024 vALLOT
 ( Need some other ANS words here esp ALLOCATED )
 ( : REQUIRED XXX ; ( https://forth-standard.org/standard/file/REQUIRED -- needs INCLUDED needed REQUIRE )
 ( : REQUIRE [COMPILE] S" REQUIRED ; )
+( TODO-34-FILES check second group of words on standard )
 
 : TESTFILES
   S" TEST.FTH" W/O CREATE-FILE THROW ( fd )

@@ -96,10 +96,10 @@ const jsFunctionAttributes = [
   { n: '0<', f: 'less0' }, 'AND', 'OR', 'XOR', { n: 'UM+', f: 'UMplus' },
   'userAreaInit', 'userAreaSave',
   { n: 'PARSE', replaced: true }, { n: 'TOKEN', replaced: true }, { n: 'NUMBER?', f: 'NUMBERQ', replaced: true },
-  { n: '$COMPILE', f: 'dCOMPILE', replaced: true, jsNeeds: true }, { n: '$INTERPRET', f: 'dINTERPRET', replaced: true, jsNeeds: true },
-  { n: '[', f: 'openBracket', immediate: true, replaced: true }, { n: ']', f: 'closeBracket', replaced: true },
+  { n: '$COMPILE', f: 'dCOMPILE', replaced: true }, { n: '$INTERPRET', f: 'dINTERPRET', replaced: true, jsNeeds: true },
+  { n: '[', f: 'openBracket', immediate: true }, { n: ']', f: 'closeBracket' },
   { n: ':', f: 'colon', replaced: true }, { n: ';', f: 'semicolon', immediate: true, replaced: true }, { n: "'", f: 'tick', replaced: true },
-  'debugNA', 'testing3', 'Fbreak', 'debugPrintTIB', 'TEST',
+  'debugNA', 'testing3', 'Fbreak', 'debugPrintTIB', 'TEST', 'stringBuffer',
 ];
 
 // Define the tokens used in the first cell of each word.
@@ -152,7 +152,9 @@ const INoffset = USER('>IN', 0);        // Hold the character pointer while pars
 const nTIBoffset = USER('#TIB', 0);       // Hold the current count of the terminal input buffer.
 const TIBoffset = USER(undefined, 'TIB0');  // Hold current address of Terminal Input Buffer (must be cell after #TIB.)
 USER('CSP', 0);        // Hold the stack pointer for error checking.
-const EVALoffset = USER("'EVAL", 0);      // Initialized when have JS $INTERPRET, this switches between $INTERPRET and $COMPILE
+// eFORTH diff - eFORTH uses EVAL as vector to either $INTERPRET or $COMPILE, ANS uses a variable called STATE
+const STATEoffset = USER("STATE", 0); // True if compiling - only changed by [ ] : ; ABORT QUIT https://forth-standard.org/standard/core/STATE
+//const EVALoffset = USER("'EVAL", 0);      // Initialized when have JS $INTERPRET, this switches between $INTERPRET and $COMPILE
 const NUMBERoffset = USER("'NUMBER", 'NUMBER?');    // Execution vector of number conversion. Default to NUMBER?.
 USER('HLD', 0);        // Hold a pointer in building a numeric output string.
 USER('HANDLER', 0);    // Hold the return stack pointer for error handling.
@@ -196,8 +198,8 @@ const forthInForth = `
 1 2 ( 3 ) 1 2 2 TEST
 
 ( Uncomment first for production, 2nd for testing )
-: \\T #TIB @ >IN ! ;
-\\ : \\T ; IMMEDIATE
+\\ : \\T #TIB @ >IN ! ;
+: \\T ; IMMEDIATE
 
 
 ( === Test as many of the words defined in code as possible)
@@ -1111,27 +1113,11 @@ CREATE NULL$ 0 , ( EFORTH-ZEN-ERRATA inserts a string "coyote" after this, no id
 
 : .OK ( -- )
   ( Display 'ok' only while interpreting.)
-    [ ' $INTERPRET ] LITERAL
-      'EVAL @ =
-      IF ."  ok" THEN CR ;
+  STATE @ 0= IF ."  ok" THEN CR ;
 
 : ?STACK ( -- )
   ( Abort if the data stack underflows.)
   DEPTH 0< ABORT" underflow" ; ( Note Staapl uses $" THROW, v5 uses ABORT)
-
-: EVAL ( -- )
-  ( Interpret the input stream.)
-  BEGIN
-  TOKEN ( -- a)   ( parse a word and leave its address )
-  DUP C@          ( is the character count 0? )
-  WHILE             ( no )
-  'EVAL @EXECUTE  ( evaluate it )
-    ?STACK          ( any stack error? overflow or underflow )
-  REPEAT            ( repeat until TOKEN gets a null string )
-  DROP              ( discard the string address )
-  'PROMPT @EXECUTE ;  ( display the proper prompt, if any )
-
-( === TODO-TEST TODO-IO test EVAL, not that .OK wont work here since not yet using $INTERPRET )
 
 \\T BL PARSE 123 PAD PACK$ $INTERPRET 123 1 TEST
 \\T 123 BL PARSE DUP PAD PACK$ $INTERPRET  123 123 2 TEST
@@ -1139,10 +1125,8 @@ CREATE NULL$ 0 , ( EFORTH-ZEN-ERRATA inserts a string "coyote" after this, no id
 
 ( This switches to use new interpreter, its still using old js $COMPILE )
 
-: [ ( -- )
-  ( Start the text interpreter.) ( Replaces JS version )
-  [ ' $INTERPRET ] LITERAL
-  'EVAL !                   ( store $INTERPRET in 'EVAL )
+: [ ( -- ; Start the text interpreter.) ( Replaces JS version )
+  0 STATE !                 ( ANS version)
   ; IMMEDIATE               ( must be done even while compiling )
 
 \\T [ 1 2 3 ROT 2 3 1 3 TEST
@@ -1222,10 +1206,17 @@ CREATE I/O  ' ?RX , ' TX! , ( Array to store default I/O vectors. )
 : $" ( compile time: <string> --; interpret time: -- addr ; Compile an inline string literal that puts counted string on stack.)
   COMPILE $"|     ( compile string runtime code)
   $," ; IMMEDIATE ( compile string itself )
+( TODO-34-FILES S" is wrong, it should give the address if not compiling  - https://forth-standard.org/standard/file/Sq )
+( TODO-34-FILES implement STATE https://forth-standard.org/standard/core/STATE , then transition [ ] : ; ABORT QUIT to use it)
 : S" ( compile time: <string> ; interpret time: -- caddr u ; ANS version puts address and length ) 
-  COMPILE S"| $," ; IMMEDIATE 
+  STATE @ 
+  IF COMPILE S"| $,"
+  ELSE 34 PARSE stringBuffer PACK$ COUNT
+  THEN
+  ; IMMEDIATE
 
 \\T : foo $" hello" COUNT NIP ; foo 5 1 TEST
+( \\T S" foo" SWAP OVER + 1- C@ 3 CHAR o 2 TEST )
 
 ( === Name Dictionary Compiler Zen pg94-96: ?UNIQUE $,n $COMPILE OVERT ; ] call, : IMMEDIATE  (see this.dollarCommaN)
 
@@ -1269,22 +1260,33 @@ CREATE I/O  ' ?RX , ' TX! , ( Array to store default I/O vectors. )
   THEN          ( not a number either )
   THROW ;       ( generate an error condition )
 
+: EVAL ( -- )
+  ( Interpret the input stream.)
+  BEGIN
+  TOKEN ( -- a)   ( parse a word and leave its address )
+  DUP C@          ( is the character count 0? )
+  WHILE             ( no )
+    ( Diff: eForth vectors through 'EVAL, ANS uses  STATE )
+    STATE @ IF $COMPILE ELSE $INTERPRET THEN
+    ?STACK          ( any stack error? overflow or underflow )
+  REPEAT            ( repeat until TOKEN gets a null string )
+  DROP              ( discard the string address )
+  'PROMPT @EXECUTE ;  ( display the proper prompt, if any )
+
 : OVERT ( -- ) ( Redefining code word in Forth)
   ( Link a successfully defined word into the current vocabulary. )
   LAST @        ( name field address of last word )
   CURRENT @  ! ; ( link it to current vocabulary )
 
-: ; ( -- ) ( redefining code word)
+: ; ( -- ) ( redefining code/javascript word)
   ( Terminate a colon definition. )
   COMPILE EXIT  ( compile exit code )
   [COMPILE] [   ( return to interpreter state )
   OVERT ;       ( restore current vocabulary )
   COMPILE-ONLY IMMEDIATE
 
-: ] ( -- ) ( redefining code word)
-  ( Start compiling the words in the input stream.)
-  [ ' $COMPILE ] LITERAL  ( get code address of compiler )
-  'EVAL ! ;               ( store it in 'EVAL )
+: ] ( -- ; Start compiling the words in the input stream - replaces JS word) ( TODO-FILES maybe retire this, and maybe retires some things that use it)
+  -1 STATE ! ;
 
 : : ( -- ; <string> ) ( redefining code word)
   ( Start a new colon definition using next word as its name.)
@@ -1368,7 +1370,7 @@ CREATE I/O  ' ?RX , ' TX! , ( Array to store default I/O vectors. )
   SOURCE-ID @
   ?DUP IF
     DUP -1 =
-    IF 0 ( String - Always false )
+    IF DROP 0 ( String - Always false )
     ELSE ( File )
       TIB 1024 ROT 'READ-LINE @EXECUTE ( u2 flag ior )
       THROW SWAP #TIB ! ( flag ; True if more )
@@ -1417,9 +1419,9 @@ CREATE I/O  ' ?RX , ' TX! , ( Array to store default I/O vectors. )
     ( V5 and ZEN also send "ERR" to file handler if prompt is not OK which is a little off )
   AGAIN ;               ( go back get another command line )
 
-: quit1 ( -- ) ( TODO-34-FILES maybe move as was near QUIT 
+: quit1 ( -- ) ( TODO-34-FILES maybe move as was near QUIT )
   ( Evaluate a line that is already in TIB - could be compiling or interpreting, if error then report it)
-  [ ' EVAL ] LITERAL ( evaluate one line)
+  [ ' EVAL ] LITERAL ( evaluate one line - not this is ' EVAL which gets a line, not 'EVAL which gets one TOKEN )
   CATCH             ( execute commands with error handler)
   ?DUP
   IF ( Its an error )
@@ -1546,7 +1548,8 @@ CREATE I/O  ' ?RX , ' TX! , ( Array to store default I/O vectors. )
   CR
   DUP @ tokenDoList =
   IF
-    ." : " DUP >NAME .ID ( xt )
+    ." : " 
+    DUP >NAME .ID ( xt )
     BEGIN CELL+        ( xt+2
       DUP @ DUP         ( xt+2 xt' xt' )
       IF >NAME          ( xt+2 na|F )
@@ -1994,9 +1997,9 @@ class Forth {
     this.debugExcecutionStack = []; // Maintains a position, like a stack trace, don't manipulate directly use functions below
     this.debugName = '?'; // Set in threadtoken()
     // ported to Arduino below here to L.1831
-    this.testing = 0x0; // 0x01 display words passed to interpreters; 0x02 each word in tokenthread - typically set by 'testing3'
+    this.testing = 0x1; // 0x01 display words passed to interpreters; 0x02 each word in tokenthread - typically set by 'testing3'
     // ported to Arduino above
-    this.testingDepth = 1;
+    this.testingDepth = 5;
     this.padTestLength = 0; // Display pad length
     // === Javascript structures - implement the memory map and record the full state.
 
@@ -2352,6 +2355,10 @@ class Forth {
   npFetch() { return this.Ufetch(NPoffset) || this.ROMNAMEE; } // If ROMNAMEE is top of memory it will be 0, leading to negative results
   lastFetch() { return this.Ufetch(LASToffset); }
   padPtr() { return this.vpFetch() + 80; } // Sometimes JS needs the pad pointer
+
+  stringBuffer() {
+    this.SPpush(this.vpFetch() + 160); } // A string buffer used for input - not same as PAD see S" //TODO-24-FILES add to Arduino
+
 
   // === Functions related to building 'find'  and its wrappers ====
 
@@ -2946,7 +2953,8 @@ class Forth {
     }
   }
 
-  async EVAL() { // Same signature as Forth EVAL, reads tokens from TIB and interprets
+  async EVAL() { // Same signature as Forth EVAL, reads tokens from TIB and interprets )
+    // EVAL and $COMPILE and $INTERPRET are redefined in FORTH below
     while (this.Ufetch(INoffset) < this.Ufetch(nTIBoffset)) {
       this.TOKEN(); // a ; pointing to word in Name Buffer (NB)
       // There may be case where this.TOKEN returns empty string at end of line or similar
@@ -2954,7 +2962,7 @@ class Forth {
         this.SPpop();
       } else {
         // This is currently OK since its calling JS routines that may call Forth, there is no Forth-in-Forth
-        await this.runXT(this.Ufetch(EVALoffset));
+        if ( this.Ufetch(STATEoffset))  { await this.dCOMPILE(); } else { await this.dINTERPRET(); }
       }
       // TODO-28-MULTITASK RP0 will move
       console.assert(this.ramSP <= this.ramSPP && (this.m.fromRamAddr(this.ramRP) <= this.Ufetch(RP0offset))); // Side effect of making SP and SPP available to debugger.
@@ -2984,7 +2992,7 @@ class Forth {
         console.log(this.debugStack(), ' >>', inputline);
       }
       this.JStoTIB(inputline);
-      await this.EVAL();
+      await this.EVAL(); // TODO-34-FILES-STATE maybe should use EVALUATE
     }
   }
   interpret1(inp) { /* async by return a promise*/
@@ -2993,17 +3001,13 @@ class Forth {
   }
   // === A group of words required for the JS interpreter redefined later
 
-  // : [  doLIT $INTERPRET 'EVAL ! ; IMMEDIATE
-  //Zen pg84 and Zen pg88  redefined below to use FORTH $INTERPRET
+  // : [  0 STATE ! ; IMMEDIATE
   openBracket() {
-    this.Ustore(EVALoffset, this.js2xt.$INTERPRET); // uses JS dINTERPRET
-  }
+    this.Ustore(STATEoffset, 0); } // uses JS dINTERPRET
 
-  // : ] doLIT $COMPILE 'EVAL ! ;
-  //Zen pg84 and Zen pg95  redefined below to use FORTH $COMPILE
+  // : ] -1 STATE ! ;
   closeBracket() {
-    this.Ustore(EVALoffset, this.js2xt.$COMPILE); // Uses JS dCOMPILE
-  }
+    this.Ustore(STATEoffset, forthTrue); } // uses JS dINTERPRET
 
   // : : TOKEN $,n [ ' doLIST ] LITERAL ] ; see Zen pg96
   colon() {
