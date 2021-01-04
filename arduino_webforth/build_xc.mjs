@@ -38,5 +38,5 @@ async function build({
 }
 
 build({
-  processor: 'arduino', CELLL: 2, ROMCELLS: 0x1000, RAMCELLS: 0x200, extensions,
+  processor: 'arduino', CELLL: 2, ROMCELLS: 0x2000, RAMCELLS: 0x200, extensions,
 });

@@ -6,7 +6,7 @@ const CELLL = 2; // 2 bytes for CELLL
 const MEM = 16; // Use 16 bit memory
 // Specify areas for ROM and RAM
 // ROM: Used for UserVariable save area and Dictionary (code and names) until useRam() is called
-const ROMSIZE = 0x1000 * CELLL;
+const ROMSIZE = 0x2000 * CELLL;
 // RAM: Used for UserVariables, stacks, TIB, PAD etc and Dictionary (code and names) after useRam() is called
 const RAMSIZE = 0x2000 * CELLL;
 const extensions = ForthNodeExtensions; // especially IO while in node

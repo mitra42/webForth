@@ -196,9 +196,9 @@ const forthInForth = `
 1 2 ( 3 ) 1 2 2 TEST
 
 ( Uncomment first for production, 2nd for testing )
-: \\T #TIB @ >IN ! ;
-\\ : \\T ; IMMEDIATE
-
+\\ : \\T #TIB @ >IN ! ;
+: \\T ; IMMEDIATE
+( TODO add a test here, or elsewhere for things like: CP+PAD+StringBuffer > NP) 
 
 ( === Test as many of the words defined in code as possible)
 ( EXIT & EXECUTE tested with ' )
@@ -1994,7 +1994,7 @@ class Forth {
     this.debugExcecutionStack = []; // Maintains a position, like a stack trace, don't manipulate directly use functions below
     this.debugName = '?'; // Set in threadtoken()
     // ported to Arduino below here to L.1831
-    this.testing = 0x0; // 0x01 display words passed to interpreters; 0x02 each word in tokenthread - typically set by 'testing3'
+    this.testing = 0x1; // 0x01 display words passed to interpreters; 0x02 each word in tokenthread - typically set by 'testing3'
     // ported to Arduino above
     this.testingDepth = 1;
     this.padTestLength = 0; // Display pad length

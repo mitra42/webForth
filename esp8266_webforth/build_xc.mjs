@@ -38,5 +38,5 @@ async function build({
 }
 
 build({
-  processor: 'esp8266', CELLL: 4, ROMCELLS: 0x1000, RAMCELLS: 0x2800, extensions,
+  processor: 'esp8266', CELLL: 4, ROMCELLS: 0x2000, RAMCELLS: 0x2800, extensions,
 });
