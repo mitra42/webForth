@@ -200,7 +200,7 @@ const forthInForth = `
 ( Uncomment first for production, 2nd for testing )
 \\ : \\T #TIB @ >IN ! ;
 : \\T ; IMMEDIATE
-
+( TODO add a test here, or elsewhere for things like: CP+PAD+StringBuffer > NP) 
 
 ( === Test as many of the words defined in code as possible)
 ( EXIT & EXECUTE tested with ' )
