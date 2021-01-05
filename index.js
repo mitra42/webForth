@@ -2054,6 +2054,7 @@ class Forth {
     // TODO-28-MULTI think about how these may need to be Task specific
     this.ramSPP = this.m.ramAddr(this.SPP); // start of data stack - grows down, points at top of stack - 8 word buffer for safety
     this.IP = 0;    // Interpreter Pointer
+    this.PAYLOAD = 0; // Used by functions to know where to get argument
     this.ramSP = this.ramSPP;  // Data Stack Pointer but in MEM units rather than bytes
     this.ramRP = this.m.ramAddr(RP0);  // Return Stack Pointer (aka BP in 8086)
     this.ramUP = this.m.ramAddr(this.UPP);  // User Area Pointer // TODO-28-MULTI will move this around
@@ -2574,42 +2575,42 @@ class Forth {
   // Words that will use a Javascript function for its action are just JS functions with an entry in jsFunctionAttributes
 
   //TODO-29 maybe define VOCABULARY as CREATE DOES> word then come back
-  tokenVocabulary(payload) {
+  tokenVocabulary() {
     // : doVOC R> CONTEXT ! ;
-    this.Ustore(CONTEXToffset, this.Mfetch(payload));
+    this.Ustore(CONTEXToffset, this.Mfetch(this.PAYLOAD));
   }
 
   // Put the contents of the payload (1 word) onto Stack, used for CONSTANT
-  tokenNextVal(payload) { this.SPpush(this.Mfetch(payload)); }
+  tokenNextVal() { this.SPpush(this.Mfetch(this.PAYLOAD)); }
 
   // This is the most important token function - used for a Colon word to iterate over the list.
-  tokenDoList(payload) {
+  tokenDoList() {
     this.debugPush(); // Pop is in EXIT. this will be undefined if not 'testing'
     this.RPpush(this.IP);
-    this.IP = payload; // Point at first word in the definition
+    this.IP = this.PAYLOAD; // Point at first word in the definition
   }
 
   // Leaves an address in the user area, note it doesnt compile the actual address since UP will change when multi-tasking
-  tokenUser(payload) { this.SPpush(this.m.fromRamAddr(this.Mfetch(payload) + this.ramUP)); }
+  tokenUser() { this.SPpush(this.m.fromRamAddr(this.Mfetch(this.PAYLOAD) + this.ramUP)); }
 
   // Put the address of the payload onto Stack - used for CREATE which is used by VARIABLE
-  _tokenDoes(payload) {
-    const does = this.Mfetch(payload);
+  _tokenDoes() {
+    const does = this.Mfetch(this.PAYLOAD);
     if (does) {
       this.debugPush();
       this.RPpush(this.IP);
       this.IP = does;
     }
   }
-  tokenCreate(payload) {
-    this.SPpush(payload + this.CELLL);
-    this._tokenDoes(payload);
+  tokenCreate() {
+    this.SPpush(this.PAYLOAD + this.CELLL);
+    this._tokenDoes();
   }
 
   // Used when the data is going to be in Ram and Code in ROM
-  tokenVar(payload) {
-    this.SPpush(this.Mfetch(payload + this.CELLL));
-    this._tokenDoes(payload);
+  tokenVar() {
+    this.SPpush(this.Mfetch(this.PAYLOAD + this.CELLL));
+    this._tokenDoes();
   }
 
   // === INNER INTERPRETER YES THIS IS IT ! ==================== eForthAndZen#36
@@ -2619,8 +2620,8 @@ class Forth {
     // This next section is only done while testing, and outputs a trace, so set it on (with testing3) immediately before a likely error.
     this.debugThread(xt);
     const tok = this.Mfetch(xt);
-    xt += this.CELLL;
-    return this.jsFunctions[tok].call(this, xt); // Run the token function - like tokenDoList or tokenVar - will return null or a Promise
+    this.PAYLOAD = xt + this.CELLL;
+    return this.jsFunctions[tok].call(this); // Run the token function - like tokenDoList or tokenVar - will return null or a Promise
   }
 
   // This is not re-entrant, normally its threadtoken you want ....
