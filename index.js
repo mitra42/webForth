@@ -175,7 +175,9 @@ const NPoffset = USER('NP', undefined);  // normally set on Zen pg106 but we are
 const LASToffset = USER('LAST', undefined); // normally set on Zen pg106 but using live
 const VPoffset = USER('VP', undefined);  // not part of eForth, pointer into Data space for EPROMability
 USER('SOURCE-ID', 0);  // 0 for terminal, -1 for string, fd for files
-USER("'unreadFile", 0); // TODO-34-FILES temporary till have files compilation choice
+USER("'unreadFile", 0); // TODO-34-FILES temporary till have files compilation choice //TODO-2ARDUINO
+const testFlagsOffset = USER("testFlags", 0); // bit field: 1 trace interpreter 2 trace threading 4 safety checks 8 tests TODO-67-TESTING - see unreadFile above //TODO-2ARDUINO
+const testDepthOffset = USER("testDepth", 0);  // Needs to autoadjust //TODO-2ARDUINO
 // ported to Arduino above
 
 const forthInForth = `
@@ -196,42 +198,41 @@ const forthInForth = `
 1 2 ( 3 ) 1 2 2 TEST
 
 ( Uncomment first for production, 2nd for testing )
-\\ : \\T #TIB @ >IN ! ;
-: \\T ; IMMEDIATE
+
 ( TODO add a test here, or elsewhere for things like: CP+PAD+StringBuffer > NP) 
 
 ( === Test as many of the words defined in code as possible)
 ( EXIT & EXECUTE tested with ' )
 ( doLIT implicitly tested by all literals )
 ( next, ?branch, branch implicitly tested by control structures )
-\\T 123 HLD ! HLD @ 123 1 TEST ( Also tests user variables )
-\\T 222 HLD C! HLD C@ 222 1 TEST
+123 HLD ! HLD @ 123 1 TEST ( Also tests user variables )
+222 HLD C! HLD C@ 222 1 TEST
 ( R> >R R@ SP@ SP! tested after arithmetic operators )
-\\T 30 20 DROP 30 1 TEST
-\\T 30 20 DUP 30 20 20 3 TEST
-\\T 10 20 SWAP 20 10 2 TEST
-\\T 10 20 OVER 10 20 10 3 TEST
-\\T 123 0< -123 0< 0 -1 2 TEST
-\\T 16 BASE !
-\\T 5050 6060 AND 5050 6060 OR 5050 6060 XOR 4040 7070 3030 3 TEST
-\\T 0A BASE !
+30 20 DROP 30 1 TEST
+30 20 DUP 30 20 20 3 TEST
+10 20 SWAP 20 10 2 TEST
+10 20 OVER 10 20 10 3 TEST
+123 0< -123 0< 0 -1 2 TEST
+16 BASE !
+5050 6060 AND 5050 6060 OR 5050 6060 XOR 4040 7070 3030 3 TEST
+0A BASE !
 
-\\T 12 34 UM+ 46 0 2 TEST
+12 34 UM+ 46 0 2 TEST
 ( Next test is contrived to work with any CELLL size )
-\\T -1 -1 UM+ -2 1 2 TEST
+-1 -1 UM+ -2 1 2 TEST
 ( IMMEDIATE implicitly tested )
-\\T 32 PARSE ABC SWAP DROP 3 1 TEST
-\\T !IO 62 TX! 0 TEST ( Should output > )
-\\T : FOO 10 EXIT 20 ; FOO 10 1 TEST
-\\T ' FOO EXECUTE 30 10 30 2 TEST
+32 PARSE ABC SWAP DROP 3 1 TEST
+!IO 62 TX! 0 TEST ( Should output > )
+: FOO 10 EXIT 20 ; FOO 10 1 TEST
+' FOO EXECUTE 30 10 30 2 TEST
 
 
 ( === First section is words moved earlier than they appear in eForth as they are needed for other words )
 ( they are mostly still in the same order as in eForth )
 
-\\T BL 32 1 TEST
+BL 32 1 TEST
 : NIP SWAP DROP ;
-\\T 1 2 NIP 2 1 TEST
+1 2 NIP 2 1 TEST
 
 ( Note failure on this line, can be for three reasons )
 ( a: its the first execution of an immediate word inside a compilation )
@@ -289,6 +290,14 @@ const forthInForth = `
 ( TODO-TEST of above group non-obvious as writing to dictionary. )
 ( IF-THEN tested in ?DUP; )
 
+: 0= IF 0 ELSE -1 THEN ;
+: ?\\ ( f -- ; Conditional compilation/interpretation - comment out if f is 0 )
+  0= IF [COMPILE] \\ THEN ; IMMEDIATE 
+: ?safe\\ ( compilation/interpretation line if checking for safety - overflows etc )
+  testFlags @ 4 AND [COMPILE] ?\\ ; IMMEDIATE
+: ?test\\  ( compilation/interpretation line if running compile time tests )
+  testFlags @ 8 AND [COMPILE] ?\\ ; IMMEDIATE
+
 ( === Multitasking Zen pg48 - not implemented in eForth TODO )
 
 ( === More Stack Words Zen pg49 TODO-OPTIMIZE )
@@ -298,9 +307,9 @@ const forthInForth = `
 : 2DUP OVER OVER ; ( w1 w2 -- w1 w2 w1 w2;)
 ( 2DROP & NIP moved earlier )
 
-\\T 1 ?DUP 0 ?DUP 1 1 0 3 TEST
-\\T 1 2 3 ROT 2 3 1 3 TEST
-\\T 1 2 2DUP 1 2 1 2 4 TEST
+?test\\ 1 ?DUP 0 ?DUP 1 1 0 3 TEST
+?test\\ 1 2 3 ROT 2 3 1 3 TEST
+?test\\ 1 2 2DUP 1 2 1 2 4 TEST
 
 ( === More Arithmetic operators Zen pg50 and a few not in eForth but widely used )
 : + UM+ DROP ; ( w1 w2 -- w1+w2)
@@ -313,16 +322,15 @@ const forthInForth = `
 : - NEGATE + ; ( n1 n2 -- n1-n2)
 : 1- 1 - ; 
 : ABS DUP 0< IF NEGATE THEN ; ( n -- n; Absolute value of w)
-: 0= IF 0 ELSE -1 THEN ;
 
-\\T 1 2 + 3 1 TEST
-\\T -1 1 -1 3 D+ -2 5 2 TEST ( Test contrived to be CELLL independent )
-\\T 257 INVERT -258 1 TEST ( 257 is 0x101 65278 is 0xFEFE )
-\\T 53 NEGATE 53 + 0 1 TEST
-\\T 456 123 - 456 -123 - 333 579 2 TEST
-\\T -456 ABS 456 ABS - 0 1 TEST
-\\T 111 >R R@ RP@ R> SWAP RP@ SWAP - 111 111 CELLL 3 TEST
-\\T 1 2 SP@ CELL+ SP! 1 1 TEST
+?test\\ 1 2 + 3 1 TEST
+?test\\ -1 1 -1 3 D+ -2 5 2 TEST ( Test contrived to be CELLL independent )
+?test\\ 257 INVERT -258 1 TEST ( 257 is 0x101 65278 is 0xFEFE )
+?test\\ 53 NEGATE 53 + 0 1 TEST
+?test\\ 456 123 - 456 -123 - 333 579 2 TEST
+?test\\ -456 ABS 456 ABS - 0 1 TEST
+?test\\ 111 >R R@ RP@ R> SWAP RP@ SWAP - 111 111 CELLL 3 TEST
+?test\\ 1 2 SP@ CELL+ SP! 1 1 TEST
 
 ( === More comparison Zen pg51-52 - ud< is added)
 : = XOR IF 0 EXIT THEN -1 ; ( w w -- t)
@@ -333,12 +341,12 @@ const forthInForth = `
 : MIN 2DUP SWAP < IF SWAP THEN DROP ;
 : WITHIN OVER - >R - R> U< ;
 
-\\T 123 123 = 123 124 = -1 0 2 TEST
-\\T 123 100 U< 100 123 U< 123 -100 U< -100 123 U< 0 -1 -1 0 4 TEST
-\\T 123 100 < 100 123 < 123 -100 < -100 123 < 0 -1 0 -1 4 TEST
-\\T 100 200 MAX 300 100 MAX 200 300 2 TEST
-\\T 100 200 MIN 300 100 MIN 100 100 2 TEST
-\\T 200 100 300 WITHIN 300 100 200 WITHIN 100 -100 200 WITHIN -1 0 -1 3 TEST
+?test\\ 123 123 = 123 124 = -1 0 2 TEST
+?test\\ 123 100 U< 100 123 U< 123 -100 U< -100 123 U< 0 -1 -1 0 4 TEST
+?test\\ 123 100 < 100 123 < 123 -100 < -100 123 < 0 -1 0 -1 4 TEST
+?test\\ 100 200 MAX 300 100 MAX 200 300 2 TEST
+?test\\ 100 200 MIN 300 100 MIN 100 100 2 TEST
+?test\\ 200 100 300 WITHIN 300 100 200 WITHIN 100 -100 200 WITHIN -1 0 -1 3 TEST
 
 ( === More Math Words Zen pg53-55 UM/MOD M/MOD /MOD MOD / UM+ * M* )
 : UM/MOD ( udl udh u -- ur uq ) ( needs FOR-NEXT from 91)
@@ -416,15 +424,15 @@ const forthInForth = `
   ABS SWAP ABS UM*  ( multiply absolutes)
   R> IF DNEGATE THEN ;  ( negate if signs are different)
 
-\\T -1 1 2 UM/MOD 1 -1 2 TEST
-\\T -1 1 2 M/MOD 1 -1 2 TEST
-\\T 9 0 4 UM/MOD 1 2 2 TEST
-\\T 9 4 /MOD 1 2 2 TEST
-\\T 9 4 MOD 1 1 TEST
-\\T 9 4 / 2 1 TEST
-\\T 2 -1 UM* -2 1 2 TEST
-\\T 3 4 * 12 1 TEST
-\\T -2 -3 M* 6 0 2 TEST
+?test\\ -1 1 2 UM/MOD 1 -1 2 TEST
+?test\\ -1 1 2 M/MOD 1 -1 2 TEST
+?test\\ 9 0 4 UM/MOD 1 2 2 TEST
+?test\\ 9 4 /MOD 1 2 2 TEST
+?test\\ 9 4 MOD 1 1 TEST
+?test\\ 9 4 / 2 1 TEST
+?test\\ 2 -1 UM* -2 1 2 TEST
+?test\\ 3 4 * 12 1 TEST
+?test\\ -2 -3 M* 6 0 2 TEST
 
 ( === Scaling Words Zen pg56 */MOD */ )
 
@@ -437,8 +445,8 @@ const forthInForth = `
   ( Multiple by n1 by n2, then divide by n3. Return quotient only)
   */MOD NIP ; ( n1*n2/n3 and discard remainder)
 
-\\T 5 7 2 */MOD 1 17 2 TEST
-\\T 5 7 2 */ 17 1 TEST
+?test\\ 5 7 2 */MOD 1 17 2 TEST
+?test\\ 5 7 2 */ 17 1 TEST
 
 ( === Memory Alignment words Zen pg57 CELL+ CELL- CELLS ALIGNED )
 ( CELL+ & ALIGNED moved earlier ERRATA Zen & v5 use 2 which is wrong unless CELL is '2' )
@@ -451,8 +459,8 @@ const forthInForth = `
   ( Multiply n by cell size in bytes)
   CELLL * ;
 
-\\T 123 CELL- CELLL + 123 1 TEST
-\\T 123 CELLS CELLL / 123 1 TEST
+?test\\ 123 CELL- CELLL + 123 1 TEST
+?test\\ 123 CELLS CELLL / 123 1 TEST
 
 ( === Special Characters Zen pg58 BL >CHAR )
 
@@ -463,7 +471,7 @@ const forthInForth = `
   127 BL WITHIN ( if its a control character)
   IF DROP 95 THEN ; ( replace with an underscore)
 
-\\T 41 >CHAR 23 >CHAR BL >CHAR 41 95 32 3 TEST
+?test\\ 41 >CHAR 23 >CHAR BL >CHAR 41 95 32 3 TEST
 
 ( === Managing Data Stack Zen pg59 DEPTH PICK )
 
@@ -479,8 +487,8 @@ const forthInForth = `
   1+ CELLS     ( bytes below tos)
   SP@ + @ ;     ( fetch directly from stack)
 
-\\T 1 2 3 DEPTH 1 2 3 3 4 TEST
-\\T 11 22 33 1 PICK 11 22 33 22 4 TEST
+?test\\ 1 2 3 DEPTH 1 2 3 3 4 TEST
+?test\\ 11 22 33 1 PICK 11 22 33 22 4 TEST
 
 ( === Memory Access Zen pg60 +! 2! 2@ HERE PAD TIB @EXECUTE )
 ( Note 2! 2@ presume big-endian which is a Forth assumption (high word at low address)
@@ -510,10 +518,10 @@ const forthInForth = `
 : @EXECUTE ( a -- ; execute vector -if any- stored in address a)
   @ ?DUP IF EXECUTE THEN ;
 
-\\T HLD @ 2 HLD +! HLD @ SWAP - 2 1 TEST
-\\T 1 2 3 SP@ 4 5 ROT 2! 1 4 5 3 TEST
-\\T 1 2 3 SP@ 2@ 1 2 3 2 3 5 TEST
-\\T TIB >R BL PARSE XXX SWAP R> - 3 19 2 TEST
+?test\\ HLD @ 2 HLD +! HLD @ SWAP - 2 1 TEST
+?test\\ 1 2 3 SP@ 4 5 ROT 2! 1 4 5 3 TEST
+?test\\ 1 2 3 SP@ 2@ 1 2 3 2 3 5 TEST
+?test\\ >IN @ BL PARSE XXX SWAP TIB - ROT - 3 9 2 TEST
 
 ( === Memory Array and String Zen pg61-62: COUNT CMOVE FILL -TRAILING PACK$ )
 
@@ -563,10 +571,10 @@ const forthInForth = `
   1+ SWAP CMOVE      ( ; store characters in cells - 0 padded to end of cell)
   R> ;        ( leave only word buffer address )
 
-\\T NP @ CELL+ CELL+ COUNT NIP 5 1 TEST
-\\T NP @ CELL+ CELL+ COUNT OVER PAD ROT CMOVE C@ PAD C@ 1 TEST ( Check first character copied - expect pad="PACK$"
-\\T PAD 3 + 5 BL FILL PAD 7 + C@ BL 1 TEST
-\\T PAD 8 -TRAILING PAD 3 2 TEST
+?test\\ NP @ CELL+ CELL+ COUNT NIP 5 1 TEST
+?test\\ NP @ CELL+ CELL+ COUNT OVER PAD ROT CMOVE C@ PAD C@ 1 TEST ( Check first character copied - expect pad="PACK$"
+?test\\ PAD 3 + 5 BL FILL PAD 7 + C@ BL 1 TEST
+?test\\ PAD 8 -TRAILING PAD 3 2 TEST
 
 ( === TEXT INTERPRETER ===  Zen pg63 )
 
@@ -579,7 +587,7 @@ const forthInForth = `
   0 SWAP UM/MOD   ( divide n by base)
   SWAP DIGIT ;    ( convert remainder to a digit)
 
-\\T 123 10 EXTRACT 12 51 2 TEST
+?test\\ 123 10 EXTRACT 12 51 2 TEST
 
 ( === Number formatting Zen pg65 <# HOLD #S SIGN #> )
 
@@ -611,8 +619,8 @@ const forthInForth = `
   HLD @         ( address of last digit)
   PAD OVER - ;  ( return address of 1st digit and length)
 
-\\T 123 <# DUP SIGN #S #> SWAP COUNT SWAP COUNT SWAP COUNT NIP 3 49 50 51 4 TEST ( hold="123" )
-\\T -123 DUP ABS <# #S SWAP SIGN #> SWAP COUNT SWAP COUNT SWAP COUNT SWAP COUNT NIP 4 45 49 50 51 5 TEST ( hold="-123" )
+?test\\ 123 <# DUP SIGN #S #> SWAP COUNT SWAP COUNT SWAP COUNT NIP 3 49 50 51 4 TEST ( hold="123" )
+?test\\ -123 DUP ABS <# #S SWAP SIGN #> SWAP COUNT SWAP COUNT SWAP COUNT SWAP COUNT NIP 4 45 49 50 51 5 TEST ( hold="-123" )
 
 ( === More definitions moved up )
 
@@ -628,7 +636,7 @@ const forthInForth = `
   FOR AFT DUP C@ EMIT 1+ THEN NEXT DROP ;
 : .$ ( a -- ) COUNT TYPE ; ( from Staapl, not in eForth)
 
-\\T 60 EMIT SPACE 2 SPACES 61 EMIT 0 TEST
+?test\\ 60 EMIT SPACE 2 SPACES 61 EMIT 0 TEST
 ( .$ is tested by ."| and others )
 
 ( === Number output Zen pg66 str HEX DECIMAL .R U.R U. . ? )
@@ -668,7 +676,7 @@ const forthInForth = `
 : ? ( a -- ; Display the contents in a memory cell.)
   @ . ; ( very simple but useful command)
 
-\\T -123 5 .R 123 5 U.R 123 U. 123 . BASE ? 0 TEST
+?test\\ -123 5 .R 123 5 U.R 123 U. 123 . BASE ? 0 TEST
 
 ( === Numeric input Zen pg67-68 DIGIT? NUMBER? )
 ( ERRATA Zen NIP is used but not defined )
@@ -726,10 +734,10 @@ const forthInForth = `
   2DROP             ( discard garbage )
   R> BASE ! ;       ( restore radix )
 
-\\T 50 10 DIGIT? 2 -1 2 TEST
-\\T BL PARSE 1234 PAD PACK$ NUMBER? DROP 1234 1 TEST
+?test\\ 50 10 DIGIT? 2 -1 2 TEST
+?test\\ BL PARSE 1234 PAD PACK$ NUMBER? DROP 1234 1 TEST
 ' NUMBER? 'NUMBER !
-\\T 123 123 1 TEST
+?test\\ 123 123 1 TEST
 
 ( TODO Note the EFORTH-ZEN-ERRATA in the docs v. code for NUMBER? means we drop testing the flag will reconsider when see how used )
 ( === Serial I/O Zen pg69 ?KEY KEY EMIT NUF? )
@@ -850,14 +858,14 @@ const forthInForth = `
 
 : CHAR BL PARSE DROP C@ ; ( Parse a word and return its first character )
 : CTRL CHAR 31 AND ; ( Parse a word, return first character as a control )
-\\T CHAR ) 41 1 TEST
-\\T CTRL H 8 1 TEST
+?test\\ CHAR ) 41 1 TEST
+?test\\ CTRL H 8 1 TEST
 
 : .(  ( -- ) ( Output following string up to next )
   [ CHAR ) ] LITERAL PARSE
    ( parse the string until next )
   TYPE ; IMMEDIATE         ( type the string to terminal )
-\\T .( on consecutive ) CR .( lines )
+?test\\ .( on consecutive ) CR .( lines )
 
 ( Note there is this.TOKEN which does same thing )
 : TOKEN ( -- a ; <string> ; Parse a word from input stream and copy it to name dictionary.)
@@ -870,11 +878,11 @@ const forthInForth = `
   PARSE         ( parse out a string delimited by c )
   HERE PACK$ ;  ( copy the string into the word buffer )
 
-\\T 1 2 ( 3 ) 4 \\ commenting
-\\T 1 2 4 3 TEST
-\\T : foo TOKEN C@ ; foo xxx 3 1 TEST
-\\T BL WORD yyyy DUP C@ SWAP CP @ - 4 0 2 TEST
-\\T : foo .( output at compile time) ; 0 TEST
+?test\\ 1 2 ( 3 ) 4 \\ commenting
+?test\\ 1 2 4 3 TEST
+?test\\ : foo TOKEN C@ ; foo xxx 3 1 TEST
+?test\\ BL WORD yyyy DUP C@ SWAP CP @ - 4 0 2 TEST
+?test\\ : foo .( output at compile time) ; 0 TEST
 
 ( === Dictionary Search Zen pg75-77 NAME> SAME? find NAME? )
 
@@ -958,12 +966,12 @@ const forthInForth = `
   0 ;           ( exit with a false flag )
 
 ( NAME> implicitly tested by find )
-\\T BL WORD xxx DUP C@ 1+ PAD SWAP CMOVE PAD BL WORD xxx 4 SAME? >R 2DROP R> 0 1 TEST
-\\T BL WORD xxx DUP C@ 1+ PAD SWAP CMOVE PAD BL WORD xzx 4 SAME? >R 2DROP R> 0= 0 1 TEST
-\\T FORTH 0 TEST
+?test\\ BL WORD xxx DUP C@ 1+ PAD SWAP CMOVE PAD BL WORD xxx 4 SAME? >R 2DROP R> 0 1 TEST
+?test\\ BL WORD xxx DUP C@ 1+ PAD SWAP CMOVE PAD BL WORD xzx 4 SAME? >R 2DROP R> 0= 0 1 TEST
+?test\\ FORTH 0 TEST
 
-\\T BL WORD TOKEN CONTEXT @ find BL WORD TOKEN CONTEXT @ FORTHfind 2 TEST
-\\T BL WORD TOKEN CONTEXT @ find BL WORD TOKEN NAME? 2 TEST ( Name searches all vocabs )
+?test\\ BL WORD TOKEN CONTEXT @ find BL WORD TOKEN CONTEXT @ FORTHfind 2 TEST
+?test\\ BL WORD TOKEN CONTEXT @ find BL WORD TOKEN NAME? 2 TEST ( Name searches all vocabs )
 
 ( === Error Handling Zen pg80-82 CATCH THROW = moved in front of Text input )
 
@@ -1086,11 +1094,11 @@ CREATE NULL$ 0 , ( EFORTH-ZEN-ERRATA inserts a string "coyote" after this, no id
   $," ; IMMEDIATE ( compile print string )
 
 ( Test is tricky - the "3" in bar is thrown away during hte "THROW" while 5 is argument to THROW )
-\\T : bar 3 5 THROW 4 ; : foo 1 [ ' bar ] LITERAL CATCH 2 ; foo 1 5 2 3 TEST
-\\T : bar 3 ; : foo 1 [ ' bar ] LITERAL CATCH 2 ; foo 1 3 0 2 4 TEST
-\\T : foo ." hello" ; foo 0 TEST
+?test\\ : bar 3 5 THROW 4 ; : foo 1 [ ' bar ] LITERAL CATCH 2 ; foo 1 5 2 3 TEST
+?test\\ : bar 3 ; : foo 1 [ ' bar ] LITERAL CATCH 2 ; foo 1 3 0 2 4 TEST
+?test\\ : foo ." hello" ; foo 0 TEST
 ( Note that abort restores the stack, so shouldn't have consumed something else will have random noise on stack )
-\\T : bar ?DUP ABORT" test" 3 ; : foo [ ' bar ] LITERAL CATCH ; 1 foo C@ 0 foo 1 4 3 0 4 TEST
+?test\\ : bar ?DUP ABORT" test" 3 ; : foo [ ' bar ] LITERAL CATCH ; 1 foo C@ 0 foo 1 4 3 0 4 TEST
 ( $," and abort" are implicitly tested by ABORT")
 
 ( === Text Interpreter loop Zen pg83-84 $INTERPRET [ .OK ?STACK EVAL )
@@ -1133,9 +1141,9 @@ CREATE NULL$ 0 , ( EFORTH-ZEN-ERRATA inserts a string "coyote" after this, no id
 
 ( === TODO-TEST TODO-IO test EVAL, not that .OK wont work here since not yet using $INTERPRET )
 
-\\T BL PARSE 123 PAD PACK$ $INTERPRET 123 1 TEST
-\\T 123 BL PARSE DUP PAD PACK$ $INTERPRET  123 123 2 TEST
-\\T : foo 1 2DROP ?STACK ; : bar [ ' foo ] LITERAL CATCH ; bar C@ 9 1 TEST
+?test\\ BL PARSE 123 PAD PACK$ $INTERPRET 123 1 TEST
+?test\\ 123 BL PARSE DUP PAD PACK$ $INTERPRET  123 123 2 TEST
+?test\\ : foo 1 2DROP ?STACK ; : bar [ ' foo ] LITERAL CATCH ; bar C@ 9 1 TEST
 
 ( This switches to use new interpreter, its still using old js $COMPILE )
 
@@ -1145,7 +1153,7 @@ CREATE NULL$ 0 , ( EFORTH-ZEN-ERRATA inserts a string "coyote" after this, no id
   'EVAL !                   ( store $INTERPRET in 'EVAL )
   ; IMMEDIATE               ( must be done even while compiling )
 
-\\T [ 1 2 3 ROT 2 3 1 3 TEST
+?test\\ [ 1 2 3 ROT 2 3 1 3 TEST
 
 ( === Operating System Zen pg85-86 PRESET XIO FILE HAND I/O CONSOLE )
 
@@ -1208,10 +1216,10 @@ CREATE I/O  ' ?RX , ' TX! , ( Array to store default I/O vectors. )
 ( ERRATA Staapl & Zen do 'CURRENT @ !', v5 does 'NAME> ,' this is fundamentally different usage, ANS matches latter )
 : RECURSE ( -- ) LAST @ NAME> , ; IMMEDIATE
 
-\\T 1 ' DUP EXECUTE 1 1 2 TEST
-\\T HERE 2 ALLOT HERE SWAP - 2 1 TEST
-\\T : foo [COMPILE] ( ; foo 2 ) 0 TEST
-\\T : foo ?DUP IF DUP 1- RECURSE THEN ; 3 foo 3 2 1 3 TEST
+?test\\ 1 ' DUP EXECUTE 1 1 2 TEST
+?test\\ HERE 2 ALLOT HERE SWAP - 2 1 TEST
+?test\\ : foo [COMPILE] ( ; foo 2 ) 0 TEST
+?test\\ : foo ?DUP IF DUP 1- RECURSE THEN ; 3 foo 3 2 1 3 TEST
 
 ( === Control Structures Zen pg91-92: FOR BEGIN NEXT UNTIL AGAIN IF AHEAD REPEAT THEN AFT ELSE WHILE )
 ( All moved earlier )
@@ -1225,7 +1233,7 @@ CREATE I/O  ' ?RX , ' TX! , ( Array to store default I/O vectors. )
 : S" ( compile time: <string> ; interpret time: -- caddr u ; ANS version puts address and length ) 
   COMPILE S"| $," ; IMMEDIATE 
 
-\\T : foo $" hello" COUNT NIP ; foo 5 1 TEST
+?test\\ : foo $" hello" COUNT NIP ; foo 5 1 TEST
 
 ( === Name Dictionary Compiler Zen pg94-96: ?UNIQUE $,n $COMPILE OVERT ; ] call, : IMMEDIATE  (see this.dollarCommaN)
 
@@ -1236,7 +1244,7 @@ CREATE I/O  ' ?RX , ' TX! , ( Array to store default I/O vectors. )
   OVER .$       ( with the offending name )
   THEN DROP ;     ( discard token address )
 
-\\T TOKEN foo DUP ?UNIQUE - 0 1 TEST
+?test\\ TOKEN foo DUP ?UNIQUE - 0 1 TEST
 
 : $,n ( na -- ) ( See also this.dollarCommaN above)
   ( Build a new dictionary name using the string at na.)
@@ -1292,7 +1300,7 @@ CREATE I/O  ' ?RX , ' TX! , ( Array to store default I/O vectors. )
   tokenDoList ,
   ] ;
 
-\\T : foo 1 ; foo 1 1 TEST
+?test\\ : foo 1 ; foo 1 1 TEST
 
 
 ( TODO may need JS equivalent - see if used;  : CALL, ( ca -- ; ( DTC 8086 relative call ; [ =CALL ] LITERAL , HERE CELL+ - , ; )
@@ -1310,14 +1318,14 @@ CREATE I/O  ' ?RX , ' TX! , ( Array to store default I/O vectors. )
 ( vCREATE is like CREATE but if VP is set it makes space in the writable DATA area) 
 : vCREATE ( -- ; <string> ) VP @ ?DUP 0= IF CREATE ELSE tokenVar create , THEN ; ( Compile pointer to data area )
 
-\\T : foo CREATE 123 , DOES> @ ; foo BAR BAR 123 1 TEST
+?test\\ : foo CREATE 123 , DOES> @ ; foo BAR BAR 123 1 TEST
 
 : VARIABLE ( -- ; <string> ) vCREATE 0 v, ;
 
 : CONSTANT ( u -- ; <string> ) TOKEN $,n OVERT tokenNextVal , , ;
 
-\\T VARIABLE foo 0 TEST
-\\T 12 foo ! 0 TEST
+?test\\ VARIABLE foo 0 TEST
+?test\\ 12 foo ! 0 TEST
 \\ TEST-15-EPROM test failing: foo @ 12 1 TEST
 
 ( === Text input from terminal Zen pg 78: ^H TAP kTAP accept EXPECT QUERY )
@@ -1468,7 +1476,7 @@ CREATE I/O  ' ?RX , ' TX! , ( Array to store default I/O vectors. )
   DROP R> BASE ! ;      ( restore radix )
 
 ( DUMP needs NUF? which needs ?RX, so will fail test if those are not defined yet )
-\\T LAST @ 48 DUMP 0 TEST
+?test\\ LAST @ 48 DUMP 0 TEST
 
 ( === Stack Dump Zen pg100 .S )
 
@@ -1482,7 +1490,7 @@ CREATE I/O  ' ?RX , ' TX! , ( Array to store default I/O vectors. )
   NEXT          ( repeat until done )
   ."  <sp " ;    ( print stack pointer )
 
-\\T 1 2 .S 1 2 2 TEST
+?test\\ 1 2 .S 1 2 2 TEST
 
 ( === Stack Checking Zen pg101 !CSP ?CSP )
 
@@ -1495,7 +1503,7 @@ CREATE I/O  ' ?RX , ' TX! , ( Array to store default I/O vectors. )
 : ?CSP ( -- ; Check stack pointer matches saved stack pointer )
   SP@ CSP @ XOR ABORT" stack depth" ;
 
-\\T .BASE .FREE 1 !CSP ?CSP 1 1 TEST
+?test\\ .BASE .FREE 1 !CSP ?CSP 1 1 TEST
 
 ( === Dictionary Dump Zen pg102 .ID WORDS )
 
@@ -1521,7 +1529,7 @@ CREATE I/O  ' ?RX , ' TX! , ( Array to store default I/O vectors. )
     DROP
   THEN ;          ( end of vocab exit )
 
-\\T WORDS 0 TEST ( Commented out as expensive )
+?test\\ WORDS 0 TEST ( Commented out as expensive )
 
 ( === Search Token Name Zen pg103 >NAME )
 : FORTH>NAME ( ca -- na, F ) (
@@ -1536,9 +1544,9 @@ CREATE I/O  ' ?RX , ' TX! , ( Array to store default I/O vectors. )
     THEN NIP ?DUP
   UNTIL NIP NIP EXIT  ( found.  return name address )
   THEN DROP 0 ;       ( end of vocabulary, failure )
-\\T BL WORD DUP NAME? SWAP >NAME = -1 1 TEST ( Test FAST JS version )
+?test\\ BL WORD DUP NAME? SWAP >NAME = -1 1 TEST ( Test FAST JS version )
 ( : >NAME FORTH>NAME ; ) ( Uncomment to use FORTH version of >NAME )
-\\T BL WORD DUP NAME? SWAP FORTH>NAME = -1 1 TEST
+?test\\ BL WORD DUP NAME? SWAP FORTH>NAME = -1 1 TEST
 
 ( === The simplest Decompiler Zen pg104 SEE )
 : SEE ( -- ; <string> )
@@ -1562,7 +1570,7 @@ CREATE I/O  ' ?RX , ' TX! , ( Array to store default I/O vectors. )
   THEN
   DROP ;
 
-\\T SEE FORTH>NAME 0 TEST
+?test\\ SEE FORTH>NAME 0 TEST
 
 ( ERRATA Zen uses CONSTANT but doesnt define it )
 ( === Signon Message Zen pg105 VER hi )
@@ -1980,7 +1988,10 @@ const MemClasses = {
 // noinspection JSBitwiseOperatorUsage,JSUnusedGlobalSymbols
 class Forth {
   // Build and return an initialized Forth memory obj
-  constructor({ CELLL = 2, MEM = 8, memClass = undefined, ROMSIZE = undefined, RAMSIZE = undefined, extensions = [] }) {
+  constructor({ CELLL = 2, MEM = 8, memClass = undefined,
+                ROMSIZE = undefined, RAMSIZE = undefined,
+                testFlags = 0, testDepth = 1,
+                extensions = [] }) {
     // ERRATA Zen doesnt define CELLL (and presumes is 2 in multiple places)
     this.CELLL = CELLL;  // 2,3 or 4. Needs to be big enough for an address
     // ported to Arduino below here to L.1823
@@ -1988,16 +1999,13 @@ class Forth {
     // mask used when masking cells in fast search for name ERRATA Zen uses this but its not defined e.g. 0x1FFFFF if CELLL = 3
     // Support parameters for TODO-27-MEMORY TODO-28-MULTI
     // ported to Arduino above
-
     // === Support for Debugging ============
 
+    jsUsers[testFlagsOffset][1] = testFlags; // Pass configuration through to user variable
+    jsUsers[testDepthOffset][1] = testDepth; // Pass configuration through to user variable
     this.debugExcecutionStack = []; // Maintains a position, like a stack trace, don't manipulate directly use functions below
     this.debugName = '?'; // Set in threadtoken()
-    // ported to Arduino below here to L.1831
-    this.testing = 0x1; // 0x01 display words passed to interpreters; 0x02 each word in tokenthread - typically set by 'testing3'
-    // ported to Arduino above
-    this.testingDepth = 1;
-    this.padTestLength = 0; // Display pad length
+    this.padTestLength = 0; // Display pad length TODO check - probably obsolete
     // === Javascript structures - implement the memory map and record the full state.
 
     // ported below to L.1840 - but most things output by XC
@@ -2140,7 +2148,7 @@ class Forth {
     return xt;
   }
   buildUser(name, init) {
-    if (this.testing & 0x01) console.log('USER>>', name, init);
+    if (this.isTestFlags(0x01)) console.log('USER>>', name, init);
     const initVal = typeof init === 'string'
       ? (typeof this[init] !== 'undefined' ? this[init] : this.JStoXT(init)) // Either field of this, or function
       : typeof init === 'undefined'
@@ -2208,7 +2216,7 @@ class Forth {
       this.jsFunctions.push(e); // Intentionally invalid pointer in slot 0
     } else {
       // Shortcut
-      if (this.testing & 0x01) console.log('>> ', e);
+      if (this.isTestFlags(0x01)) console.log('>> ', e);
       // for the function - first choice is a supplied, function otherwise look up either string supplied or n as a method of the forth instance.
       // noinspection JSUnresolvedVariable
       const f = this.extensionFindFunction(e);
@@ -2271,10 +2279,10 @@ class Forth {
   debugReturnStack() {
     return this.debugRam(this.ramRP, this.m.ramAddr(this.Ufetch(RP0offset)));
   }
-  debugThread(xt) {
-    if (this.testing & 0x02) {
+  debugThread(xt) { //TODO coment out call to this, its expensive even to test flag in the middle of loop
+    if (this.isTestFlags(0x02)) {
       this.debugName = this.xt2name(xt); // Expensive so only done when testing
-      if (this.testingDepth > this.debugExcecutionStack.length) {
+      if (this.Ufetch(testDepthOffset) > this.debugExcecutionStack.length) {
         //TODO-28-MULTITASK RPP(RP0) and SPP will move
         console.log('R:', this.debugReturnStack(), this.debugExcecutionStack, this.xt2name(xt), 'S:', this.ramSPP === this.ramSP ? '' : this.debugStack(),
           this.padTestLength ? ('pad: ' + (this.padTestLength > 0 ? this.m.decodeString(this.padPtr(), this.padPtr() + this.padTestLength) : this.m.decodeString(this.padPtr() + this.padTestLength, this.padPtr()))) : '');
@@ -2288,7 +2296,8 @@ class Forth {
   // Put debugNA in a definition to print a counted string on the console
   debugNA() { console.log('NAME=', this.countedToJS(this.SPfetch())); } // Print the NA on console
   // Put testing3 in a definition to start outputing stack trace on console.
-  testing3() { this.testing |= 3; }
+  testing3(n=this.SPpop()) { this.Ustore(testFlagsOffset, n); } // TODO unclear if need this now
+  isTestFlags(bb) { return (this.Ufetch(testFlagsOffset) & bb); }
   // Put Fbreak in a definition.
   Fbreak() {
     console.log('\nbreak in a FORTH word'); } // Put a breakpoint in your IDE at this line
@@ -2618,7 +2627,7 @@ class Forth {
 
   threadtoken(xt) {
     // This next section is only done while testing, and outputs a trace, so set it on (with testing3) immediately before a likely error.
-    this.debugThread(xt);
+    //this.debugThread(xt);
     const tok = this.Mfetch(xt);
     this.PAYLOAD = xt + this.CELLL;
     return this.jsFunctions[tok].call(this); // Run the token function - like tokenDoList or tokenVar - will return null or a Promise
@@ -2918,7 +2927,7 @@ class Forth {
         await this.runXT(xt); // This will work as long as this $INTERPRET never called from Forth as cant nest 'run' even indirectly
       } else {
         this.checkNotCompilingReplaceable(xt, na);
-        if (this.testing & 0x02) console.log('COMPILING:', this.countedToJS(na));
+        if (this.isTestFlags(0x02)) console.log('COMPILING:', this.countedToJS(na));
         this.DW(xt);
       }
     } else { // a
@@ -2981,7 +2990,7 @@ class Forth {
     for (const i in inputs) {
       // noinspection JSUnfilteredForInLoop
       const inputline = inputs[i];
-      if (this.testing & 0x01) {
+      if (this.isTestFlags(0x01)) {
         console.log(this.debugStack(), ' >>', inputline);
       }
       this.JStoTIB(inputline);
