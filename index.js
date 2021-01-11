@@ -1214,8 +1214,6 @@ CREATE I/O  ' ?RX , ' TX! , ( Array to store default I/O vectors. )
 : $" ( compile time: <string> --; interpret time: -- addr ; Compile an inline string literal that puts counted string on stack.)
   COMPILE $"|     ( compile string runtime code)
   $," ; IMMEDIATE ( compile string itself )
-( TODO-34-FILES S" is wrong, it should give the address if not compiling  - https://forth-standard.org/standard/file/Sq )
-( TODO-34-FILES implement STATE https://forth-standard.org/standard/core/STATE , then transition [ ] : ; ABORT QUIT to use it)
 : S" ( compile time: <string> ; interpret time: -- caddr u ; ANS version puts address and length ) 
   STATE @ 
   IF COMPILE S"| $,"
@@ -1224,7 +1222,7 @@ CREATE I/O  ' ?RX , ' TX! , ( Array to store default I/O vectors. )
   ; IMMEDIATE
 
 ?test\\ : foo $" hello" COUNT NIP ; foo 5 1 TEST
-( ?test\\ S" foo" SWAP OVER + 1- C@ 3 CHAR o 2 TEST )
+?test\\ S" foo" SWAP OVER + 1- C@ 3 CHAR o 2 TEST
 
 ( === Name Dictionary Compiler Zen pg94-96: ?UNIQUE $,n $COMPILE OVERT ; ] call, : IMMEDIATE  (see this.dollarCommaN)
 
@@ -1367,9 +1365,9 @@ CREATE I/O  ' ?RX , ' TX! , ( Array to store default I/O vectors. )
 
 : 0> DUP 0= SWAP 0< OR 0= ;
 : sourcePush sourceStack >R 
-  SOURCE-ID @ DUP 0> 
-  IF SOURCE-ID @ 'unreadFile @EXECUTE THROW THEN  
-  SOURCE >IN @ R@ spush R@ spush R@ spush R> spush ; ( TODO-NEST needs to reposition existing file  )
+  SOURCE-ID @ 
+[ rqFiles ] ?\\ DUP 0> IF DUP 'unreadFile @EXECUTE THROW THEN ( Check if a file and if so unread any buffered )
+  SOURCE >IN @ R@ spush R@ spush R@ spush R> spush ;
 : source! ( source-id buff len in ) 
   >IN ! #TIB ! #TIB CELL+ ! DUP SOURCE-ID ! 
   IF FILE ELSE HAND THEN ; ( Set prompt - same for String or File )
@@ -1377,14 +1375,14 @@ CREATE I/O  ' ?RX , ' TX! , ( Array to store default I/O vectors. )
 
 : REFILL ( https://forth-standard.org/standard/core/REFILL )
   0 >IN ! ( initialized parsing pointer )
-  SOURCE-ID @
-  ?DUP IF
-    DUP -1 =
-    IF DROP 0 ( String - Always false )
-    ELSE ( File )
-      TIB 1024 ROT 'READ-LINE @EXECUTE ( u2 flag ior )
-      THROW SWAP #TIB ! ( flag ; True if more )
-    THEN
+  SOURCE-ID @ ( source )
+  ?DUP IF ( not a terminal )  
+[ rqFiles ] ?\\ DUP -1 = IF 
+      DROP 0 ( String - Always false )
+[ rqFiles ] ?\\ ELSE  
+[ rqFiles ] ?\\   TIB 1024 ROT 'READ-LINE @EXECUTE ( u2 flag ior )
+[ rqFiles ] ?\\   THROW SWAP #TIB ! ( flag ; True if more )
+[ rqFiles ] ?\\ THEN
   ELSE
     ( Accept input stream to terminal input buffer.)
     TIB 80 ( addr and size of terminal input buffer)
@@ -1996,6 +1994,7 @@ class Forth {
   constructor({ CELLL = 2, MEM = 8, memClass = undefined,
                 ROMSIZE = undefined, RAMSIZE = undefined,
                 testFlags = 0, testDepth = 1,
+                rqFiles = 0,
                 extensions = [] }) {
     // ERRATA Zen doesnt define CELLL (and presumes is 2 in multiple places)
     this.CELLL = CELLL;  // 2,3 or 4. Needs to be big enough for an address
@@ -2051,6 +2050,8 @@ class Forth {
       this.ROMNAMEE = this.ROM0 + ROMSIZE;
       this.ROMCODEE = this.UZERO + US;
     }
+
+    this.rqFiles = rqFiles;
 
     // Get a instance of a class to store in
     this.m = new (memClass || MemClasses[`${MEM}_${this.CELLbits}`])({ ramSize: this.RAMSIZE, romSize: this.ROMSIZE, rom0: this.ROM0 });
@@ -2112,7 +2113,7 @@ class Forth {
     this.OVERT(); // Uses the initialization done by this.Ustore(CURRENToffset) above.
 
     // copy constants over
-    ['CELLL', 'CELLbits', 'CELLMASK', 'TIB0'].forEach((k) => this.buildConstant(k, this[k]));
+    ['CELLL', 'CELLbits', 'CELLMASK', 'TIB0', 'rqFiles'].forEach((k) => this.buildConstant(k, this[k]));
     Object.entries(l).forEach((kv) => this.buildConstant(kv[0], kv[1]));
 
     this.js2xt = {};

@@ -246,7 +246,8 @@ vCREATE buf 1024 vALLOT
   ;
 : TESTER ." starting test" doLIT TESTFILES CATCH ?DUP .$ ."  After " ;
 `;
-const forth = new Forth({ CELLL, ROMSIZE, RAMSIZE, MEM, extensions, memClass });
+const forth = new Forth({
+  CELLL, ROMSIZE, RAMSIZE, MEM, extensions, memClass, rqFiles: -1 });
 // Has to be before compileForthInForth as uses READ-LINE
 fsExtensions.forEach((e) => forth.extensionAdd(e));
 forth.compileForthInForth()
