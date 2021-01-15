@@ -24,8 +24,9 @@ extern void printCounted(CELLTYPE a);
 #define IMED 0x80 // bit in first char of name field to indicate 'immediate' ERRATA Zen uses this but its not defined
 #define bitsSPARE 0x20 // Unused spare bit in names
 #define BYTEMASK 0xFF - COMP - IMED - bitsSPARE // bits to mask out of a call with count and first char. ERRATA Zen uses this but its not defined
-// Using const for forthtrue as we care about its size
-const CELLTYPE forthTrue = -1; // Not quite correct, should be masked BUT when pushed that it is done underneath
+// Using const for TRUE as we care about its size
+const CELLTYPE TRUE = -1;
+const CELLTYPE FALSE = 0;
 #define nameMaxLength 31
 #define BL 32
 
@@ -53,9 +54,9 @@ const CELLTYPE forthTrue = -1; // Not quite correct, should be masked BUT when p
 // mask used when masking cells in fast search for name ERRATA Zen uses this but its not defined e.g. 0x1FFFFF if CELLL = 3
 // Note - this will fail if master that dumped dictionary above is the opposite Endian. (Currently only Flash8_xx is little-endian; and Arduino is using Flash16_16).
 #ifdef LITTLEENDIAN
-const CELLTYPE CELLMASK = forthTrue ^ (0xFF ^ BYTEMASK);
+const CELLTYPE CELLMASK = TRUE ^ (0xFF ^ BYTEMASK);
 #else
-const CELLTYPE CELLMASK = forthTrue ^ ((0xFF ^ BYTEMASK) << (CELLbits - 8));
+const CELLTYPE CELLMASK = TRUE ^ ((0xFF ^ BYTEMASK) << (CELLbits - 8));
 #endif
 
 //L.1831
@@ -468,7 +469,7 @@ void EXECUTE() { threadtoken(SPpop()); }
 void QRX() { // ?RX
    if (Serial.available() > 0) {
     SPpush(Serial.read());
-    SPpush(forthTrue);
+    SPpush(TRUE);
   } else {
     SPpush(0);
   }
@@ -567,7 +568,7 @@ void OVER() {
 
   // Logical Words eForthAndZen43
   // noinspection JSBitwiseOperatorUsage
-void less0() { SPpush((SPpop() & (1 << (CELLbits - 1))) ? forthTrue : 0); } //0<  e.g. 0x8000 for CELLL=2
+void less0() { SPpush((SPpop() & (1 << (CELLbits - 1))) ? TRUE : FALSE); } //0<  e.g. 0x8000 for CELLL=2
 void AND() { SPpush(SPpop() & SPpop()); }
 void OR() { SPpush(SPpop() | SPpop()); }
 void XOR() { SPpush(SPpop() ^ SPpop()); }
@@ -722,7 +723,7 @@ void NUMBERQ() {
   }
   if (neg) { acc = -acc; }
   SPpush(acc);
-  SPpush(forthTrue);
+  SPpush(TRUE);
 }
 */
 /* Not needed on Arduino
@@ -846,7 +847,7 @@ void openBracket() {
 // : ] doLIT $COMPILE 'EVAL ! ;
 //Zen pg84 and Zen pg95  redefined below to use FORTH $COMPILE
 void closeBracket() {
-  Ustore(STATEoffset, -1); } // uses JS dINTERPRET
+  Ustore(STATEoffset, TRUE); } // uses JS dINTERPRET
 }
 */
 

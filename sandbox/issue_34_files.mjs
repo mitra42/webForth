@@ -68,7 +68,7 @@ const fsExtensions = [
   { n: 'exists-file', // c-addr u -- F
     f() {
       const u = SPpop(); const filepath = this.SPpopString();
-      return new Promise((resolve) => fs.access(filepath, fs.constants.F_OK, (err) => {this.SPpush(err ? 0 : -1); resolve(); } ))}
+      return new Promise((resolve) => fs.access(filepath, fs.constants.F_OK, (err) => {this.SPpush(err ? l.FALSE : l.TRUE); resolve(); } ))}
   },
  */
   { n: 'CREATE-FILE', // c-addr u fam -- fileid ior ; https://forth-standard.org/standard/file/CREATE-FILE)
@@ -190,7 +190,7 @@ const filesExtension = `
   ( caddr u~ caddr' u' ^ fd ; u~ is size up to but excluding first crlf u' is amount from crlf to end )
   skipCRLF ( caddr u~ caddr" u" ^ fd ; u" is size from first after CRLF to end)
   NIP 0 DNEGATE R> reposRelativeFile ( position file to after crlf )
-  >R NIP -1 R> ( u~ T ior )
+  >R NIP TRUE R> ( u~ T ior )
 ;
 ' READ-LINE 'READ-LINE ! 
    
@@ -205,15 +205,83 @@ vCREATE buf 1024 vALLOT
 : PARSE-NAME BL WORD COUNT ; ( TODO look in index.js for other places it does part of this - 34 WORD)
 : INCLUDE PARSE-NAME INCLUDED ; ( i*x "name" -- j*x ; https://forth-standard.org/standard/file/INCLUDE )
 
-( TODO-34-FILES Maybe retire 'EXPECT and EXPECT and rename accept to EXPECT, retire SPAN as not used )
 ( TODO-34-FILES blocks - this would be handled in SOURCE I think https://forth-standard.org/standard/block)
+
+: ALLOCATE ( u -- a ior; Shortcut to https://forth-standard.org/standard/memory/ALLOCATE rewrite if want to use FREE) 
+    HERE SWAP ALLOT 0 ;
+: MOVE ( a a' u -- ; https://forth-standard.org/standard/core/MOVE ; TODO redefine in terms of CMOVE or CMOVE> depending on overlaps)
+  CMOVE ; 
+: n2sign DUP IF 0< IF -1 ELSE 1 THEN THEN ; ( u -- -1 | 0 | 1)
+: COMPARE ( c-addr1 u1 c-addr2 u2 -- n ; https://forth-standard.org/standard/string/COMPARE )
+  ROT SWAP 2DUP 2>R \\ c1 c2 u1 u2 ^ u1,u2 ; save lengths
+  MIN FOR AFT \\ c1 c2 ^ u' u1,u2 ; iterate over minimum length
+    1+ SWAP 1+ SWAP
+    OVER C@ OVER C@ - \\ c1 c2 char1-char2
+    ?DUP IF \\ c1 c2 char1-char2 ^ u' u1,u2
+      NIP NIP R> DROP 2R> 2DROP \\ char1-char2
+      n2sign EXIT
+    THEN \\ c1 c2 ^ u' u1,u2
+  THEN NEXT \\ c1 c2 ^ u1,u2
+  2DROP 2R> - \\ u1-u2
+  n2sign
+;  \\ TODO Non conformant definition should be -1|0|1 not 0|n
+
+\\ Implementation comes from https://forth-standard.org/standard/file/REQUIRED except ...
+: save-mem ( addr1 u -- addr2 u ) \\ gforth
+\\ copy a memory block into a newly allocated region in the heap
+ SWAP >R
+ HERE OVER ALLOT SWAP
+ 2DUP R> ROT ROT 
+ MOVE ;
+
+: name-add ( addr u listp -- )
+   >R save-mem ( addr1 u )
+   3 CELLS ALLOCATE THROW \\ allocate list node
+   R@ @ OVER ! \\ set next pointer
+   DUP R> ! \\ store current node in list var
+   CELL+ 2!
+;
+: name-present? ( addr u list -- f )
+   ROT ROT 2>R BEGIN ( list R: addr u )
+     DUP
+   WHILE
+     DUP CELL+ 2@ 2R@ COMPARE 0= IF
+       DROP 2R> 2DROP TRUE 
+       EXIT
+     THEN
+     @
+   REPEAT
+   ( DROP 0 ) 2R> 2DROP 
+;
+
+: name-join ( addr u list -- )
+   >R 2DUP R@ @ name-present? IF
+     R> DROP 2DROP
+   ELSE
+     R> name-add
+   THEN ;
+
+VARIABLE included-names 0 included-names !
+
+: included ( i*x addr u -- j*x )
+   2DUP included-names name-join
+   INCLUDED 
+   ;
+
+: REQUIRED ( i*x addr u -- i*x )
+   2DUP included-names @ name-present? 0= IF
+     included
+   ELSE
+     2DROP
+   THEN ; 
+
+: REQUIRE [COMPILE] S" REQUIRED ;
+
+
 
 ( ==== BELOW HERE STILL NEED DEFINING ==== )
 ( : S\\" ( "ccc<quote>" -- c-addr u ; read and translate escape chars )
 ( : ( ( needs to skip till gets to end of file )
-( Need some other ANS words here esp ALLOCATED )
-( : REQUIRED XXX ; ( https://forth-standard.org/standard/file/REQUIRED -- needs INCLUDED needed REQUIRE )
-( : REQUIRE [COMPILE] S" REQUIRED ; )
 ( TODO-34-FILES check second group of words on standard )
 
 : TESTFILES

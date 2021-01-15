@@ -91,6 +91,7 @@ const jsFunctionAttributes = [
   { n: 'doLIT', jsNeeds: true }, { n: 'DOES>', f: 'DOES' }, 'next', { n: '?branch', f: 'qBranch' }, 'branch',
   { n: '!', f: 'store' }, { n: '@', f: 'fetch' }, { n: 'C@', f: 'cFetch' }, { n: 'C!', f: 'cStore' },
   { n: 'RP@', f: 'RPat' }, { n: 'RP!', f: 'RPbang' }, { n: 'R>', f: 'Rfrom'  }, { n: 'R@', f: 'Rat'  }, { n: '>R', f: 'toR'  },
+  { n: '2R>', f: 'TwoRfrom'  }, { n: '2R@', f: 'TwoRat'  }, { n: '2>R', f: 'TwoToR'  },
   { n: 'SP@', f: 'SPat' }, { n: 'SP!', f: 'SPbang' },
   'DROP', 'DUP', 'SWAP', 'OVER',
   { n: '0<', f: 'less0' }, 'AND', 'OR', 'XOR', { n: 'UM+', f: 'UMplus' },
@@ -119,8 +120,9 @@ l.COMP = 0x40; // bit in first char of name field to indicate 'compile-only'  ER
 l.IMED = 0x80; // bit in first char of name field to indicate 'immediate' ERRATA Zen uses this but its not defined
 const bitsSPARE = 0x20; // Unused spare bit in names
 l.BYTEMASK = 0xFF - l.COMP - l.IMED - bitsSPARE; // bits to mask out of a call with count and first char. ERRATA Zen uses this but its not defined
-//const forthTrue = (2 ** (l.CELLL * 8)) - 1; // Also used to mask numbers
-const forthTrue = -1; // Not quite correct, should be masked BUT when pushed that it is done underneath
+//l.TRUE = (2 ** (l.CELLL * 8)) - 1; // Also used to mask numbers
+l.TRUE = -1; // Not quite correct, should be masked BUT when pushed that it is done underneath
+l.FALSE = 0;
 const nameMaxLength = 31; // Max number of characters in a name, length needs to be representable after BitMask (we have one spare bit here)
 console.assert(nameMaxLength === l.BYTEMASK); // If this isn't true then check each of the usages below
 l.BL = 32;
@@ -153,7 +155,7 @@ const nTIBoffset = USER('#TIB', 0);       // Hold the current count of the termi
 const TIBoffset = USER(undefined, 'TIB0');  // Hold current address of Terminal Input Buffer (must be cell after #TIB.)
 USER('CSP', 0);        // Hold the stack pointer for error checking.
 // eFORTH diff - eFORTH uses EVAL as vector to either $INTERPRET or $COMPILE, ANS uses a variable called STATE
-const STATEoffset = USER("STATE", 0); // True if compiling - only changed by [ ] : ; ABORT QUIT https://forth-standard.org/standard/core/STATE
+const STATEoffset = USER("STATE", l.FALSE); // True if compiling - only changed by [ ] : ; ABORT QUIT https://forth-standard.org/standard/core/STATE
 //const EVALoffset = USER("'EVAL", 0);      // Initialized when have JS $INTERPRET, this switches between $INTERPRET and $COMPILE
 const NUMBERoffset = USER("'NUMBER", 'NUMBER?');    // Execution vector of number conversion. Default to NUMBER?.
 USER('HLD', 0);        // Hold a pointer in building a numeric output string.
@@ -292,7 +294,7 @@ BL 32 1 TEST
 ( TODO-TEST of above group non-obvious as writing to dictionary. )
 ( IF-THEN tested in ?DUP; )
 
-: 0= IF 0 ELSE -1 THEN ;
+: 0= IF FALSE ELSE TRUE THEN ;
 : ?\\ ( f -- ; Conditional compilation/interpretation - comment out if f is 0 )
   0= IF [COMPILE] \\ THEN ; IMMEDIATE 
 : ?safe\\ ( compilation/interpretation line if checking for safety - overflows etc )
@@ -335,9 +337,9 @@ BL 32 1 TEST
 ?test\\ 1 2 SP@ CELL+ SP! 1 1 TEST
 
 ( === More comparison Zen pg51-52 - ud< is added)
-: = XOR IF 0 EXIT THEN -1 ; ( w w -- t)
+: = XOR IF FALSE EXIT THEN TRUE ; ( w w -- t)
 : U< 2DUP XOR 0< IF NIP 0< EXIT THEN - 0< ;
-: ud< ( ud ud -- f ) ROT SWAP U< IF 2DROP -1 ELSE U< THEN ;
+: ud< ( ud ud -- f ) ROT SWAP U< IF 2DROP TRUE ELSE U< THEN ;
 : < 2DUP XOR 0< IF DROP 0< EXIT THEN - 0< ;
 : MAX 2DUP < IF SWAP THEN DROP ;
 : MIN 2DUP SWAP < IF SWAP THEN DROP ;
@@ -729,7 +731,7 @@ BL 32 1 TEST
     ELSE            ( a non-digit was encountered )
       R> R>         ( a sum b" b index)
       2DROP         ( a sum b")
-      2DROP 0       ( a 0 , conversion failed )
+      2DROP FALSE   ( a 0 , conversion failed )
     THEN DUP        ( /sum a a/ if success; else /a 0/ 0 )
   THEN
   R> ( n ?sign)     ( retrieve the sign flag )
@@ -911,7 +913,7 @@ BL 32 1 TEST
       THEN          ( a1 a2 )
     THEN            ( a1 a2 R: u-n)
   NEXT              ( loop u times if strings are the same ) ( a1 a2;  R: u-n-1)
-  0 ;               ( then push the 0 flag on the stack ) ( a1 a2 0)
+  FALSE ;               ( then push the 0 flag on the stack ) ( a1 a2 0)
 
 ( This can replace the code definition of find, however it is approx 8x slower )
 : FORTHfind ( a va -- ca na, a F )
@@ -928,7 +930,7 @@ BL 32 1 TEST
       [ CELLMASK ] LITERAL AND ( mask off lexicon bits - note CELLMASK is endian dependent )
       R@ XOR          ( compare with 1st cell in string )
       IF              ( 1st cells do not match )
-        CELL+ -1      ( try the next name in the vocabulary )
+        CELL+ TRUE      ( try the next name in the vocabulary )
       ELSE CELL+      ( get address of the 2nd cell )
         temp @        ( get the length of string )
         SAME?         ( string=name? )
@@ -965,7 +967,7 @@ BL 32 1 TEST
     R> DROP EXIT ( word is found, exit with ca and na )
   THEN
   R> DROP       ( word is not found in all vocabularies )
-  0 ;           ( exit with a false flag )
+  FALSE ;           ( exit with a false flag )
 
 ( NAME> implicitly tested by find )
 ?test\\ BL WORD xxx DUP C@ 1+ PAD SWAP CMOVE PAD BL WORD xxx 4 SAME? >R 2DROP R> 0 1 TEST
@@ -1014,7 +1016,7 @@ BL 32 1 TEST
     [ CTRL H ] LITERAL 'ECHO @EXECUTE
     BL 'ECHO @EXECUTE
     [ CTRL H ] LITERAL 'ECHO @EXECUTE
-  THEN        ( bot eot cur 0|-1 -- )
+  THEN        ( bot eot cur F|T -- )
   R> + ;      ( decrement cur, but not passing bot )
 
 : TAP ( bottom eot current key -- bottom eot current )
@@ -1029,14 +1031,14 @@ BL 32 1 TEST
   DUP 10 = SWAP 13 = OR ;
 : skipCRLF ( caddr u -- caddr' u' )
   BEGIN
-    DUP IF OVER C@ crlf? ELSE 0 THEN ( caddr u bool)
+    DUP IF OVER C@ crlf? ELSE FALSE THEN ( caddr u bool)
   WHILE ( caddr u )
     1- SWAP 1+ SWAP ( caddr' u')
   REPEAT
 ;
 : skipToCRLF ( caddr u -- caddr' u' ; caddr should point at first crlf and u' is size removed from end ) 
   BEGIN
-    DUP IF OVER C@ crlf? 0= ELSE 0 THEN ( caddr u bool)
+    DUP IF OVER C@ crlf? 0= ELSE FALSE THEN ( caddr u bool)
   WHILE ( caddr u )
     1- SWAP 1+ SWAP ( caddr' u')
   REPEAT
@@ -1134,7 +1136,7 @@ CREATE NULL$ 0 , ( EFORTH-ZEN-ERRATA inserts a string "coyote" after this, no id
 ( This switches to use new interpreter, its still using old js $COMPILE )
 
 : [ ( -- ; Start the text interpreter.) ( Replaces JS version )
-  0 STATE !                 ( ANS version)
+  FALSE STATE !                 ( ANS version)
   ; IMMEDIATE               ( must be done even while compiling )
 
 ?test\\ [ 1 2 3 ROT 2 3 1 3 TEST
@@ -1294,7 +1296,7 @@ CREATE I/O  ' ?RX , ' TX! , ( Array to store default I/O vectors. )
   COMPILE-ONLY IMMEDIATE
 
 : ] ( -- ; Start compiling the words in the input stream - replaces JS word) ( TODO-FILES maybe retire this, and maybe retires some things that use it)
-  -1 STATE ! ;
+  TRUE STATE ! ;
 
 : : ( -- ; <string> ) ( redefining code word)
   ( Start a new colon definition using next word as its name.)
@@ -1378,7 +1380,7 @@ CREATE I/O  ' ?RX , ' TX! , ( Array to store default I/O vectors. )
   SOURCE-ID @ ( source )
   ?DUP IF ( not a terminal )  
 [ rqFiles ] ?\\ DUP -1 = IF 
-      DROP 0 ( String - Always false )
+      DROP FALSE ( String - Always false )
 [ rqFiles ] ?\\ ELSE  
 [ rqFiles ] ?\\   TIB 1024 ROT 'READ-LINE @EXECUTE ( u2 flag ior )
 [ rqFiles ] ?\\   THROW SWAP #TIB ! ( flag ; True if more )
@@ -1389,7 +1391,7 @@ CREATE I/O  ' ?RX , ' TX! , ( Array to store default I/O vectors. )
     accept ( caddr u ; )
     #TIB !  ( store number of characters received )
     DROP ( discard buffer address )
-    -1    ( return true, never unwind from termial )
+    TRUE    ( return true, never unwind from termial )
   THEN
 ;
 : QUERY REFILL 0= IF sourcePop THEN ; ( Read from current source, on fail go back to previous reseting >IN )
@@ -1545,7 +1547,7 @@ CREATE I/O  ' ?RX , ' TX! , ( Array to store default I/O vectors. )
     REPEAT            ( ca not found, repeat next word)
     THEN NIP ?DUP
   UNTIL NIP NIP EXIT  ( found.  return name address )
-  THEN DROP 0 ;       ( end of vocabulary, failure )
+  THEN DROP FALSE ;       ( end of vocabulary, failure )
 ?test\\ BL WORD DUP NAME? SWAP >NAME = -1 1 TEST ( Test FAST JS version )
 ( : >NAME FORTH>NAME ; ) ( Uncomment to use FORTH version of >NAME )
 ?test\\ BL WORD DUP NAME? SWAP FORTH>NAME = -1 1 TEST
@@ -1638,7 +1640,7 @@ class FlashXX_XX {
   cellRomFetch(cellAddr) {
     if (cellAddr >= this.romCells) {
       console.log('Attempt to read above top of Rom at', cellAddr);
-    } // TODO-OPTIMIZE comment out
+    } // TODO-OP.l.TIMIZE comment out
     return this.rom[cellAddr];
   }
   cellRamFetch(cellAddr) {
@@ -2050,7 +2052,6 @@ class Forth {
       this.ROMNAMEE = this.ROM0 + ROMSIZE;
       this.ROMCODEE = this.UZERO + US;
     }
-
     this.rqFiles = rqFiles;
 
     // Get a instance of a class to store in
@@ -2059,9 +2060,9 @@ class Forth {
 
     // Needs to be after the call to create this.m, its endian dependent as lowest address byte is always the count
     if (this.m.littleEndian) {
-      this.CELLMASK = forthTrue ^ (0xFF ^ l.BYTEMASK);
+      this.CELLMASK = l.TRUE ^ (0xFF ^ l.BYTEMASK);
     } else {
-      this.CELLMASK = forthTrue ^ ((0xFF ^ l.BYTEMASK) << (this.CELLbits - 8));
+      this.CELLMASK = l.TRUE ^ ((0xFF ^ l.BYTEMASK) << (this.CELLbits - 8));
     }
 
     // === Standard pointers used - Zen pg22
@@ -2398,7 +2399,7 @@ class Forth {
   // xt     if present we are looking for name pointing at this executable (for decompiler)
   // returns 0 or na
   _sameq(na1, na2, cells) { // return f
-    // Note this is similar to SAME? but takes a count (not count of cells, and returns boolean
+    // Note this is similar to SAME? but returns boolean
     const bytes = cells * this.CELLL;
     for (let i = 0; i < bytes; i += this.CELLL) {
       if (this.Mfetch(na1 + i) !== this.Mfetch(na2 + i)) {
@@ -2423,7 +2424,7 @@ class Forth {
       p -= this.CELLL; // point at link address and loop for next word
     }
     // Drop through not found
-    return 0;
+    return l.FALSE;
   }
 
   // Search a single vocabulary for a string
@@ -2440,7 +2441,7 @@ class Forth {
       this.SPpush(na);
     } else {
       this.SPpush(a);
-      this.SPpush(0);
+      this.SPpush(l.FALSE);
     }
   }
 
@@ -2455,7 +2456,7 @@ class Forth {
       p -= this.CELLL; // point at link address and loop for next word
     }
     // Drop through not found
-    return 0;
+    return l.FALSE;
   }
   // ported to Arduino above L.2177-
 
@@ -2637,7 +2638,7 @@ class Forth {
 
   threadtoken(xt) {
     // This next section is only done while testing, and outputs a trace, so set it on (with testing3) immediately before a likely error.
-    //this.debugThread(xt);
+    this.debugThread(xt); //TODO comment out this expensive call
     const tok = this.Mfetch(xt);
     this.PAYLOAD = xt + this.CELLL;
     return this.jsFunctions[tok].call(this); // Run the token function - like tokenDoList or tokenVar - will return null or a Promise
@@ -2709,9 +2710,9 @@ class Forth {
     const [f, c] = this.qrx();
     if (f) {
       this.SPpush(c);
-      this.SPpush(forthTrue);
+      this.SPpush(l.TRUE);
     } else {
-      this.SPpush(0);
+      this.SPpush(l.FALSE);
     }
   }
 
@@ -2777,6 +2778,10 @@ class Forth {
   Rfrom() { this.SPpush(this.RPpop()); } // R>
   Rat() { this.SPpush(this.RPfetch()); } // R@
   toR() { this.RPpush(this.SPpop()); } // >R
+  // 2>R 2R> 2R@ are odd - they swap the order so 2>R !=== >R >R
+  TwoToR() { const x2 = this.SPpop(); this.RPpush(this.SPpop()); this.RPpush(x2); }
+  TwoRfrom() { const x2 = this.RPpop(); this.SPpush(this.RPpop()); this.SPpush(x2); }
+  TwoRat() { const x2 = this.RPpop(); this.SPpush(this.RPfetch()); this.SPpush(x2); this.RPpush(x2); }
 
   // Data stack initialization eForthAndZen#41
   SPat() { this.SPpush(this.m.fromRamAddr(this.ramSP)); } //SP@
@@ -2800,7 +2805,7 @@ class Forth {
 
   // Logical Words eForthAndZen43
   // noinspection JSBitwiseOperatorUsage
-  less0() { this.SPpush((this.SPpop() & (1 << (this.CELLbits - 1))) ? -1 : 0); } //0<  e.g. 0x8000 for CELLL=2
+  less0() { this.SPpush((this.SPpop() & (1 << (this.CELLbits - 1))) ? l.TRUE : l.FALSE); } //0<  e.g. 0x8000 for CELLL=2
   AND() { this.SPpush(this.SPpop() & this.SPpop()); }
   OR() { this.SPpush(this.SPpop() | this.SPpop()); }
   XOR() { this.SPpush(this.SPpop() ^ this.SPpop()); }
@@ -2884,10 +2889,10 @@ class Forth {
     const n = parseInt(w, base); // TODO-32-ERRORS handle parsing errors // Needs forth to convert word
     if (isNaN(n)) {
       this.SPpush(a);
-      this.SPpush(0);
+      this.SPpush(l.FALSE);
     } else {
       this.SPpush(n);
-      this.SPpush(forthTrue);
+      this.SPpush(l.TRUE);
     }
     /*
       // ALTERNATIVE without using parseInt and countedToJS (backported fromArduino TODO - port and test
@@ -2911,7 +2916,7 @@ class Forth {
       }
       if (neg) { acc = -acc; }
       this.SPpush(acc);
-      this.SPpush(forthTrue);
+      this.SPpush(l.TRUE);
     */
   }
 
@@ -3014,13 +3019,13 @@ class Forth {
   }
   // === A group of words required for the JS interpreter redefined later
 
-  // : [  0 STATE ! ; IMMEDIATE
+  // : [  FALSE STATE ! ; IMMEDIATE
   openBracket() {
-    this.Ustore(STATEoffset, 0); } // uses JS dINTERPRET
+    this.Ustore(STATEoffset, l.FALSE); } // uses JS dINTERPRET
 
-  // : ] -1 STATE ! ;
+  // : ] TRUE STATE ! ;
   closeBracket() {
-    this.Ustore(STATEoffset, forthTrue); } // uses JS dINTERPRET
+    this.Ustore(STATEoffset, l.TRUE); } // uses JS dINTERPRET
 
   // : : TOKEN $,n [ ' doLIST ] LITERAL ] ; see Zen pg96
   colon() {
