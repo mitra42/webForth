@@ -1,3 +1,8 @@
+* 2021-01-19: v0.0.15
+  * Added support for files (REQUIRE, INCLUDE etc)
+  * ANS: Replace 'EVAL with STATE
+  * Backport PAYLOAD from Arduino and optimize to use it
+  * Moved debugging flags (this.testing) to testFlags and testDepth user variables
 * 2020-12-25: v0.0.14
   * ESP8266 sketch
   * Reorganize folders for sketches etc and build process

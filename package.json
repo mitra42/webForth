@@ -33,5 +33,5 @@
     "build": "for i in esp8266_webforth arduino_webforth; do cd $i; node --experimental-modules ./build_xc.mjs; cd .. ; done"
   },
   "type": "module",
-  "version": "0.0.15"
+  "version": "0.0.16"
 }

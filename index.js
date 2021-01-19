@@ -155,7 +155,7 @@ const nTIBoffset = USER('#TIB', 0);       // Hold the current count of the termi
 const TIBoffset = USER(undefined, 'TIB0');  // Hold current address of Terminal Input Buffer (must be cell after #TIB.)
 USER('CSP', 0);        // Hold the stack pointer for error checking.
 // eFORTH diff - eFORTH uses EVAL as vector to either $INTERPRET or $COMPILE, ANS uses a variable called STATE
-const STATEoffset = USER("STATE", l.FALSE); // True if compiling - only changed by [ ] : ; ABORT QUIT https://forth-standard.org/standard/core/STATE
+const STATEoffset = USER('STATE', l.FALSE); // True if compiling - only changed by [ ] : ; ABORT QUIT https://forth-standard.org/standard/core/STATE
 //const EVALoffset = USER("'EVAL", 0);      // Initialized when have JS $INTERPRET, this switches between $INTERPRET and $COMPILE
 const NUMBERoffset = USER("'NUMBER", 'NUMBER?');    // Execution vector of number conversion. Default to NUMBER?.
 USER('HLD', 0);        // Hold a pointer in building a numeric output string.
@@ -180,8 +180,8 @@ const LASToffset = USER('LAST', undefined); // normally set on Zen pg106 but usi
 const VPoffset = USER('VP', undefined);  // not part of eForth, pointer into Data space for EPROMability
 USER('SOURCE-ID', 0);  // 0 for terminal, -1 for string, fd for files
 USER("'unreadFile", 0); // TODO-34-FILES temporary till have files compilation choice //TODO-2ARDUINO
-const testFlagsOffset = USER("testFlags", 0); // bit field: 1 trace interpreter 2 trace threading 4 safety checks 8 tests TODO-67-TESTING - see unreadFile above //TODO-2ARDUINO
-const testDepthOffset = USER("testDepth", 0);  // Needs to autoadjust //TODO-2ARDUINO
+const testFlagsOffset = USER('testFlags', 0); // bit field: 1 trace interpreter 2 trace threading 4 safety checks 8 tests TODO-67-TESTING - see unreadFile above //TODO-2ARDUINO
+const testDepthOffset = USER('testDepth', 0);  // Needs to autoadjust //TODO-2ARDUINO
 // ported to Arduino above
 
 const forthInForth = `
@@ -1391,7 +1391,7 @@ CREATE I/O  ' ?RX , ' TX! , ( Array to store default I/O vectors. )
     accept ( caddr u ; )
     #TIB !  ( store number of characters received )
     DROP ( discard buffer address )
-    TRUE    ( return true, never unwind from termial )
+    TRUE    ( return true, never unwind from terminal )
   THEN
 ;
 : QUERY REFILL 0= IF sourcePop THEN ; ( Read from current source, on fail go back to previous reseting >IN )
@@ -1580,7 +1580,7 @@ CREATE I/O  ' ?RX , ' TX! , ( Array to store default I/O vectors. )
 ( ERRATA Zen uses CONSTANT but doesnt define it )
 ( === Signon Message Zen pg105 VER hi )
 
-15 CONSTANT VER ( Return the version number of this implementation.)
+16 CONSTANT VER ( Return the version number of this implementation.)
 
 : version CR ." webFORTH V" BASE @ DECIMAL VER <# # # 46 HOLD # # 46 HOLD # #> TYPE ( display sign-on text and version )  BASE ! CR ;
 
@@ -1640,7 +1640,7 @@ class FlashXX_XX {
   cellRomFetch(cellAddr) {
     if (cellAddr >= this.romCells) {
       console.log('Attempt to read above top of Rom at', cellAddr);
-    } // TODO-OP.l.TIMIZE comment out
+    } // TODO-OPTIMIZE comment out
     return this.rom[cellAddr];
   }
   cellRamFetch(cellAddr) {
@@ -1994,10 +1994,10 @@ const MemClasses = {
 class Forth {
   // Build and return an initialized Forth memory obj
   constructor({ CELLL = 2, MEM = 8, memClass = undefined,
-                ROMSIZE = undefined, RAMSIZE = undefined,
-                testFlags = 0, testDepth = 1,
-                rqFiles = 0,
-                extensions = [] }) {
+    ROMSIZE = undefined, RAMSIZE = undefined,
+    testFlags = 0, testDepth = 1,
+    rqFiles = 0,
+    extensions = [] }) {
     // ERRATA Zen doesnt define CELLL (and presumes is 2 in multiple places)
     this.CELLL = CELLL;  // 2,3 or 4. Needs to be big enough for an address
     // ported to Arduino below here to L.1823
@@ -2286,7 +2286,7 @@ class Forth {
   debugReturnStack() {
     return this.debugRam(this.ramRP, this.m.ramAddr(this.Ufetch(RP0offset)));
   }
-  debugThread(xt) { //TODO coment out call to this, its expensive even to test flag in the middle of loop
+  debugThread(xt) { //TODO comment out call to this, its expensive even to test flag in the middle of loop
     if (this.isTestFlags(0x02)) {
       this.debugName = this.xt2name(xt); // Expensive so only done when testing
       if (this.Ufetch(testDepthOffset) > this.debugExcecutionStack.length) {
@@ -2303,7 +2303,7 @@ class Forth {
   // Put debugNA in a definition to print a counted string on the console
   debugNA() { console.log('NAME=', this.countedToJS(this.SPfetch())); } // Print the NA on console
   // Put testing3 in a definition to start outputing stack trace on console.
-  testing3(n=this.SPpop()) { this.Ustore(testFlagsOffset, n); } // TODO unclear if need this now
+  testing3(n = this.SPpop()) { this.Ustore(testFlagsOffset, n); } // TODO unclear if need this now
   isTestFlags(bb) { return (this.Ufetch(testFlagsOffset) & bb); }
   // Put Fbreak in a definition.
   Fbreak() {
@@ -2372,7 +2372,6 @@ class Forth {
 
   stringBuffer() {
     this.SPpush(this.vpFetch() + 160); } // A string buffer used for input - not same as PAD see S" //TODO-24-FILES add to Arduino
-
 
   // === Functions related to building 'find'  and its wrappers ====
 
@@ -2978,9 +2977,11 @@ class Forth {
       // There may be case where this.TOKEN returns empty string at end of line or similar
       if (this.Mfetch8(this.SPfetch()) === 0) { // Skip zero length string
         this.SPpop();
-      } else {
+      } else if (this.Ufetch(STATEoffset)) {
         // This is currently OK since its calling JS routines that may call Forth, there is no Forth-in-Forth
-        if ( this.Ufetch(STATEoffset))  { await this.dCOMPILE(); } else { await this.dINTERPRET(); }
+        await this.dCOMPILE();
+      } else {
+        await this.dINTERPRET();
       }
       // TODO-28-MULTITASK RP0 will move
       console.assert(this.ramSP <= this.ramSPP && (this.m.fromRamAddr(this.ramRP) <= this.Ufetch(RP0offset))); // Side effect of making SP and SPP available to debugger.

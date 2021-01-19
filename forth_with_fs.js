@@ -1,17 +1,11 @@
 import fs from 'fs';
-import { Forth, ForthNodeExtensions } from '../index.js';
+import { Forth, ForthNodeExtensions } from './index.js';
 // Normally this would be: import Forth from 'webforth';
 
-// Valid choices for CELL:MEM are 2:8 2:16 2:32 3:8 4:8 4:16 4:32
-const CELLL = 2; // 2 bytes for CELLL
-const MEM = 16; // Use 16 bit memory
-// Specify areas for ROM and RAM, currently they have to be specified separately as there is a bug with setting ROMSIZE = 0;
-// ROM: Used for UserVariable save area and Dictionary (code and names) until useRam() is called
-const ROMSIZE = 0x4000 * CELLL;
-// RAM: Used for UserVariables, stacks, TIB, PAD etc and Dictionary (code and names) after useRam() is called
-const RAMSIZE = 0x2000 * CELLL; // Make it larger will use
-const extensions = ForthNodeExtensions;
-const memClass = undefined; // Define to override default based on CELLL and MEM
+/* This extends the standard Forth class to add capability for Files.
+  It can't be fully integrated because of its dependence on "fs" which
+  cannot be imported (I don't think) on a browser.
+ */
 
 /* Files design decisions
   At this point no local data is stored - File descriptors are returned.
@@ -40,6 +34,7 @@ const fsExtensions = [
           (err, fd) => {
             fsDescriptors[fd] = { filepath, fam, position: 0 };
             this.SPpush(fd || 0); // will be indeterminate if error
+            // noinspection JSUnresolvedFunction
             this.JSerrToCounted(err);
             resolve();
           }),
@@ -53,6 +48,7 @@ const fsExtensions = [
       fs.close(fd,
         (err) => {
           delete fsDescriptors[fd];
+          // noinspection JSUnresolvedFunction
           this.JSerrToCounted(err);
           resolve(); });
     }); },
@@ -61,7 +57,9 @@ const fsExtensions = [
     f() { return new Promise((resolve) => {
       const filename = this.SPpopString();
       fs.unlink(filename,
-        (err) => { this.JSerrToCounted(err); resolve(); });
+        (err) => {
+          // noinspection JSUnresolvedFunction
+          this.JSerrToCounted(err); resolve(); });
     }); },
   },
   /*
@@ -77,26 +75,33 @@ const fsExtensions = [
       return new Promise((resolve) => fs.open(filepath, fam, 0o666,
         (err, fd) => {
           fsDescriptors[fd] = { filepath, fam, position: 0 };
-          this.SPpush(fd || 0); this.JSerrToCounted(err); resolve(); })); },
+          this.SPpush(fd || 0);
+          // noinspection JSUnresolvedFunction
+          this.JSerrToCounted(err); resolve(); })); },
   },
   { n: 'FILE-SIZE', // fileid -- ud ior ; https://forth-standard.org/standard/file/FILE-SIZE )
     f() {
       const fd = this.SPpop();
       return new Promise((resolve) => fs.fstat(fd, (err, stats) => {
         this.SPpushD(stats ? stats.size : 0);
+        // noinspection JSUnresolvedFunction
         this.JSerrToCounted(err);
         resolve(); })); },
   },
   { n: 'FLUSH-FILE', // fileid -- ior ; https://forth-standard.org/standard/file/FLUSH-FILE )
     f() {
       const fd = this.SPpop();
-      return new Promise((resolve) => fs.fsync(fd, (err) => { this.JSerrToCounted(err); resolve(); })); },
+      return new Promise((resolve) => fs.fsync(fd, (err) => {
+        // noinspection JSUnresolvedFunction
+        this.JSerrToCounted(err); resolve(); })); },
   },
   {
     n: 'RENAME-FILE', // c-addr1 u1 c-addr2 u2 -- ior ; https://forth-standard.org/standard/file/RENAME-FILE )
     f() {
       const filepath2 = this.SPpopString(); const filepath1 = this.SPpopString();
-      return new Promise((resolve) => fs.rename(filepath1, filepath2, (err) => { this.JSerrToCounted(err); resolve(); })); },
+      return new Promise((resolve) => fs.rename(filepath1, filepath2, (err) => {
+        // noinspection JSUnresolvedFunction
+        this.JSerrToCounted(err); resolve(); })); },
   },
   {
     n: 'RESIZE-FILE', // ud fileid -- ior ; https://forth-standard.org/standard/file/RESIZE-FILE )
@@ -104,7 +109,9 @@ const fsExtensions = [
     f() {
       const fd = this.SPpop(); const len = this.SPpopD();
       fsDescriptors[fd].position = Math.min(fsDescriptors[fd].position, len);
-      return new Promise((resolve) => fs.truncate(fd, len, (err) => { this.JSerrToCounted(err); resolve(); })); },
+      return new Promise((resolve) => fs.truncate(fd, len, (err) => {
+        // noinspection JSUnresolvedFunction
+        this.JSerrToCounted(err); resolve(); })); },
   },
   { n: 'READ-FILE', //  ( c-addr u1 fileid -- u2 ior )  https://forth-standard.org/standard/file/READ-FILE
     f() {
@@ -113,7 +120,9 @@ const fsExtensions = [
       return new Promise((resolve) => fs.read(fd, buf, 0, len, fsDescriptors[fd].position,
         (err, bytesRead, unusedBuf) => {
           if (!err) { fsDescriptors[fd].position += bytesRead; }
-          this.SPpush(bytesRead || 0); this.JSerrToCounted(err); resolve();
+          this.SPpush(bytesRead || 0);
+          // noinspection JSUnresolvedFunction
+          this.JSerrToCounted(err); resolve();
         })); },
   },
   { n: 'WRITE-FILE', // ( c-addr u fileid -- ior ; https://forth-standard.org/standard/file/WRITE-FILE )
@@ -122,6 +131,7 @@ const fsExtensions = [
       return new Promise((resolve) => fs.write(fd, buf, 0, len, fsDescriptors[fd].position,
         (err, bytesWritten, unusedBuf) => {
           if (!err) { fsDescriptors[fd].position += bytesWritten; }
+          // noinspection JSUnresolvedFunction
           this.JSerrToCounted(err); resolve(); })); },
   },
   { n: 'write-cr', // ( fileid -- ior ; https://forth-standard.org/standard/file/WRITE-FILE )
@@ -130,6 +140,7 @@ const fsExtensions = [
       return new Promise((resolve) => fs.write(fd, lineEnding, fsDescriptors[fd].position, 'utf8',
         (err, bytesWritten, unusedBuf) => {
           if (!err) { fsDescriptors[fd].position += bytesWritten; }
+          // noinspection JSUnresolvedFunction
           this.JSerrToCounted(err); resolve(); })); },
   },
   { n: 'FILE-POSITION', // fileid - ud iod ; https://forth-standard.org/standard/file/FILE-POSITION and https://www.npmjs.com/package/fs-ext)
@@ -314,16 +325,19 @@ VARIABLE included-names 0 included-names !
   ;
 : TESTER ." starting test" doLIT TESTFILES CATCH ?DUP .$ ."  After " ;
 `;
-const forth = new Forth({
-  CELLL, ROMSIZE, RAMSIZE, MEM, extensions, memClass, rqFiles: -1 });
-// Has to be before compileForthInForth as uses READ-LINE
-fsExtensions.forEach((e) => forth.extensionAdd(e));
-forth.compileForthInForth()
-  .then(() => console.log('===forthInForth compiled'))
-  //.then(() => forth.cleanupBootstrap()).then(() => console.log('===forthInForth cleaned up'))
-  //.then(() => forth.interpret("WARM"));
-  // TODO-34-FILES can we use EVALUATE or similar for filesExtension or is that self-reference
-  .then(() => forth.interpret(filesExtension))
-  //.then(() => forth.console()) // Old Interactive console
-  .then(() => forth.interpret("WARM")) // New interactive console
-  .then(() => console.log('\nconsole exited'));
+
+class Forth_with_fs extends Forth {
+  constructor(opts) {
+    // This constructor just passes on the arguments for Forth mostly unchanged
+    opts.rqFiles = -1; // Make sure hooks are there for files
+    super(opts); // Note this will add any 'extensions' from opts (typically ForthNodeExtensions)
+    // Has to add extensions be before compileForthInForth as uses READ-LINE
+    fsExtensions.forEach((e) => this.extensionAdd(e));
+  }
+  async initialize() {
+    // TODO-34-FILES can we use EVALUATE or similar for filesExtension or is that self-reference
+    await this.compileForthInForth();
+    await this.interpret(filesExtension);
+  }
+}
+export { Forth_with_fs, ForthNodeExtensions };

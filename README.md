@@ -4,8 +4,8 @@ I hear you ask why, which is hardly surprising.
 * Forth was the first language I got good at
 * Javascript is the language I like to play in now
 * You can run it in any browser, and on a server, and on some embedded devices
-* If its modular enough I should be able to replace the JS with C, C++, Wasm or Assembler.
-* All the Forth I've seen has been really antiquated, or over-complex, needs a fresh approach
+* Its modular enough that I could replace the JS with C, C++, Wasm or Assembler.
+* Much of the Forth I've seen has been really antiquated, or over-complex, needs a fresh approach
 
 ## Installation
 The only prerequisite is [`node`](https://nodejs.org) and `npm` (or `yarn`). 
@@ -14,7 +14,8 @@ The only prerequisite is [`node`](https://nodejs.org) and `npm` (or `yarn`).
 npm install webforth
 ```
 Installs webforth, note there are intentionally no dependencies 
-in the minimal node or browser versions.
+in the browser versions and the only dependency in the node version is to
+the builtin `fs`
 
 If you only want to host the web version, then cloning the git repo should be sufficient.
 
@@ -112,6 +113,20 @@ node --experimental-modules ./build_xc.mjs
 * Support for pins and interrupts [issue#63](https://github.com/mitra42/webForth/issues/63)
 * Support for the WiFi & TCP/IP [issue#73](https://github.com/mitra42/webForth/issues/73)
 
+## File support
+File support is in its early days but works.
+How to test it will probably change as it evolves
+
+Because browsers don't have access to `fs` it uses a separate class
+that has a imports `fs`.
+```
+cd scripts
+./forth_console_with_fs_via_node.mjs
+...
+webFORTH V0.00.15
+REQUIRE ../sandbox/tester.f
+\ This will load the forth in tester.f and anything that file INCLUDEs
+```
 ## Contributing
 
 Yes please ! 
@@ -124,6 +139,7 @@ but lets discuss first (open a new issue in GIT).
 ## Cutting a release 
 * Run a code inspection - surprising how many bugs this ESLint or most IDE's catch ! 
 * Update CHANGELOG.md
+* Check README.md reflects any changes
 * Update VER in index.js and version in package.json to next even number
 * `npm publish`
 * push to git on master branch
