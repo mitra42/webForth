@@ -1580,7 +1580,7 @@ CREATE I/O  ' ?RX , ' TX! , ( Array to store default I/O vectors. )
 ( ERRATA Zen uses CONSTANT but doesnt define it )
 ( === Signon Message Zen pg105 VER hi )
 
-16 CONSTANT VER ( Return the version number of this implementation.)
+17 CONSTANT VER ( Return the version number of this implementation.)
 
 : version CR ." webFORTH V" BASE @ DECIMAL VER <# # # 46 HOLD # # 46 HOLD # #> TYPE ( display sign-on text and version )  BASE ! CR ;
 
