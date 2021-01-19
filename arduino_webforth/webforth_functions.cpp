@@ -491,6 +491,7 @@ void TXbangS(CELLTYPE byteaddr, const uint8_t len) {
 // it assumes a maximum of nameMaxLength (31) characters.
 // Mostly used for debugging but also in number conversion.
 void printCounted(CELLTYPE a) { const char c = Mfetch8(a++) & BYTEMASK; TXbangS(a, c); }  // TODO-backport maybe use this in TYPE
+void TYPE() { const char c = SPpop(); const CELLTYPE a = SPpop(); TXbangS(a, c); }
 
 // === Literals and Branches - using next value in dictionary === eForthAndZen#37
 

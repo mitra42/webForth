@@ -11,12 +11,13 @@ async function ForthLoad({ extensions = [] } = {}) {
   const fLog = extensions.map((x) => x.f).find((f) => f.name === 'bound TXbangS') || console.log;
   const CELLL = 2;
   const MEM = 8;
-  const EM = 0x2000 * CELLL; // default is 0x2000 * CELLL
+  const RAMSIZE = 0x2000 * CELLL; // default is 0x2000 * CELLL
+  const ROMSIZE = 0x2000 * CELLL;
   try {
     const module = await import('./index.js');
     Forth = module.Forth; // Make available globally to this file
     const f = new Forth({
-      CELLL, EM, MEM, memClass: module.Flash16_16, // Define memory
+      CELLL, RAMSIZE, ROMSIZE, MEM, memClass: module.Flash16_16, // Define memory
       extensions,
     });         // Setup I/O (just output currently)
     fLog('\nCompiling Forth from Forth\n');
@@ -112,7 +113,7 @@ class ForthConsole extends HTMLElement {
     this.input = EL('forth-input', { stack: this.stack });
     // Define hooks for IO to these areas
     const extensions = [{ f: (function TXbangS(s) {
-      this.output.TXbangS_web(s); }).bind(this) }]; // Note this is instance of ForthConsole not Forth
+        this.output.TXbangS_web(s); }).bind(this) }]; // Note this is instance of ForthConsole not Forth
     // Load Forth can also define CELL, EM, memClass
     const CELLL = 2;
     const MEM = 8;

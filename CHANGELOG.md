@@ -1,4 +1,7 @@
-* 2021-01-19: v0.0.15
+* 2021-01-XX: v0.0.17
+  * Fix bitrot (RAMSIZE, ROMSIZE) in console.js 
+  * Use String output for TYPE instead of CHAR (issue#52)
+* 2021-01-19: v0.0.16
   * Added support for files (REQUIRE, INCLUDE etc)
   * ANS: Replace 'EVAL with STATE
   * Backport PAYLOAD from Arduino and optimize to use it

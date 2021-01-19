@@ -100,7 +100,7 @@ const jsFunctionAttributes = [
   { n: '$COMPILE', f: 'dCOMPILE', replaced: true }, { n: '$INTERPRET', f: 'dINTERPRET', replaced: true, jsNeeds: true },
   { n: '[', f: 'openBracket', immediate: true, replaced: true }, { n: ']', f: 'closeBracket', replaced: true },
   { n: ':', f: 'colon', replaced: true }, { n: ';', f: 'semicolon', immediate: true, replaced: true }, { n: "'", f: 'tick', replaced: true },
-  'debugNA', 'testing3', 'Fbreak', 'debugPrintTIB', 'TEST', 'stringBuffer',
+  'debugNA', 'testing3', 'Fbreak', 'debugPrintTIB', 'TEST', 'stringBuffer', 'TYPE',
 ];
 
 // Define the tokens used in the first cell of each word.
@@ -636,8 +636,9 @@ BL 32 1 TEST
   SWAP 0 MAX FOR AFT DUP EMIT THEN NEXT DROP ; ( From Staapl and V5, not in Zen) ( TODO-ANS flagged as possible conflict)
 : SPACES ( n -- ; Send n spaces to the output device. Zen pg70) ( ERRATA Zen has bad initial SWAP)
   BL CHARS ;
-: TYPE ( b u -- ; Output u characters from b)
-  FOR AFT DUP C@ EMIT 1+ THEN NEXT DROP ;
+\\ use JS definition (hand coded on Arduino etc)
+\\ : TYPE ( b u -- ; Output u characters from b)
+\\  FOR AFT DUP C@ EMIT 1+ THEN NEXT DROP ;
 : .$ ( a -- ) COUNT TYPE ; ( from Staapl, not in eForth)
 
 ?test\\ 60 EMIT SPACE 2 SPACES 61 EMIT 0 TEST
@@ -2720,6 +2721,9 @@ class Forth {
     this.TXbangS(String.fromCharCode(c)); } // TXbangS is passed in by node and console.js
   TXbang() { this.TXbangC(this.SPpop()); }
   qrx() { return [false]; } // Overridden by node
+  TYPE() { // a u -- ; same signature as Forth this.TYPE
+    this.TXbangS(this.SPpopString());
+  }
 
   bangIO() { } // Default to nothing to do, but Node extends
 

@@ -427,7 +427,7 @@ void runXT(CELLTYPE xt) {
     // console.assert(this.IP >= CODEE && this.IP <= NAMEE); // uncomment if tracking down jumping into odd places
     xt = IPnext();
     // Comment this out except when needed for debugging, they are slow
-    // debugTIB =  this.m.decodeString(this.Ufetch(TIBoffset) + this.Ufetch(INoffset), this.Ufetch(TIBoffset) + this.Ufetch(nTIBoffset));
+    // debugTIB =  this.m.decodeString(Ufetch(TIBoffset) + Ufetch(INoffset), Ufetch(TIBoffset) + Ufetch(nTIBoffset));
     // 'await this.threadtoken(xt)' would be legit, but creates a stack frame in critical inner loop, when usually not reqd.
     threadtoken(xt);
   }
@@ -491,6 +491,7 @@ void TXbangS(CELLTYPE byteaddr, const uint8_t len) {
 // it assumes a maximum of nameMaxLength (31) characters.
 // Mostly used for debugging but also in number conversion.
 void printCounted(CELLTYPE a) { const char c = Mfetch8(a++) & BYTEMASK; TXbangS(a, c); }  // TODO-backport maybe use this in TYPE
+void TYPE() { const char c = SPpop(); const CELLTYPE a = SPpop(); TXbangS(a, c); }
 
 // === Literals and Branches - using next value in dictionary === eForthAndZen#37
 
