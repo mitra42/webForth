@@ -101,6 +101,7 @@ const jsFunctionAttributes = [
   { n: '[', f: 'openBracket', immediate: true, replaced: true }, { n: ']', f: 'closeBracket', replaced: true },
   { n: ':', f: 'colon', replaced: true }, { n: ';', f: 'semicolon', immediate: true, replaced: true }, { n: "'", f: 'tick', replaced: true },
   'debugNA', 'testing3', 'Fbreak', 'debugPrintTIB', 'TEST', 'stringBuffer', 'TYPE',
+  'loop' /* TODO-ARDUINO needs this */, 'I' /* TODO-ARDUINO needs this */
 ];
 
 // Define the tokens used in the first cell of each word.
@@ -271,14 +272,16 @@ BL 32 1 TEST
 ( === Control structures - were on Zen pg91 but needed earlier Zen pg 91-92 but moved early )
 ( this version comes from EFORTH-V5 which introduced MARK> >MARK )
 
-( FOR-NEXT FOR-AFT-THEN-NEXT BEGIN-AGAIN BEGIN-WHILE-REPEAT BEGIN-UNTIL IF-ELSE-THEN ?WHEN)
-: <MARK ( -- a ) HERE ;
-: <RESOLVE ( a -- ) , ;
-: >MARK ( -- A ) HERE 0 , ;
-: >RESOLVE ( A -- ) <MARK SWAP ! ;
+( FOR-I-NEXT FOR-AFT-I-THEN-NEXT BEGIN-AGAIN BEGIN-WHILE-REPEAT BEGIN-UNTIL IF-ELSE-THEN ?WHEN DO-I-LOOP)
+: <MARK ( -- a ) HERE ; \\ Leave an address suitable for <RESOLVE
+: <RESOLVE ( a -- ) , ; \\ Resolve a link back to start of structure (e.g. in a loop)
+: >MARK ( -- A ) HERE 0 , ; \\ Leave a space to put a jump destination
+: >RESOLVE ( A -- ) <MARK SWAP ! ; \\ Resolve a forward jump destination
 : FOR ( -- a ) COMPILE >R <MARK ; IMMEDIATE
+: DO ( -- a; at run time pushes limit and start to Return ) COMPILE 2>R <MARK ; IMMEDIATE
 : BEGIN ( -- a ) <MARK ; IMMEDIATE
 : NEXT ( a -- ) COMPILE next <RESOLVE ; IMMEDIATE
+: LOOP ( a -- ) COMPILE loop <RESOLVE ; IMMEDIATE
 : UNTIL ( a -- ) COMPILE ?branch <RESOLVE ; IMMEDIATE
 : AGAIN ( a -- ) COMPILE branch <RESOLVE ; IMMEDIATE
 : IF ( -- A )   COMPILE ?branch >MARK ; IMMEDIATE
@@ -2651,20 +2654,30 @@ class Forth {
   async runXT(xt) {
     let waitFrequency = 0;
     //console.assert(xt && this.IP === 0); // Cant nest runXT()
-    await this.threadtoken(xt);
-    // If this returns without changing program Counter, it will exit
-    while (this.IP) {
-      // console.assert(this.IP >= this.CODEE && this.IP <= this.NAMEE); // uncomment if tracking down jumping into odd places
-      xt = this.IPnext();
-      // 'await this.threadtoken(xt)' would be legit, but creates a stack frame in critical inner loop, when usually not reqd.
-      const maybePromise = this.threadtoken(xt);
-      if (maybePromise) {
-        await maybePromise;
-      } else if (!waitFrequency--) {
-        //setTimeout(resolve, 0) is same as setImmediate(resolve) but latter is not available in browsers
-        await new Promise((resolve) => setTimeout(resolve, 0)); //ASYNC: to allow IO to run
-        waitFrequency = 100; // How many cycles to allow a thread swap
-      }
+    while (true) {
+      try {
+        await this.threadtoken(xt);
+        // If this returns without changing program Counter, it will exit
+        while (this.IP) {
+          // console.assert(this.IP >= this.CODEE && this.IP <= this.NAMEE); // uncomment if tracking down jumping into odd places
+          xt = this.IPnext();
+          // 'await this.threadtoken(xt)' would be legit, but creates a stack frame in critical inner loop, when usually not reqd.
+          const maybePromise = this.threadtoken(xt);
+          if (maybePromise) {
+            await maybePromise;
+          } else if (!waitFrequency--) {
+            //setTimeout(resolve, 0) is same as setImmediate(resolve) but latter is not available in browsers
+            await new Promise((resolve) => setTimeout(resolve, 0)); //ASYNC: to allow IO to run
+            waitFrequency = 100; // How many cycles to allow a thread swap
+          }
+        }
+        return;
+        } catch(err) {
+          console.log("Error caught in runXT");
+          console.error(err);
+          xt = this.JStoXT('THROW', true);
+          console.log("Looping back for a good throw")
+        }
     }
   }
 
@@ -2755,6 +2768,18 @@ class Forth {
       this.IP = destn; // Jump back
     }
   }
+  // ASN, not eForth
+  loop() { // R: I limit -- I+1 limit | ; loop if I < limit
+    let i = this.RPpop();
+    const destn = this.IPnext(); // Increment over loop
+    if (++i < this.RPfetch()) {
+      this.RPpush(i);
+      this.IP = destn; // jump back
+    } else {
+      this.RPpop();
+    }
+  }
+  I() { this.SPpush(this.RPfetch()) }
 
   // Jump if flag on stack is zero to destn in dictionary
   qBranch() {
