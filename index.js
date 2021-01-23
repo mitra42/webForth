@@ -101,7 +101,8 @@ const jsFunctionAttributes = [
   { n: '[', f: 'openBracket', immediate: true, replaced: true }, { n: ']', f: 'closeBracket', replaced: true },
   { n: ':', f: 'colon', replaced: true }, { n: ';', f: 'semicolon', immediate: true, replaced: true }, { n: "'", f: 'tick', replaced: true },
   'debugNA', 'testing3', 'Fbreak', 'debugPrintTIB', 'TEST', 'stringBuffer', 'TYPE',
-  'loop' /* TODO-ARDUINO needs this */, 'I' /* TODO-ARDUINO needs this */
+  // TODO-ARDUINO needs from here down
+  'loop', 'I', 'leave', 'RDROP', { n: '2RDROP', f: 'TwoRDROP'},
 ];
 
 // Define the tokens used in the first cell of each word.
@@ -278,10 +279,9 @@ BL 32 1 TEST
 : >MARK ( -- A ) HERE 0 , ; \\ Leave a space to put a jump destination
 : >RESOLVE ( A -- ) <MARK SWAP ! ; \\ Resolve a forward jump destination
 : FOR ( -- a ) COMPILE >R <MARK ; IMMEDIATE
-: DO ( -- a; at run time pushes limit and start to Return ) COMPILE 2>R <MARK ; IMMEDIATE
+: DO ( -- a; at run time pushes limit and start to Return ) COMPILE 2>R 0 <MARK ; IMMEDIATE
 : BEGIN ( -- a ) <MARK ; IMMEDIATE
 : NEXT ( a -- ) COMPILE next <RESOLVE ; IMMEDIATE
-: LOOP ( a -- ) COMPILE loop <RESOLVE ; IMMEDIATE
 : UNTIL ( a -- ) COMPILE ?branch <RESOLVE ; IMMEDIATE
 : AGAIN ( a -- ) COMPILE branch <RESOLVE ; IMMEDIATE
 : IF ( -- A )   COMPILE ?branch >MARK ; IMMEDIATE
@@ -289,10 +289,16 @@ BL 32 1 TEST
 : REPEAT ( A a -- ) [COMPILE] AGAIN >RESOLVE ; IMMEDIATE
 : THEN ( A -- ) >RESOLVE ; IMMEDIATE
 ( ERRATA ZEN - doesnt mark this as immediate)
+: LEAVE ( 0 A* a -- 0 A* A a ) COMPILE leave >MARK SWAP ; IMMEDIATE
 : AFT ( a -- a A ) DROP [COMPILE] AHEAD [COMPILE] BEGIN SWAP ; IMMEDIATE
 : ELSE ( A -- A )  [COMPILE] AHEAD SWAP [COMPILE] THEN ; IMMEDIATE
 : WHEN ( a -- a A a ) [COMPILE] IF OVER ; IMMEDIATE ( Cannot find documentation on how this is used )
 : WHILE ( a -- A a )    [COMPILE] IF SWAP ; IMMEDIATE
+: ?DUP DUP IF DUP THEN ; ( w--ww|0) ( Dup top of stack if its is not zero.)
+: >RESOLVES ( 0 A* -- ) BEGIN ?DUP WHILE >RESOLVE REPEAT ; ( Resolve zero or more forward branches e.g. from multiple LEAVE )
+: LOOP ( 0 A* a -- ) COMPILE loop <RESOLVE >RESOLVES ; IMMEDIATE
+
+
 
 ( TODO-TEST of above group non-obvious as writing to dictionary. )
 ( IF-THEN tested in ?DUP; )
@@ -308,7 +314,6 @@ BL 32 1 TEST
 ( === Multitasking Zen pg48 - not implemented in eForth TODO )
 
 ( === More Stack Words Zen pg49 TODO-OPTIMIZE )
-: ?DUP DUP IF DUP THEN ; ( w--ww|0) ( Dup top of stack if its is not zero.)
 : ROT >R SWAP R> SWAP ; ( w1, w2, w3 -- w2 w3 w1; Rotate third item to top)
 : -ROT SWAP >R SWAP R> ; ( w1, w2, w3 -- w3 w1 w2; Rotate top item to third)
 : 2DUP OVER OVER ; ( w1 w2 -- w1 w2 w1 w2;)
@@ -341,6 +346,7 @@ BL 32 1 TEST
 
 ( === More comparison Zen pg51-52 - ud< is added)
 : = XOR IF FALSE EXIT THEN TRUE ; ( w w -- t)
+: <> XOR IF TRUE EXIT THEN FALSE ; ( w w -- t; from ANS not eForth)
 : U< 2DUP XOR 0< IF NIP 0< EXIT THEN - 0< ;
 : ud< ( ud ud -- f ) ROT SWAP U< IF 2DROP TRUE ELSE U< THEN ;
 : < 2DUP XOR 0< IF DROP 0< EXIT THEN - 0< ;
@@ -2791,6 +2797,7 @@ class Forth {
 
   // Unconditional jump to destn in dictionary
   branch() { this.IP = this.IPnext(); }
+  leave() { this.RPpop(); this.RPpop(); this.branch(); }
 
   // === Primitive words for memory, stack and return access.
 
@@ -2810,6 +2817,8 @@ class Forth {
   TwoToR() { const x2 = this.SPpop(); this.RPpush(this.SPpop()); this.RPpush(x2); }
   TwoRfrom() { const x2 = this.RPpop(); this.SPpush(this.RPpop()); this.SPpush(x2); }
   TwoRat() { const x2 = this.RPpop(); this.SPpush(this.RPfetch()); this.SPpush(x2); this.RPpush(x2); }
+  RDROP() { this.ramRP++; } // TODO-ARDUINO needs
+  TwoRDROP() { this.ramRP += 2; } // TODO-ARDUINO needs
 
   // Data stack initialization eForthAndZen#41
   SPat() { this.SPpush(this.m.fromRamAddr(this.ramSP)); } //SP@
