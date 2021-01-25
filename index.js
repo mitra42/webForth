@@ -101,8 +101,8 @@ const jsFunctionAttributes = [
   { n: '[', f: 'openBracket', immediate: true, replaced: true }, { n: ']', f: 'closeBracket', replaced: true },
   { n: ':', f: 'colon', replaced: true }, { n: ';', f: 'semicolon', immediate: true, replaced: true }, { n: "'", f: 'tick', replaced: true },
   'debugNA', 'testing3', 'Fbreak', 'debugPrintTIB', 'TEST', 'stringBuffer', 'TYPE',
-  // TODO-ARDUINO needs from here down
-  'loop', 'I', 'leave', 'RDROP', { n: '2RDROP', f: 'TwoRDROP'},
+  // TODO-ARDUINO needs from here down - some could be in Forth instead
+  'loop', 'I', 'leave', 'RDROP', { n: '2RDROP', f: 'TwoRDROP' }, { n: 'FIND-NAME-IN', f: 'FIND_NAME_IN' }, { n: 'immediate?', f: 'immediateQ' },
 ];
 
 // Define the tokens used in the first cell of each word.
@@ -958,7 +958,8 @@ BL 32 1 TEST
   DUP NAME>           ( find code field address )
   SWAP ;              ( reorder and return.  -- ca na )
 
-: NAME? ( a -- ca na, a F )
+: FIND-NAME ( caddr u -- na | F; see https://forth-standard.org/proposals/find-name#contribution-58)
+  ( Note this ONLY currently workds if caddr-- is a counted string )
   ( Search all context vocabularies for a string.)
   CONTEXT       ( address of context vocabulary stack )
   DUP 2@ XOR    ( are two top vocabularies the same? )
@@ -966,18 +967,31 @@ BL 32 1 TEST
     CELL-   ( backup the vocab address for looping )
   THEN
   >R            ( save the prior vocabulary address )
-  BEGIN
-    R> CELL+    ( get the next vocabulary address )
-    DUP >R      ( save it for next vocabulary )
-    @ ?DUP      ( is this a valid vocabulary? )
-  WHILE         ( yes)
-    find        ( find the word in this vocabulary )
+  BEGIN         ( caddr u R: va )
+    R> CELL+ >R ( caddr u R: va'; get the next vocabulary address and save)
+    R@ @        ( is this a valid vocabulary? )
+  WHILE         ( caddr u R: va' ; yes)
+    2DUP R@ @    ( caddr u caddr u va' R: va' )
+    FIND-NAME-IN ( caddr u na R: va' | caddr u F R: va')
     ?DUP        ( word found here? )
   UNTIL         ( if not, go searching next vocabulary )
-    R> DROP EXIT ( word is found, exit with ca and na )
-  THEN
-  R> DROP       ( word is not found in all vocabularies )
-  FALSE ;           ( exit with a false flag )
+                ( caddr u na R: va)
+    R> DROP NIP NIP EXIT ( word is found, exit with na )
+  THEN          ( caddr u R: va' ; goes here from the WHILE )
+  R> DROP 2DROP ( ; word is not found in all vocabularies )
+  FALSE ;       ( F ; exit with a false flag )
+
+
+: NAME? ( a -- ca na, a F )
+  ( Search all context vocabularies for a string.)
+  DUP COUNT         ( a caddr u ) 
+  FIND-NAME     ( a na | a F) 
+  ?DUP
+  IF            ( a na; word found)
+    NIP DUP NAME> SWAP ( ca na )
+  ELSE          ( a ) 
+    FALSE       ( a F )
+  THEN ; 
 
 ( NAME> implicitly tested by find )
 ?test\\ BL WORD xxx DUP C@ 1+ PAD SWAP CMOVE PAD BL WORD xxx 4 SAME? >R 2DROP R> 0 1 TEST
@@ -985,7 +999,24 @@ BL 32 1 TEST
 ?test\\ FORTH 0 TEST
 
 ?test\\ BL WORD TOKEN CONTEXT @ find BL WORD TOKEN CONTEXT @ FORTHfind 2 TEST
+?test\\ BL WORD TOKEN CONTEXT @ find NIP BL WORD TOKEN COUNT CONTEXT @ FIND-NAME-IN 1 TEST
+?test\\ BL WORD TOKEN CONTEXT @ find NIP BL WORD TOKEN COUNT FIND-NAME 1 TEST ( FIND-NAME searches all vocabs)
 ?test\\ BL WORD TOKEN CONTEXT @ find BL WORD TOKEN NAME? 2 TEST ( Name searches all vocabs )
+
+: FIND ( caddr -- c-addr 0 | xt 1 | xt -1 ; https://forth-standard.org/standard/core/FIND )
+    DUP COUNT ( caddr caddr' u )
+    FIND-NAME ( caddr na | caddr F )
+    ?DUP IF
+      NIP DUP NAME> ( na xt )
+      SWAP immediate? ( xt b )
+      IF 1 ELSE -1 THEN
+    ELSE ( caddr )
+      0
+    THEN ;
+
+?test\\ BL WORD TOKEN CONTEXT @ find DROP ( xt ) -1 BL WORD TOKEN FIND ( xt -1 ) 2 TEST ( not immediate )
+?test\\ BL WORD XYZZY 0 OVER FIND 2 TEST ( failure case)
+?test\\ BL WORD THEN CONTEXT @ find DROP ( xt ) 1 BL WORD THEN FIND 2 TEST ( immediate)
 
 ( === Error Handling Zen pg80-82 CATCH THROW = moved in front of Text input )
 
@@ -1649,7 +1680,8 @@ class FlashXX_XX {
   }
   cellRomFetch(cellAddr) {
     if (cellAddr >= this.romCells) {
-      console.log('Attempt to read above top of Rom at', cellAddr);
+      console.lo
+      g('Attempt to read above top of Rom at', cellAddr);
     } // TODO-OPTIMIZE comment out
     return this.rom[cellAddr];
   }
@@ -2393,7 +2425,7 @@ class Forth {
   countedToJS(a) { // Convert string specified by address which holds a count - possibly with a bytemask to JS
     return this.stringToJS(a + 1, this.Mfetch8(a) & l.BYTEMASK); }
   // Convert a name address to the code dictionary definition.
-  na2xt(na) { return this.Mfetch(na - (2 * this.CELLL)); }
+  na2xt(na) { return this.Mfetch(na - (2 * this.CELLL)); } // Forth version is NAME>
   // a u --; return JS string given an ANS style string on stack.
   SPpopString() {
     const u = this.SPpop();
@@ -2418,8 +2450,10 @@ class Forth {
     return true;
   }
 
-  _find(va, na) { // return na that matches or 0
-    const cellCount = ((this.Mfetch8(na) & l.BYTEMASK)  / this.CELLL) >> 0; // Count of cells after first one
+  //TODO-84-ARDUINO needs
+  _findNameIn(caddr, u, va) { // c-addr u va -- nt | 0 ; https://forth-standard.org/proposals/find-name#contribution-58
+    const cellCount = (u / this.CELLL) >> 0; // Count of cells after first one
+    const na = caddr--; // Point at count
     const cell1 = this.Mfetch(na);  // Could be little or big-endian
     let p = va;
     while (p = this.Mfetch(p)) {
@@ -2435,7 +2469,13 @@ class Forth {
     // Drop through not found
     return l.FALSE;
   }
-
+  FIND_NAME_IN() { // caddr u va -- na; Note this ONLY currently workds if caddr-- is a counted string
+    const va = this.SPpop();
+    const u = this.SPpop();
+    const caddr = this.SPpop();
+    this.SPpush(this._findNameIn(caddr, u, va));
+  }
+  //TODO-84-ARDUINO needs change from _find to _findNameIn and usage in jsFind
   // Search a single vocabulary for a string
   // This has same footprint as eForth's 'find' but we do not replace it since this is approx 8x faster
   // Note the string must be aligned to CELLL boundary even if using a non-aligned mem (e.g. celll=2 mem=8)
@@ -2444,7 +2484,10 @@ class Forth {
     const a = this.SPpop();
     //this.m.assertAlign(a);
     //console.log('find: Looking for', name) // comment out except when debugging find
-    const na = this._find(va, a);  // return matching na or 0
+    //const na = this._find(va, a);  // return matching na or 0
+
+    const charCount = this.Mfetch8(a) & l.BYTEMASK;
+    const na = this._findNameIn(a+1, charCount, va);
     if (na) {
       this.SPpush(this.na2xt(na));
       this.SPpush(na);
@@ -2968,14 +3011,19 @@ class Forth {
     }
   }
 
+  _immediateQ(na) {
+    const ch = this.Mfetch8(na);
+    return ch & l.IMED;
+  }
+  immediateQ() {
+    this.SPpush(this.Mfetch8(this.SPpop()) & l.IMED);
+  }
   async dCOMPILE() { // a -- ...; same signature as to $COMPILE at Zen pg96
     this.findName(); // xt na | a F
     const na = this.SPpop();
     if (na) { // ca
       const xt = this.SPpop();
-      const ch = this.Mfetch8(na);
-      // noinspection JSBitwiseOperatorUsage
-      if (ch & l.IMED) {
+      if (this._immediateQ(na)) {
         await this.runXT(xt); // This will work as long as this $INTERPRET never called from Forth as cant nest 'run' even indirectly
       } else {
         this.checkNotCompilingReplaceable(xt, na);
