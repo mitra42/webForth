@@ -95,6 +95,7 @@ const jsFunctionAttributes = [
   { n: 'SP@', f: 'SPat' }, { n: 'SP!', f: 'SPbang' },
   'DROP', 'DUP', 'SWAP', 'OVER',
   { n: '0<', f: 'less0' }, 'AND', 'OR', 'XOR', { n: 'UM+', f: 'UMplus' },
+  /* TODO-ARDUINO needs this line */ 'RSHIFT', 'LSHIFT', {n: '2/', f: 'TwoDiv' },
   'userAreaInit', 'userAreaSave',
   { n: 'PARSE', replaced: true }, { n: 'TOKEN', replaced: true }, { n: 'NUMBER?', f: 'NUMBERQ', replaced: true },
   { n: '$COMPILE', f: 'dCOMPILE', replaced: true }, { n: '$INTERPRET', f: 'dINTERPRET', replaced: true, jsNeeds: true },
@@ -279,7 +280,6 @@ BL 32 1 TEST
 : >MARK ( -- A ) HERE 0 , ; \\ Leave a space to put a jump destination
 : >RESOLVE ( A -- ) <MARK SWAP ! ; \\ Resolve a forward jump destination
 : FOR ( -- a ) COMPILE >R <MARK ; IMMEDIATE
-: DO ( -- a; at run time pushes limit and start to Return ) COMPILE 2>R 0 <MARK ; IMMEDIATE
 : BEGIN ( -- a ) <MARK ; IMMEDIATE
 : NEXT ( a -- ) COMPILE next <RESOLVE ; IMMEDIATE
 : UNTIL ( a -- ) COMPILE ?branch <RESOLVE ; IMMEDIATE
@@ -289,14 +289,12 @@ BL 32 1 TEST
 : REPEAT ( A a -- ) [COMPILE] AGAIN >RESOLVE ; IMMEDIATE
 : THEN ( A -- ) >RESOLVE ; IMMEDIATE
 ( ERRATA ZEN - doesnt mark this as immediate)
-: LEAVE ( 0 A* a -- 0 A* A a ) COMPILE leave >MARK SWAP ; IMMEDIATE
 : AFT ( a -- a A ) DROP [COMPILE] AHEAD [COMPILE] BEGIN SWAP ; IMMEDIATE
 : ELSE ( A -- A )  [COMPILE] AHEAD SWAP [COMPILE] THEN ; IMMEDIATE
 : WHEN ( a -- a A a ) [COMPILE] IF OVER ; IMMEDIATE ( Cannot find documentation on how this is used )
 : WHILE ( a -- A a )    [COMPILE] IF SWAP ; IMMEDIATE
 : ?DUP DUP IF DUP THEN ; ( w--ww|0) ( Dup top of stack if its is not zero.)
 : >RESOLVES ( 0 A* -- ) BEGIN ?DUP WHILE >RESOLVE REPEAT ; ( Resolve zero or more forward branches e.g. from multiple LEAVE )
-: LOOP ( 0 A* a -- ) COMPILE loop <RESOLVE >RESOLVES ; IMMEDIATE
 
 
 
@@ -317,6 +315,8 @@ BL 32 1 TEST
 : ROT >R SWAP R> SWAP ; ( w1, w2, w3 -- w2 w3 w1; Rotate third item to top)
 : -ROT SWAP >R SWAP R> ; ( w1, w2, w3 -- w3 w1 w2; Rotate top item to third)
 : 2DUP OVER OVER ; ( w1 w2 -- w1 w2 w1 w2;)
+: 2OVER >R >R 2DUP R> -ROT R> -ROT ; ( w1 w2 w3 w4 -- w1 w2 w3 w4 w1 w2 )
+: 2SWAP >R -ROT R> -ROT ; ( w1 w2 w3 w4 -- w3 w4 w1 w2 )
 ( 2DROP & NIP moved earlier )
 
 ?test\\ 1 ?DUP 0 ?DUP 1 1 0 3 TEST
@@ -350,6 +350,7 @@ BL 32 1 TEST
 : U< 2DUP XOR 0< IF NIP 0< EXIT THEN - 0< ;
 : ud< ( ud ud -- f ) ROT SWAP U< IF 2DROP TRUE ELSE U< THEN ;
 : < 2DUP XOR 0< IF DROP 0< EXIT THEN - 0< ;
+: > SWAP < ;
 : MAX 2DUP < IF SWAP THEN DROP ;
 : MIN 2DUP SWAP < IF SWAP THEN DROP ;
 : WITHIN OVER - >R - R> U< ;
@@ -474,6 +475,10 @@ BL 32 1 TEST
 
 ?test\\ 123 CELL- CELLL + 123 1 TEST
 ?test\\ 123 CELLS CELLL / 123 1 TEST
+
+\\ Math routines from Forth2012
+( see also in functions e.g. RSHIFT )
+
 
 ( === Special Characters Zen pg58 BL >CHAR )
 
@@ -2904,6 +2909,17 @@ class Forth {
       const x = a + b;
       this.SPpushD(x); // Push double word
     }
+  }
+
+  // Math from Forth2012 - could probably define in Forth but efficiency important
+  RSHIFT(u = this.SPpop(), x = this.SPpop()) {
+    this.SPpush(x >> u);
+  }
+  LSHIFT(u = this.SPpop(), x = this.SPpop()) {
+    this.SPpush(x << u);
+  }
+  TwoDiv(x = this.SPpop()) {
+    this.SPpush((x & (1 << (this.CELLbits - 1))) | (x >> 1));
   }
   // === Define and initialize User variables Zen pg33 see Zen pg46
   // See Zen pg31 for tokenUser etc and $USER and Zen pg33 for USER initialization values

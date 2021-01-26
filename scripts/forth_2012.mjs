@@ -13,8 +13,6 @@ const extensions = ForthNodeExtensions; // Only current case is Node for running
 const memClass = undefined; // Define to override default based on CELLL and MEM
 
 const preTest = `
-1 testFlags ! \\ Get some debugging
-
 \\ TODO multi line comments, once put this in a file
 \\ : ( 41 PARSE ." XXX(" 2DUP + C@ 41 = IF ... ; IMMEDIATE
 \\ ( testing one line comment )
@@ -157,12 +155,9 @@ VARIABLE LEAVE-PTR
   SOME-LOOP
 ; IMMEDIATE
 
-: I     ( -- n ) COMPILE R@ ; IMMEDIATE
 : I-MAX ( -- n ) RP@ 12 - @ ;
 : J     ( -- n ) RP@ 16 - @ ;
 : J-MAX ( -- n ) RP@ 20 - @ ;
-
-
 
 `;
 
