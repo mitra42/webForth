@@ -1127,7 +1127,7 @@ CREATE NULL$ 0 , ( EFORTH-ZEN-ERRATA inserts a string "coyote" after this, no id
   CP ! ; ( adjust the code pointer)
 
 ( Moved earlier from Zen pg93 )
-: ABORT" ( -- ; <string> )
+: ABORT" ( C: -- ; I: f --; <string> )
   ( Conditional abort with an error message.)
   COMPILE abort"  ( compile runtime abort code )
   $," ; IMMEDIATE ( compile abort message )

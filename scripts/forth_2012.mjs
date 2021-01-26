@@ -25,9 +25,17 @@ const preTest = `
 
 .( starting pretest)
 : 2* 2 * ; \\ TODO-83 This should be optimized to a left shift and then find where used
-\\ There are other semantics in https://forth-standard.org/standard/core/POSTPONE for COMPILE type usage
-\\ and implementation in https://github.com/NieDzejkob/2klinux/blob/2665d2491d82f0f8ced8d89163199a42bcd8c5f0/image-files/stage1.frt#L302
-: POSTPONE [COMPILE] [COMPILE] ; IMMEDIATE 
+\\ SEE https://github.com/NieDzejkob/2klinux/blob/2665d2491d82f0f8ced8d89163199a42bcd8c5f0/image-files/stage1.frt#L302
+: POSTPONE 
+  TOKEN ( a )
+  COUNT FIND-NAME ( na | F)
+  ?DUP 0= ABORT" Not found"
+  DUP immediate? 0= IF 
+    COMPILE COMPILE
+  THEN ( na ) 
+  NAME> ,
+; IMMEDIATE
+
 : [CHAR] ( "name" <spaces> -- ) CHAR POSTPONE LITERAL ; IMMEDIATE
 .( finishing pretest)
 \\ REQUIRE prelimtest.fth \\ TODO-83 figure out why cant include REQUIRE here
