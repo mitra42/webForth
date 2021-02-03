@@ -208,7 +208,7 @@ const filesExtension = `
 vCREATE buf 1024 vALLOT
 
 : EVALUATE ( xxx caddr u -- yyy;  https://forth-standard.org/standard/core/EVALUATE )
-  sourcePush -1 -ROT 0 source! ;
+  sourcePush -1 -ROT 0 source! quit1  ; \\ TODO may not want the prompt at the end - which quit1 does
 : INCLUDE-FILE ( i * x fileid -- j * x ; https://forth-standard.org/standard/file/INCLUDE-FILE )
   sourcePush buf 0 0 source! ; ( currently empty )
 : INCLUDED ( caddr u -- ; https://forth-standard.org/standard/file/INCLUDED e.g. $" filename" INCLUDED )
