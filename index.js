@@ -617,11 +617,21 @@ BL 32 1 TEST
   9 OVER <    ( if u is greater than 9)
   7 AND +     ( add 7 to make it A-F)
   48 + ;      ( add ASCII 0 for offset)
-: EXTRACT ( n base -- n/base c ; Extract the least significant digit from n.)
-  0 SWAP UM/MOD   ( divide n by base)
-  SWAP DIGIT ;    ( convert remainder to a digit)
+  
+\\ : EXTRACT ( d base -- n/base c ; Extract the least significant digit from n.)
+\\   UM/MOD   ( divide n by base)
+\\  SWAP DIGIT ;    ( convert remainder to a digit)
+: extract ( d base -- d c ; Extract least significant digit from d)
+  >R
+  0 R@ FM/MOD  ( S: l rh qh R: b )
+  R> SWAP >R   ( S: l rh b R: qh )
+  FM/MOD       ( S: r ql R: qh )
+  R> ROT       ( S: ql qh r ) 
+  DIGIT
+  ;
 
-?test\\ 123 10 EXTRACT 12 51 2 TEST
+\\ ?test\\ 123 10 EXTRACT 12 51 2 TEST
+?test\\ 123 0 10 extract 12 0 51 3 TEST
 
 ( === Number formatting Zen pg65 <# HOLD #S SIGN #> )
 
@@ -633,28 +643,30 @@ BL 32 1 TEST
      1- DUP HLD !  ( decrement HLD)
      C! ;           ( store c where HLD pointed to)
 
-: # ( u -- u; Extract one digit from u and append the digit to output string.)
+: # ( u -- u; Extract one digit from u and append the digit to output string.- ANS/eForth conflict eForth used single, ANS double )
+  \\ eFORTH: BASE @ EXTRACT HOLD
      BASE @         ( get current base)
-     EXTRACT        ( extract one digit from u)
+     extract        ( extract one digit from u)
      HOLD ;         ( save digit to number buffer)
 
-: #S ( u -- 0 ; Convert u until all digits are added to the output string.)
+: #S ( u -- 0 0 ; Convert u until all digits are added to the output string. - ANS/eForth conflict eForth used single, ANS double )
+  \\ eFORTH BEGIN # DUP WHILE REPEAT
   BEGIN     ( begin converting all digits)
-    # DUP   ( convert one digit)
-  WHILE     ( repeat until u is divided to 0)
+    #   ( convert one digit)
+  2DUP OR WHILE     ( repeat until u is divided to 0)
   REPEAT ;
 
 : SIGN ( n-- ; Add a minus sign to the numeric output string.)
   0< ( if n is negative)
   IF 45 HOLD THEN ; ( add a - sign to number string)
 
-: #> ( w -- b u ; Prepare the output string to be TYPEed.)
-  DROP          ( discard w)
+: #> ( d -- b u ; Prepare the output string to be TYPEed. - ANS/eForth conflict eForth used single, ANS double )
+  2DROP          ( discard w)
   HLD @         ( address of last digit)
   PAD OVER - ;  ( return address of 1st digit and length)
 
-?test\\ 123 <# DUP SIGN #S #> SWAP COUNT SWAP COUNT SWAP COUNT NIP 3 49 50 51 4 TEST ( hold="123" )
-?test\\ -123 DUP ABS <# #S SWAP SIGN #> SWAP COUNT SWAP COUNT SWAP COUNT SWAP COUNT NIP 4 45 49 50 51 5 TEST ( hold="-123" )
+?test\\ 123 0 <# OVER SIGN #S #> SWAP COUNT SWAP COUNT SWAP COUNT NIP 3 49 50 51 4 TEST ( hold="123" )
+?test\\ -123 DUP ABS 0 <# #S ROT SIGN #> SWAP COUNT SWAP COUNT SWAP COUNT SWAP COUNT NIP 4 45 49 50 51 5 TEST ( hold="-123" )
 
 ( === More definitions moved up )
 
@@ -679,7 +691,7 @@ BL 32 1 TEST
 : str ( n -- b u ; Convert a signed integer to a numeric string)
   DUP >R  ( save a copy for sign)
   ABS     ( use absolute of n)
-  <# #S   ( convert all digits)
+  0 <# #S   ( convert all digits)
   R> SIGN ( add sign from n)
   #> ;    ( return number string addr and length)
 
@@ -694,12 +706,12 @@ BL 32 1 TEST
 
 : U.R ( u+ n -- ; Display an unsigned integer in n column, right justified.)
   >R            ( save column number)
-  <# #S #> R>   ( convert unsigned number)
+  0 <# #S #> R>   ( convert unsigned number)
   OVER - SPACES ( print leading spaces)
   TYPE ;        ( print number in +n columns)
 
 : U. ( u -- ; Display an unsigned integer in free format.)
-  <# #S #>  ( convert unsigned number)
+  0 <# #S #>  ( convert unsigned number)
   SPACE     ( print one leading space)
   TYPE ;    ( print number)
 
@@ -1496,10 +1508,17 @@ CREATE I/O  ' ?RX , ' TX! , ( Array to store default I/O vectors. )
       CATCH             ( execute commands with error handler)
       ?DUP
     UNTIL ( a)          ( exit if an error occurred )
+    ." XXX prompt Q1 is " 'PROMPT @ . CR
     'PROMPT @ >R          ( EFORTH-ZEN and EFORTH-V5 save and restore current prompt address, Staapl doesnt)
+    ." XXX prompt Q2 is " 'PROMPT @ . CR
     CONSOLE             ( Initialize for terminal interaction)
+    ." XXX prompt Q4 is " 'PROMPT @ . CR
+    Fbreak
+    ." XXX prompt Q5 is " 'PROMPT @ . CR
     quitError           ( Report error and reset data stack, source/TIB and vectored I/O ) 
-    R> 'PROMPT !           ( Restore Prompt)
+    ." XXX prompt Q6 is " 'PROMPT @ . CR
+    R> ?DUP IF 'PROMPT ! THEN ( Restore Prompt)
+    ." XXX prompt Q7 is " 'PROMPT @ . CR
     ( V5 and ZEN also send "ERR" to file handler if prompt is not OK which is a little off )
   AGAIN ;               ( go back get another command line )
 
@@ -1656,7 +1675,7 @@ CREATE I/O  ' ?RX , ' TX! , ( Array to store default I/O vectors. )
 
 17 CONSTANT VER ( Return the version number of this implementation.)
 
-: version CR ." webFORTH V" BASE @ DECIMAL VER <# # # 46 HOLD # # 46 HOLD # #> TYPE ( display sign-on text and version )  BASE ! CR ;
+: version CR ." webFORTH V" BASE @ DECIMAL VER 0 <# # # 46 HOLD # # 46 HOLD # #> TYPE ( display sign-on text and version )  BASE ! CR ;
 
 ( ERRATA v5 'hi' doesnt restore BASE )
 ( ERRATA ZEN uses !XIO when it means !IO)

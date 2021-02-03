@@ -173,10 +173,9 @@ VARIABLE LEAVE-PTR
 
 `;
 
-/* DOUBLE word set https://forth-standard.org/standard/double
-  implemented: D0< D0= DABS
-  not implemented yet: 2CONSTANT 2LITERAL D+ D- D. D.R D2* D2/ D< D= D>S DMAX DMIN DNEGATE M*/ M+
- */
+// DOUBLE word set https://forth-standard.org/standard/double
+// implemented: D0< D0= DABS
+// not implemented yet: 2CONSTANT 2LITERAL D+ D- D. D.R D2* D2/ D< D= D>S DMAX DMIN DNEGATE M * / M+
 
 
 const forth = new Forth_with_fs({ CELLL, MEM, ROMSIZE, RAMSIZE, extensions, memClass });
