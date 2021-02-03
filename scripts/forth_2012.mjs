@@ -155,18 +155,35 @@ VARIABLE LEAVE-PTR
   SOME-LOOP
 ; IMMEDIATE
 
-: I-MAX ( -- n ) RP@ 12 - @ ;
-: J     ( -- n ) RP@ 16 - @ ;
-: J-MAX ( -- n ) RP@ 20 - @ ;
+: I-MAX ( -- n ) RP@ 2 CELLS + @ ;
+: J     ( -- n ) RP@ 3 CELLS + @ ;
+: J-MAX ( -- n ) RP@ 4 CELLS + @ ;
+
+: D0< ( d -- f ; check if d is negative ) NIP 0< ;  
+: DABS ( d -- abs d ; https://forth-standard.org/standard/double/DABS )
+  2DUP D0< IF DNEGATE THEN ;
+: SM/REM ( d1 n1 -- n2 n3 ; copied from FlashForth)
+  2DUP XOR >R
+  OVER >R
+  ABS >R DABS R> UM/MOD
+  SWAP R> ?negate
+  SWAP R> ?negate
+;
+: ['] ' POSTPONE LITERAL ; IMMEDIATE
 
 `;
+
+/* DOUBLE word set https://forth-standard.org/standard/double
+  implemented: D0< D0= DABS
+  not implemented yet: 2CONSTANT 2LITERAL D+ D- D. D.R D2* D2/ D< D= D>S DMAX DMIN DNEGATE M*/ M+
+ */
 
 
 const forth = new Forth_with_fs({ CELLL, MEM, ROMSIZE, RAMSIZE, extensions, memClass });
 forth.initialize()
   .then(() => console.log("Forth with FS built"))
   .then(() => forth.interpret(preTest))
-  // TODO-83 figure out why next line fails
-  // .then(() => forth.interpret('REQUIRE prelimtest.fth'))
+  // TODO-83 next line fails because it only switches SOURCE-ID, so it returns immediately.
+  //.then(() => forth.interpret('REQUIRE prelimtest.fth'))
   .then(() => forth.console())
   // .then(() => console.log('EXITING AFTER TEST'));
