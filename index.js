@@ -104,6 +104,7 @@ const jsFunctionAttributes = [
   'debugNA', 'testing3', 'Fbreak', 'debugPrintTIB', 'TEST', 'stringBuffer', 'TYPE',
   // TODO-ARDUINO needs from here down - some could be in Forth instead
   'loop', 'I', 'leave', 'RDROP', { n: '2RDROP', f: 'TwoRDROP' }, { n: 'FIND-NAME-IN', f: 'FIND_NAME_IN' }, { n: 'immediate?', f: 'immediateQ' },
+  { n: 'ALIGN', f: 'vpAlign' }, { n: '>BODY', f: 'toBody' },
 ];
 
 // Define the tokens used in the first cell of each word.
@@ -2684,6 +2685,14 @@ class Forth {
     this._tokenDoes();
   }
 
+  toBody(xt = this.SPpop()) { // xt -- a; push address of data space for something built with VARIABLE or CREATE
+    const token = this.Mfetch(xt); // token - ideally tokenCreate or tokenVar
+    let dataSpace = xt + (this.CELLL * 2);
+    if (token === tokenVar) {
+      dataSpace = this.Mfetch(dataSpace);
+    }
+    this.SPpush(dataSpace);
+  }
   // Used when the data is going to be in Ram and Code in ROM
   tokenVar() {
     this.SPpush(this.Mfetch(this.PAYLOAD + this.CELLL));
