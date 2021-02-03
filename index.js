@@ -303,6 +303,7 @@ BL 32 1 TEST
 ( IF-THEN tested in ?DUP; )
 
 : 0= IF FALSE ELSE TRUE THEN ;
+: D0= OR 0= ;
 : ?\\ ( f -- ; Conditional compilation/interpretation - comment out if f is 0 )
   0= IF [COMPILE] \\ THEN ; IMMEDIATE 
 : ?safe\\ ( compilation/interpretation line if checking for safety - overflows etc )
@@ -333,8 +334,16 @@ BL 32 1 TEST
 : NEGATE INVERT  1+ ; ( w -- w; 2's complement)
 : DNEGATE INVERT >R INVERT  1 UM+ R> + ;
 : - NEGATE + ; ( n1 n2 -- n1-n2)
+: ?negate ( n1 n2 -- n1|-n1 ; negate n1 if n2 negative)
+  0< IF NEGATE THEN ; 
 : 1- 1 - ; 
-: ABS DUP 0< IF NEGATE THEN ; ( n -- n; Absolute value of w)
+
+: ABS DUP ?negate ; ( n -- n; Absolute value of w)
+
+: CHAR+ 1+ ; 
+: C, ( c --; Compile a single character into code dictionary and advance pointer 1 character )
+  HERE DUP CHAR+ CP ! C! ; 
+
 
 ?test\\ 1 2 + 3 1 TEST
 ?test\\ -1 1 -1 3 D+ -2 5 2 TEST ( Test contrived to be CELLL independent )
@@ -362,6 +371,8 @@ BL 32 1 TEST
 ?test\\ 100 200 MAX 300 100 MAX 200 300 2 TEST
 ?test\\ 100 200 MIN 300 100 MIN 100 100 2 TEST
 ?test\\ 200 100 300 WITHIN 300 100 200 WITHIN 100 -100 200 WITHIN -1 0 -1 3 TEST
+
+: S>D DUP 0< ; ( n -- d)
 
 ( === More Math Words Zen pg53-55 UM/MOD M/MOD /MOD MOD / UM+ * M* )
 : UM/MOD ( udl udh u -- ur uq ) ( needs FOR-NEXT from 91)
@@ -400,10 +411,12 @@ BL 32 1 TEST
   R>              ( if n is negative)
   IF SWAP NEGATE SWAP THEN  ( negative remainder also )
 ;
+: FM/MOD ( d n -- r q) M/MOD ; \\ Forth2012 https://github.com/NieDzejkob/2klinux.git
+
 : /MOD ( n1 n2 -- r q)
   ( Signed divide. Return mod and quotient)
-  OVER 0<     ( sign extend n1)
-  SWAP M/MOD  ( floored divide)
+  >R S>D R> ( d1 n2 ; sign extend n1)
+  M/MOD     ( floored divide)
 ;
 : MOD ( n n -- r)
   ( Signed divide. Return mod only)
@@ -473,6 +486,8 @@ BL 32 1 TEST
 : CELLS ( n - n )
   ( Multiply n by cell size in bytes)
   CELLL * ;
+
+: CHARS ; \\ A noop since 1 address unit per char - note this is ANS CHARS, eFORTH CHARS is now emits
 
 ?test\\ 123 CELL- CELLL + 123 1 TEST
 ?test\\ 123 CELLS CELLL / 123 1 TEST
@@ -647,10 +662,10 @@ BL 32 1 TEST
   'EMIT @EXECUTE ;
 : SPACE ( -- ; Send the blank character to the output device. Zen pg70)
   BL EMIT ; ( send out blank character)
-: CHARS ( +n c -- ; Send n characters to output device)
+: emits ( +n c -- ; Send n characters to output device)
   SWAP 0 MAX FOR AFT DUP EMIT THEN NEXT DROP ; ( From Staapl and V5, not in Zen) ( TODO-ANS flagged as possible conflict)
 : SPACES ( n -- ; Send n spaces to the output device. Zen pg70) ( ERRATA Zen has bad initial SWAP)
-  BL CHARS ;
+  BL emits ;
 \\ use JS definition (hand coded on Arduino etc)
 \\ : TYPE ( b u -- ; Output u characters from b)
 \\  FOR AFT DUP C@ EMIT 1+ THEN NEXT DROP ;
@@ -785,7 +800,7 @@ BL 32 1 TEST
 
 : PACE ( --) ( Send a pace character for the file downloading process.)
   11 EMIT ; ( 11 is the pace character)
-( SPACE and SPACES and TYPE and CHARS moved earlier)
+( SPACE and SPACES and TYPE and CHARS, now emits moved earlier)
 ( ERRATA Zen has 15 instead of 13 and 11 instead of 10)
 : CR ( --) ( Output carriage return line feed)
   13 EMIT 10 EMIT ;
@@ -1686,8 +1701,7 @@ class FlashXX_XX {
   }
   cellRomFetch(cellAddr) {
     if (cellAddr >= this.romCells) {
-      console.lo
-      g('Attempt to read above top of Rom at', cellAddr);
+      console.log('Attempt to read above top of Rom at', cellAddr);
     } // TODO-OPTIMIZE comment out
     return this.rom[cellAddr];
   }
@@ -2411,9 +2425,18 @@ class Forth {
   // === Access to the USER variables before they are defined
   currentFetch() { return this.Ufetch(CURRENToffset); }
   cpFetch() { return this.Ufetch(CPoffset); }
+  // Return pointer to writable address space (aka data space), if code is going to RAM this will be CP, if code is going to ROM it will be VP
   vpFetch() { return this.Ufetch(VPoffset) || this.Ufetch(CPoffset); }
   cpAlign() { this.Ustore(CPoffset, this.m.cellAlign(this.cpFetch())); }
-  vpAlign() { this.Ustore(VPoffset, this.m.cellAlign(this.vpFetch())); }
+  // TODO-ARDUINO vpAlign needs updating
+  // OLD vpAlign() { this.Ustore(VPoffset, this.m.cellAlign(this.vpFetch())); }
+  // Align whichever pointer using for data space.
+  vpAlign() {
+    let h = this.Ufetch(VPoffset);
+    const o = h ? VPoffset : CPoffset;
+    h = this.m.cellAlign(h || this.Ufetch(CPoffset));
+    this.Ustore(o, h);
+  }
   npFetch() { return this.Ufetch(NPoffset) || this.ROMNAMEE; } // If ROMNAMEE is top of memory it will be 0, leading to negative results
   lastFetch() { return this.Ufetch(LASToffset); }
   padPtr() { return this.vpFetch() + 80; } // Sometimes JS needs the pad pointer
