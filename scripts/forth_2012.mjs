@@ -11,6 +11,7 @@ const ROMSIZE = 0x4000 * CELLL;
 const RAMSIZE = 0x2000 * CELLL; // Make it larger will use
 const extensions = ForthNodeExtensions; // Only current case is Node for running fs but that could change
 const memClass = undefined; // Define to override default based on CELLL and MEM
+const testFlags = 0;
 
 const preTest = `
 \\ TODO multi line comments, once put this in a file
@@ -178,7 +179,8 @@ VARIABLE LEAVE-PTR
 // not implemented yet: 2CONSTANT 2LITERAL D+ D- D. D.R D2* D2/ D< D= D>S DMAX DMIN DNEGATE M * / M+
 
 
-const forth = new Forth_with_fs({ CELLL, MEM, ROMSIZE, RAMSIZE, extensions, memClass });
+
+const forth = new Forth_with_fs({ CELLL, MEM, ROMSIZE, RAMSIZE, extensions, testFlags, memClass });
 forth.initialize()
   .then(() => console.log("Forth with FS built"))
   .then(() => forth.interpret(preTest))
