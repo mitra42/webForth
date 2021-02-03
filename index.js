@@ -1207,10 +1207,6 @@ CREATE NULL$ 0 , ( EFORTH-ZEN-ERRATA inserts a string "coyote" after this, no id
 
 ( EFORTH-V5-ERRATA uses TIB #TIB CELL+ ! which since ' TIB #TIB CELL+ @' is a NOOP )
 ( EFORTH-ZEN-ERRATA uses =TIB but doesnt define =TIB which is TIB0)
-: PRESET ( -- )
-  ( Reset data stack pointer and the terminal input buffer. )
-  SP0 @ SP!   ( initialize data stack )
-  TIB0 #TIB CELL+ ! ; ( initialize terminal input buffer )
 
 : XIO ( prompt echo tap -- )
   ( Reset the I/O vectors 'EXPECT, 'TAP, 'ECHO and 'PROMPT.)
@@ -1424,6 +1420,7 @@ CREATE I/O  ' ?RX , ' TX! , ( Array to store default I/O vectors. )
 : stack CREATE HERE 0 , OVER , vHERE SWAP ! 0 v, CELLS vALLOT ;
 : spop @ DUP @ CELLS OVER + @ SWAP --  ;
 : spush @ DUP @ 1+ 2DUP SWAP ! CELLS + ! ;
+: sempty @ 0 SWAP ! ; 
 
 8 4 * stack sourceStack ( sourceStack holds 8 * [ SOURCE-ID buff len >IN ] )
 
@@ -1464,16 +1461,30 @@ CREATE I/O  ' ?RX , ' TX! , ( Array to store default I/O vectors. )
   QUERY ( get a line of commands from )
   EVAL ; ( Evaluate it)
 
+: PRESET ( -- )
+  ( Reset data stack pointer and the terminal input buffer. )
+    ." XXX prompt P0 is " 'PROMPT @ . CR
+  SP0 @ SP!   ( initialize data stack )
+    ." XXX prompt P1 is " 'PROMPT @ . CR
+  sourceStack sempty ( empty any nested files
+    ." XXX prompt P2 is " 'PROMPT @ . CR
+  0 TIB0 0 0 source!  ( and read from terminal - resets PROMPT and vetored I/O )
+    ." XXX prompt P3 is " 'PROMPT @ . CR
+  ;
 : quitError ( f -- )
   ( Handle a possible error returned by EVAL - common to QUIT and quit1 )
+    ." XXX prompt qE1 is " 'PROMPT @ . CR
       NULL$ OVER XOR      ( is error address=NULL$ ? )
     ( V5, ZEN and Staapl differ, prefer Staapl I think)
     IF                  ( its not NULL$ )
       CR TIB #TIB @ TYPE ( Display line in TIB )
-      CR >IN @ [ CHAR ^ ] LITERAL CHARS ( ^ under offending word )
+      CR >IN @ [ CHAR ^ ] LITERAL emits ( ^ under offending word )
       CR .$ ."  ? "     ( followed by error message and "?" )
     THEN
-    PRESET ;             ( reset the data stack )
+    ." XXX prompt qE2 is " 'PROMPT @ . CR
+    PRESET             ( reset the data stack, TIB and vectored I/O )
+    ." XXX prompt qE3 is " 'PROMPT @ . CR
+    ;
 
 : QUIT ( -- )
  ( Reset return stack pointer and start text interpreter. )
@@ -1485,9 +1496,10 @@ CREATE I/O  ' ?RX , ' TX! , ( Array to store default I/O vectors. )
       CATCH             ( execute commands with error handler)
       ?DUP
     UNTIL ( a)          ( exit if an error occurred )
-    ( 'PROMPT @ SWAP )  ( EFORTH-ZEN and EFORTH-V5 save current prompt address, Staapl doesnt)
+    'PROMPT @ >R          ( EFORTH-ZEN and EFORTH-V5 save and restore current prompt address, Staapl doesnt)
     CONSOLE             ( Initialize for terminal interaction)
-    quitError           ( Report error and reset data stack) 
+    quitError           ( Report error and reset data stack, source/TIB and vectored I/O ) 
+    R> 'PROMPT !           ( Restore Prompt)
     ( V5 and ZEN also send "ERR" to file handler if prompt is not OK which is a little off )
   AGAIN ;               ( go back get another command line )
 
