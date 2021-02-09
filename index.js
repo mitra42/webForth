@@ -297,8 +297,6 @@ BL 32 1 TEST
 : ?DUP DUP IF DUP THEN ; ( w--ww|0) ( Dup top of stack if its is not zero.)
 : >RESOLVES ( 0 A* -- ) BEGIN ?DUP WHILE >RESOLVE REPEAT ; ( Resolve zero or more forward branches e.g. from multiple LEAVE )
 
-
-
 ( TODO-TEST of above group non-obvious as writing to dictionary. )
 ( IF-THEN tested in ?DUP; )
 
@@ -476,6 +474,21 @@ BL 32 1 TEST
 ?test\\ 5 7 2 */MOD 1 17 2 TEST
 ?test\\ 5 7 2 */ 17 1 TEST
 
+( === More arithmetic needed for ANS compliance ==== )
+\\ TODO-DOUBLE word set https://forth-standard.org/standard/double
+\\ implemented: D0< D0= DABS
+\\ not implemented yet: 2CONSTANT 2LITERAL D+ D- D. D.R D2* D2/ D< D= D>S DMAX DMIN DNEGATE M * / M+
+: D0< ( d -- f ; check if d is negative ) NIP 0< ;  
+: DABS ( d -- abs d ; https://forth-standard.org/standard/double/DABS )
+  2DUP D0< IF DNEGATE THEN ;
+: SM/REM ( d1 n1 -- n2 n3 ; copied from FlashForth)
+  2DUP XOR >R
+  OVER >R
+  ABS >R DABS R> UM/MOD
+  SWAP R> ?negate
+  SWAP R> ?negate
+;
+
 ( === Memory Alignment words Zen pg57 CELL+ CELL- CELLS ALIGNED )
 ( CELL+ & ALIGNED moved earlier ERRATA Zen & v5 use 2 which is wrong unless CELL is '2' )
 
@@ -488,6 +501,7 @@ BL 32 1 TEST
   CELLL * ;
 
 : CHARS ; \\ A noop since 1 address unit per char - note this is ANS CHARS, eFORTH CHARS is now emits
+: 2* 2 * ; \\ TODO-83 This should be optimized to a left shift and then find where used
 
 ?test\\ 123 CELL- CELLL + 123 1 TEST
 ?test\\ 123 CELLS CELLL / 123 1 TEST
@@ -751,7 +765,6 @@ BL 32 1 TEST
   DUP                   ( OR result will still be n )
   R> U< ;               ( if n=/>radix, the digit is not valid )
 
-( TODO evaluate control structures here)
 ( EFORTH-ZEN-ERRATA it doesnt return 'n T' it returns 'n a' on success
 : NUMBER? ( a -- n T, a F ; Convert a number string to integer. Push a flag on tos.)
   BASE @ >R         ( save the current radix in BASE )
@@ -1192,6 +1205,20 @@ CREATE NULL$ 0 , ( EFORTH-ZEN-ERRATA inserts a string "coyote" after this, no id
 
 ( === Text Interpreter loop Zen pg83-84 $INTERPRET [ .OK ?STACK EVAL )
 
+: POSTPONE ( "<spaces><name>" -- ; replaces COMPILE and [COMPILE] )
+\\ https://forth-standard.org/standard/core/POSTPONE - seriously unclear standard definition
+\\ SEE https://github.com/NieDzejkob/2klinux/blob/2665d2491d82f0f8ced8d89163199a42bcd8c5f0/image-files/stage1.frt#L302
+  TOKEN ( a )
+  COUNT FIND-NAME ( na | F)
+  ?DUP 0= ABORT" Not found"
+  DUP immediate? 0= IF 
+    COMPILE COMPILE
+  THEN ( na ) 
+  NAME> ,
+; IMMEDIATE
+
+: [CHAR] ( "name" <spaces> -- ) CHAR POSTPONE LITERAL ; IMMEDIATE
+
 : $INTERPRET ( a -- )
   ( Note js $INTERPRET has same signature as this except for THROW
                                                            ( Interpret a word. If failed, try to convert it to an integer.)
@@ -1273,7 +1300,7 @@ CREATE I/O  ' ?RX , ' TX! , ( Array to store default I/O vectors. )
 
 ( "," COMPILE LITERAL $," are moved earlier, redefinition of ] is moved later as needs $COMPILE )
 : ' ( -- ca ) TOKEN NAME? IF EXIT THEN THROW ;
-
+: ['] ' POSTPONE LITERAL ; IMMEDIATE
 : ALLOT ( n -- ) CP +! ; ( ERRATA Zen has +1 instead of +! fixed in V5 and Staapl)
 : vALLOT ( n -- ) VP @ IF VP +! ELSE ALLOT THEN ; ( EPROM ALLOT - not part of eForth)
 
@@ -1412,6 +1439,142 @@ CREATE I/O  ' ?RX , ' TX! , ( Array to store default I/O vectors. )
 ?test\\ 12 foo ! 0 TEST
 \\ TEST-15-EPROM test failing: foo @ 12 1 TEST
 
+\\ Advanced Loops   DO | ?DO ... LEAVE ... LOOP | +LOOP; I,J,I-MAX,J-MAX,UNLOOP
+\\ lifted from https://github.com/NieDzejkob/2klinux/blob/2665d2491d82f0f8ced8d89163199a42bcd8c5f0/image-files/stage1.frt#L538-L649
+
+
+\\ We can now define DO, ?DO, LOOP, +LOOP and LEAVE. It would be much easier if LEAVE didn't exist,
+\\  but oh well. Because storing LEAVE's data on the stack would interfere with other control flow
+\\  inside the loop, let's store it in a variable. )
+
+VARIABLE leave-ptr
+
+\\ ( Let's consider the base case: only one LEAVE in the loop. This can be trivially handled by
+\\  storing the address we need to patch in the variable.
+
+\\  This would also work quite well with nested loops. All we need to do is store the old value of
+\\  the variable on the stack when opening a loop.
+
+\\  Finally, we can extend this to an arbitrary number of LEAVEs by threading a singly-linked list
+\\  through the branch target address holes. )
+
+\\ ( The loop control variables are stored on the return stack, with the counter on top and the limit
+\\   on the bottom.
+
+\\   DO -> 2>R loop-inside
+
+\\   ?DO -> (?do) ?branch [do the LEAVE thing but with a conditional jump] loop-inside
+\\ )
+
+: (?do)    ( limit counter R: retaddr -- R: limit counter retaddr )
+  R>       ( limit counter retaddr )
+  -ROT     ( retaddr limit counter )
+  2DUP 2>R ( retaddr limit counter R: limit counter )
+  <>       ( retaddr should-loop-at-all? )
+  SWAP >R  ( should-loop-at-all? R: limit counter retaddr )
+;
+
+\\ ( This means that LOOP should look for LEAVE one cells before the actual loop body. That will make
+\\   it handle ?DO correctly, and because the execution token of 2>R is not the same as the execution
+\\   token of leave, this will not break DO.
+
+\\    LOOP ->  (loop) ?branch loop-beginning 2RDROP
+\\   +LOOP -> (+loop) ?branch loop-beginning 2RDROP
+\\                                           ^ LEAVE jumps here
+\\ )
+
+: (loop)   ( R: limit old-counter retaddr )
+  R> 2R>   ( retaddr limit old-counter )
+  1+       ( retaddr limit new-counter )
+  2DUP 2>R ( retaddr limit new-counter R: limit new-counter )
+  =        ( retaddr should-stop-looping? R: limit new-counter )
+  SWAP >R  ( should-stop-looping? R: limit new-counter retaddr )
+;
+
+: (+loop)         ( diff R: limit old-counter retaddr )
+  R>              ( diff retaddr )
+  SWAP            ( retaddr diff )
+  2R>             ( retaddr diff limit old-counter )
+  2 PICK OVER +   ( retaddr diff limit old-counter new-counter )
+  ROT DUP >R      ( retaddr diff old-counter new-counter limit R: limit )
+  -ROT DUP >R     ( retaddr diff limit old-counter new-counter R: limit new-counter )
+  3 PICK          ( retaddr diff limit old-counter new-counter diff )
+  0< IF SWAP THEN ( retaddr diff limit min-limit max-limit )
+  1+ SWAP 1+ SWAP ( retaddr diff limit min-limit+1 max-limit+1 )
+  WITHIN          ( retaddr diff should-stop-looping? )
+  NIP SWAP >R     ( should-stop-looping? R: limit new-counter retaddr )
+;
+
+: leave,
+  HERE
+  leave-ptr @ ,
+  leave-ptr !
+;
+
+: LEAVE COMPILE branch leave, ; IMMEDIATE
+
+: UNLOOP ( https://forth-standard.org/standard/core/UNLOOP )
+  COMPILE 2RDROP
+; IMMEDIATE
+
+: DO
+  leave-ptr @
+  0 leave-ptr !
+  COMPILE 2>R
+  HERE
+; IMMEDIATE
+
+: ?DO ( https://forth-standard.org/standard/core/qDO )
+  leave-ptr @
+  0 leave-ptr !
+  COMPILE (?do)
+  COMPILE ?branch leave, 
+  HERE
+; IMMEDIATE
+
+: some-loop
+  COMPILE ?branch ,
+  leave-ptr @
+  BEGIN
+    ?DUP
+  WHILE
+    DUP @ >R
+    HERE SWAP !
+    R>
+  REPEAT
+  POSTPONE UNLOOP
+  leave-ptr !
+;
+
+: LOOP
+  COMPILE (loop)
+  some-loop
+; IMMEDIATE
+
+: +LOOP
+  COMPILE (+loop)
+  some-loop
+; IMMEDIATE
+
+: I-MAX ( -- n ) RP@ 2 CELLS + @ ;
+: J     ( -- n ) RP@ 3 CELLS + @ ;
+: J-MAX ( -- n ) RP@ 4 CELLS + @ ;
+\\ ---------
+
+( === ANS number input === )
+\\ TODO-83 convert eFORTH's NUMBER? to use 2012's >NUMBER, 
+\\    but note order of definitions tricky though NUMBER? called thru 'NUMBER
+\\ note that >NUMBER requires ?DO and UNLOOP
+\\ note that eFORTH's NUMBER? is broader - handles sign and '$' for hex.
+: accumulate ( +d0 addr digit - +d1 addr )
+  SWAP >R SWAP BASE @ UM* DROP ROT BASE @ UM* D+ R> ;
+: >NUMBER ( ud1 c-addr1 u1 -- ud2 c-addr2 u2 ) 
+  \\ https://forth-standard.org/standard/core/toNUMBER
+  \\ adapted from gForth kernel/basics.fs
+  \\ Note gForth has a different 'digit?' and has I' instead of I-MAX and uses non-standard control structure
+  \\ 0 ?DO COUNT BASE @ DIGIT? WHILE accumulate LOOP 0 ELSE DROP 1- I-MAX I - UNLOOP THEN 
+  0 SWAP 0 ?DO DROP COUNT BASE @ DIGIT? 0= IF DROP 1- I-MAX I - LEAVE THEN accumulate 0 LOOP ; 
+
 ( === Text input from terminal Zen pg 78: ^H TAP kTAP ACCEPT EXPECT QUERY )
 
 ( Errata Zen doesnt match the signature) 
@@ -1486,7 +1649,7 @@ CREATE I/O  ' ?RX , ' TX! , ( Array to store default I/O vectors. )
     ( V5, ZEN and Staapl differ, prefer Staapl I think)
     IF                  ( its not NULL$ )
       CR TIB #TIB @ TYPE ( Display line in TIB )
-      CR >IN @ [ CHAR ^ ] LITERAL emits ( ^ under offending word )
+      CR >IN @ [CHAR] ^ emits ( ^ under offending word )
       CR .$ ."  ? "     ( followed by error message and "?" )
     THEN
     PRESET ;            ( reset the data stack, TIB and vectored I/O )
@@ -1497,7 +1660,7 @@ CREATE I/O  ' ?RX , ' TX! , ( Array to store default I/O vectors. )
   BEGIN
     [COMPILE] [       ( start text interpreter )
     BEGIN
-      [ ' que ] LITERAL ( get a line and evaluate it)
+      ['] que           ( get a line and evaluate it)
       CATCH             ( execute commands with error handler)
       ?DUP
     UNTIL ( a)          ( exit if an error occurred )
@@ -1517,7 +1680,7 @@ CREATE I/O  ' ?RX , ' TX! , ( Array to store default I/O vectors. )
 
 : quit1 ( -- ) ( TODO-34-FILES maybe move as was near QUIT )
   ( Evaluate a line that is already in TIB - could be compiling or interpreting, if error then report it)
-  [ ' EVAL ] LITERAL ( evaluate one line - not this is ' EVAL which gets a line, not 'EVAL which gets one TOKEN )
+  ['] EVAL ( evaluate one line - not this is ' EVAL which gets a line, not 'EVAL which gets one TOKEN )
   CATCH             ( execute commands with error handler)
   ?DUP
   IF ( Its an error )
@@ -1726,7 +1889,7 @@ class FlashXX_XX {
   cellRomFetch(cellAddr) {
     if (cellAddr >= this.romCells) {
       console.log('Attempt to read above top of Rom at', cellAddr);
-    } // TODO-OPTIMIZE comment out
+    } // TODO-OP TIMIZE comment out
     return this.rom[cellAddr];
   }
   cellRamFetch(cellAddr) {
