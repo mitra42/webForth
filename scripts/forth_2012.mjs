@@ -172,6 +172,17 @@ VARIABLE LEAVE-PTR
 ;
 : ['] ' POSTPONE LITERAL ; IMMEDIATE
 
+\\ TODO convert eFORTH's NUMBER? to use 2012's >NUMBER, 
+\\ note that >NUMBER requires ?DO and UNLOOP
+\\ note that eFORTH's NUMBER? is broader - handles sign and '$' for hex.
+: accumulate ( +d0 addr digit - +d1 addr )
+  SWAP >R SWAP BASE @ UM* DROP ROT BASE @ UM* D+ R> ;
+: >NUMBER ( ud1 c-addr1 u1 -- ud2 c-addr2 u2 ) 
+  \\ https://forth-standard.org/standard/core/toNUMBER
+  \\ adapted from gForth kernel/basics.fs
+  \\ Note gForth has a different 'digit?' and has I' instead of I-MAX
+  \\ 0 ?DO COUNT BASE @ DIGIT? WHILE accumulate LOOP 0 ELSE DROP 1- I-MAX I - UNLOOP THEN 
+  0 SWAP 0 ?DO DROP COUNT BASE @ DIGIT? 0= IF DROP 1- I-MAX I - LEAVE THEN accumulate 0 LOOP ; 
 `;
 
 // DOUBLE word set https://forth-standard.org/standard/double

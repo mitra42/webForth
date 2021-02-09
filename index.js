@@ -572,6 +572,17 @@ BL 32 1 TEST
     THEN
   NEXT 2DROP ;    ( done discard addresses)
 
+: CMOVE> ( b1 b2 u -- ; Copy u bytes from b1 to b2 starting high)
+  >R SWAP R@ 1- + SWAP R@ 1- + R>
+  FOR             ( repeat u+1 times)
+    AFT           ( skip to THEN first time)
+      >R DUP C@   ( fetch from source )
+      R@ C!       ( store to destination)
+      1-         ( increment source address)
+      R> 1-      ( increment destination address)
+    THEN
+  NEXT 2DROP ;    ( done discard addresses)
+
 : FILL ( b u c --; Fill u bytes of character c to area beginning at b.)
   SWAP            ( b c u)
   FOR             ( loop u+1 times)
@@ -763,7 +774,7 @@ BL 32 1 TEST
     FOR DUP >R      ( save address b )
       C@            ( get one digit )
       BASE @ DIGIT? ( convert it according to current radix )
-    WHILE SWAP      ( it is a valid digit )
+    WHILE SWAP      ( it is a valid digit - jumps to ELSE if fails)
       BASE @ * +    ( multiply it by radix and add to sum )
       R> 1+        ( increment b, pointing to next digit )
     NEXT            ( loop back to convert the next digit )
@@ -1130,7 +1141,7 @@ BL 32 1 TEST
     EXIT            ( done this part )
   THEN              ( key is a return)
   DROP              ( discard bot and eot )
-  NIP DUP ;         ( bot cur cur;  duplicate cur to force accept to exit, Key not stored )
+  NIP DUP ;         ( bot cur cur;  duplicate cur to force ACCEPT to exit, Key not stored )
 
 ( === Error Handling Zen pg80-82 NULL$ ABORT abort" ?STACK )
 
@@ -1221,8 +1232,7 @@ CREATE NULL$ 0 , ( EFORTH-ZEN-ERRATA inserts a string "coyote" after this, no id
 ( EFORTH-ZEN-ERRATA uses =TIB but doesnt define =TIB which is TIB0)
 
 : XIO ( prompt echo tap -- )
-  ( Reset the I/O vectors 'EXPECT, 'TAP, 'ECHO and 'PROMPT.)
-\\  [ ' accept ] LITERAL 'EXPECT !  ( eFORTH diff - not vectoring, using SOURCE instead )
+  ( Reset the I/O vectors, 'TAP, 'ECHO and 'PROMPT.)
   'TAP !                          ( init kTAP )
   'ECHO !                         ( init ECHO )
   'PROMPT ! ;                     ( init system prompt )
@@ -1402,10 +1412,10 @@ CREATE I/O  ' ?RX , ' TX! , ( Array to store default I/O vectors. )
 ?test\\ 12 foo ! 0 TEST
 \\ TEST-15-EPROM test failing: foo @ 12 1 TEST
 
-( === Text input from terminal Zen pg 78: ^H TAP kTAP accept EXPECT QUERY )
+( === Text input from terminal Zen pg 78: ^H TAP kTAP ACCEPT EXPECT QUERY )
 
 ( Errata Zen doesnt match the signature) 
-: accept ( b u -- b u )
+: ACCEPT ( b u -- b u )
   ( Accept characters to input buffer. Return with actual count.)
   OVER + OVER       ( b b+u b;  EFORTH-ZEN-ERRATA fixed in v5 and STAAPL)
   BEGIN
@@ -1418,15 +1428,7 @@ CREATE I/O  ' ?RX , ' TX! , ( Array to store default I/O vectors. )
     THEN            ( kludge! if was a crlf then will have b+u replaced by b' causing the WHILE to trigger )
   REPEAT            ( b b+u b'; repeat until buffer full )
   DROP              ( b b+u ; drop current pointer
-  OVER - ;          ( b u; leave actual count)
-
-\\ ' accept 'EXPECT ! ( eFORTH diff not stored in 'EXPECT )
-
-: EXPECT ( b u -- )
-  ( Accept input stream and store count in SPAN.)
-  accept            ( eFORTH DIFF - uses 'EXPECT EXECUTE but we prefer Standard "REFILL" approach rather than vectoring )
-  SPAN !            ( store character count in SPAN )
-  DROP ;            ( discard eot address )
+  SWAP - ;          ( u; leave actual count)
 
 ( Generic stack 
 : stack CREATE HERE 0 , OVER , vHERE SWAP ! 0 v, CELLS vALLOT ;
@@ -1459,9 +1461,8 @@ CREATE I/O  ' ?RX , ' TX! , ( Array to store default I/O vectors. )
   ELSE
     ( Accept input stream to terminal input buffer.)
     TIB 80 ( addr and size of terminal input buffer)
-    accept ( caddr u ; )
+    ACCEPT ( u ; )
     #TIB !  ( store number of characters received )
-    DROP ( discard buffer address )
     TRUE    ( return true, never unwind from terminal )
   THEN
 ;
@@ -1475,17 +1476,12 @@ CREATE I/O  ' ?RX , ' TX! , ( Array to store default I/O vectors. )
 
 : PRESET ( -- )
   ( Reset data stack pointer and the terminal input buffer. )
-    ." XXX prompt P0 is " 'PROMPT @ . CR
   SP0 @ SP!   ( initialize data stack )
-    ." XXX prompt P1 is " 'PROMPT @ . CR
   sourceStack sempty ( empty any nested files
-    ." XXX prompt P2 is " 'PROMPT @ . CR
   0 TIB0 0 0 source!  ( and read from terminal - resets PROMPT and vetored I/O )
-    ." XXX prompt P3 is " 'PROMPT @ . CR
   ;
 : quitError ( f -- )
   ( Handle a possible error returned by EVAL - common to QUIT and quit1 )
-    ." XXX prompt qE1 is " 'PROMPT @ . CR
       NULL$ OVER XOR      ( is error address=NULL$ ? )
     ( V5, ZEN and Staapl differ, prefer Staapl I think)
     IF                  ( its not NULL$ )
@@ -1493,10 +1489,7 @@ CREATE I/O  ' ?RX , ' TX! , ( Array to store default I/O vectors. )
       CR >IN @ [ CHAR ^ ] LITERAL emits ( ^ under offending word )
       CR .$ ."  ? "     ( followed by error message and "?" )
     THEN
-    ." XXX prompt qE2 is " 'PROMPT @ . CR
-    PRESET             ( reset the data stack, TIB and vectored I/O )
-    ." XXX prompt qE3 is " 'PROMPT @ . CR
-    ;
+    PRESET ;            ( reset the data stack, TIB and vectored I/O )
 
 : QUIT ( -- )
  ( Reset return stack pointer and start text interpreter. )
@@ -2827,15 +2820,15 @@ class Forth {
    * ?RX  read one char if present
    * ?KEY via '?KEY to ?RX
    * KEY loop till ?KEY
-   * accept read a line via KEY, processing control chars via 'TAP  to kTAP
-   * QUERY read a line via 'EXPECT to accept into TIB and reset >IN
+   * ACCEPT read a line via KEY, processing control chars via 'TAP  to kTAP
+   * QUERY read a line via REFILL to ACCEPT into TIB and reset >IN
    * que read an evaluate a line
    * QUIT loop over que, handling errors
    *
    * See https://github.com/mitra42/webForth/issues/17 for strategy for async version
    */
 
-  // Call chain is ?RX < '?KEY  < ?KEY < KEY < accept < 'EXPECT < QUERY < que < QUIT
+  // Call chain is ?RX < '?KEY  < ?KEY < KEY < ACCEPT < REFILL < QUERY < que < QUIT
   QRX() {
     const [f, c] = this.qrx();
     if (f) {
@@ -3263,7 +3256,7 @@ const ForthNodeExtensions = [
       process.stdin.setEncoding('utf8');
       process.stdout.setEncoding('utf8');
     } },
-  // Call chain is ?RX < '?KEY  < ?KEY < KEY < accept < 'EXPECT < QUERY < que < QUIT
+  // Call chain is ?RX < '?KEY  < ?KEY < KEY < ACCEPT < REFILL < QUERY < que < QUIT
   { // Note - replacing qrx() not QRX() so there is no forth name for this
     f: function qrx() {
       // If there is no data in the buffer, check the stdin and reload the buffer.

@@ -221,7 +221,7 @@ vCREATE buf 1024 vALLOT
 : ALLOCATE ( u -- a ior; Shortcut to https://forth-standard.org/standard/memory/ALLOCATE rewrite if want to use FREE) 
     HERE SWAP ALLOT 0 ;
 : MOVE ( a a' u -- ; https://forth-standard.org/standard/core/MOVE ; TODO redefine in terms of CMOVE or CMOVE> depending on overlaps)
-  CMOVE ; 
+  >R 2DUP > R> SWAP IF CMOVE ELSE CMOVE> THEN ;
 : n2sign DUP IF 0< IF -1 ELSE 1 THEN THEN ; ( u -- -1 | 0 | 1)
 : COMPARE ( c-addr1 u1 c-addr2 u2 -- n ; https://forth-standard.org/standard/string/COMPARE )
   ROT SWAP 2DUP 2>R \\ c1 c2 u1 u2 ^ u1,u2 ; save lengths

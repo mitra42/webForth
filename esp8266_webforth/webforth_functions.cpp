@@ -456,15 +456,16 @@ void EXECUTE() { threadtoken(SPpop()); }
  * ?RX  read one char if present
  * ?KEY via '?KEY to ?RX
  * KEY loop till ?KEY
- * accept read a line via KEY, processing control chars via 'TAP  to kTAP
- * QUERY read a line via 'EXPECT to accept into TIB and reset >IN
+ * ACCEPT read a line via KEY, processing control chars via 'TAP  to kTAP
+ * REFILL reads a line, where depends on SOURCE-ID/SOURCE
+ * QUERY read a line via ACCEPT into TIB and reset >IN
  * que read an evaluate a line
  * QUIT loop over que, handling errors
  *
  * See https://github.com/mitra42/webForth/issues/17 for strategy for async version
  */
 
-// Call chain is ?RX < '?KEY  < ?KEY < KEY < accept < 'EXPECT < QUERY < que < QUIT
+// Call chain is ?RX < '?KEY  < ?KEY < KEY < ACCEPT < 'EXPECT < QUERY < que < QUIT
 // -- char T | F
 void QRX() { // ?RX
    if (Serial.available() > 0) {
