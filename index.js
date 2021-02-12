@@ -314,6 +314,7 @@ BL 32 1 TEST
 ( === More Stack Words Zen pg49 TODO-OPTIMIZE )
 : ROT >R SWAP R> SWAP ; ( w1, w2, w3 -- w2 w3 w1; Rotate third item to top)
 : -ROT SWAP >R SWAP R> ; ( w1, w2, w3 -- w3 w1 w2; Rotate top item to third)
+: TUCK SWAP OVER ; ( w1 w2 -- w2 w1 w2 ; tuck top of stack under 2nd )
 : 2DUP OVER OVER ; ( w1 w2 -- w1 w2 w1 w2;)
 : 2OVER >R >R 2DUP R> -ROT R> -ROT ; ( w1 w2 w3 w4 -- w1 w2 w3 w4 w1 w2 )
 : 2SWAP >R -ROT R> -ROT ; ( w1 w2 w3 w4 -- w3 w4 w1 w2 )
@@ -764,51 +765,6 @@ BL 32 1 TEST
   THEN                  ( if n>10, the flag will be 0 and )
   DUP                   ( OR result will still be n )
   R> U< ;               ( if n=/>radix, the digit is not valid )
-
-( EFORTH-ZEN-ERRATA it doesnt return 'n T' it returns 'n a' on success
-: NUMBER? ( a -- n T, a F ; Convert a number string to integer. Push a flag on tos.)
-  BASE @ >R         ( save the current radix in BASE )
-  0 OVER COUNT      ( a 0 a+1 n --, get length of the string )
-  OVER C@           ( get first digit )
-  36                ( [ CHAR $ ] LITERAL )
-  =                 ( is it a $ for hexadecimal base?)
-  IF HEX            ( use hexadecimal base and adjust string )
-    SWAP 1+        ( a 0 n a+2 )
-    SWAP 1-        ( a 0 a+2 n-1 )
-  THEN OVER C@      ( get the next digit )
-  45                ( [ CHAR - ] LITERAL )
-  =                 ( is it a - sign? )
-  >R                ( a 0 b' n'; save the - flag )
-  SWAP R@ -         ( adjust address b )
-  SWAP R@ +         ( a 0 b" n") ( adjust count n)
-  ?DUP              ( do we still have digits left? )
-  IF                ( yes. do conversion )
-    1- ( a 0 b" n"-1) ( adjust loop count for FOR-NEXT loop )
-    FOR DUP >R      ( save address b )
-      C@            ( get one digit )
-      BASE @ DIGIT? ( convert it according to current radix )
-    WHILE SWAP      ( it is a valid digit - jumps to ELSE if fails)
-      BASE @ * +    ( multiply it by radix and add to sum )
-      R> 1+        ( increment b, pointing to next digit )
-    NEXT            ( loop back to convert the next digit )
-      DROP ( a sum ) ( discard string address b )
-      R@ ( b ?sign)  ( completely convert the string.get sign )
-      IF NEGATE THEN ( negate the sum if - flag is true )
-      SWAP          ( sum a )
-    ELSE            ( a non-digit was encountered )
-      R> R>         ( a sum b" b index)
-      2DROP         ( a sum b")
-      2DROP FALSE   ( a 0 , conversion failed )
-    THEN DUP        ( /sum a a/ if success; else /a 0/ 0 )
-  THEN
-  R> ( n ?sign)     ( retrieve the sign flag )
-  2DROP             ( discard garbage )
-  R> BASE ! ;       ( restore radix )
-
-?test\\ 50 10 DIGIT? 2 -1 2 TEST
-?test\\ BL PARSE 1234 PAD PACK$ NUMBER? DROP 1234 1 TEST
-' NUMBER? 'NUMBER !
-?test\\ 123 123 1 TEST
 
 ( TODO Note the EFORTH-ZEN-ERRATA in the docs v. code for NUMBER? means we drop testing the flag will reconsider when see how used )
 ( === Serial I/O Zen pg69 ?KEY KEY EMIT NUF? )
@@ -1331,7 +1287,7 @@ CREATE I/O  ' ?RX , ' TX! , ( Array to store default I/O vectors. )
   ; IMMEDIATE
 
 ?test\\ : foo $" hello" COUNT NIP ; foo 5 1 TEST
-?test\\ S" foo" SWAP OVER + 1- C@ 3 CHAR o 2 TEST
+?test\\ S" foo" TUCK + 1- C@ 3 CHAR o 2 TEST
 
 ( === Name Dictionary Compiler Zen pg94-96: ?UNIQUE $,n $COMPILE OVERT ; ] call, : IMMEDIATE  (see this.dollarCommaN)
 
@@ -1344,19 +1300,24 @@ CREATE I/O  ' ?RX , ' TX! , ( Array to store default I/O vectors. )
 
 ?test\\ TOKEN foo DUP ?UNIQUE - 0 1 TEST
 
-: $,n ( na -- ) ( See also this.dollarCommaN above)
-  ( Build a new dictionary name using the string at na.)
-  DUP C@                      ( null input?)
-  IF ?UNIQUE                  ( duplicate name? )
+: ($,n)  ( na -- )
     ( na) DUP LAST !          ( save na for vocabulary link for OVERT)
     ( na) HERE ALIGNED SWAP   ( align code address )
     ( cp na) CELL-            ( link address )
     ( cp la) CURRENT @ @      ( link to current vocab)
     ( cp la na') OVER !
     ( cp la) CELL- DUP NP !   ( adjust name pointer )
-    ( ptr) ! EXIT             ( save code pointer and exit )
-  THEN                        ( here if null input )
-  $" name" THROW ;            ( this is an error return )
+    ( ptr) !                  ( save code pointer )
+;
+
+: $,n ( na -- ) ( See also this.dollarCommaN above)
+  ( Build a new dictionary name using the string at na.)
+  DUP C@            ( null input?)
+  IF ?UNIQUE        ( duplicate name? )
+    ($,n)
+    EXIT            ( exit )
+  THEN              ( here if null input )
+  $" name" THROW ;  ( this is an error return )
 
 : $COMPILE ( a -- ) ( Redefining code word js $COMPILE in Forth)
   ( Compile next word to code dictionary as a token or literal.)
@@ -1393,7 +1354,11 @@ CREATE I/O  ' ?RX , ' TX! , ( Array to store default I/O vectors. )
 : OVERT ( -- ) ( Redefining code word in Forth)
   ( Link a successfully defined word into the current vocabulary. )
   LAST @        ( name field address of last word )
-  CURRENT @  ! ; ( link it to current vocabulary )
+  DUP @ IF        ( Dont store if LAST is 0 as in :NONAME)
+    CURRENT @  ! ( link it to current vocabulary )
+  ELSE
+    NP @ 3 CELLS + NP !
+  THEN ;
 
 : ; ( -- ) ( redefining code/javascript word)
   ( Terminate a colon definition. )
@@ -1409,7 +1374,15 @@ CREATE I/O  ' ?RX , ' TX! , ( Array to store default I/O vectors. )
   ( Start a new colon definition using next word as its name.)
   TOKEN $,n   ( compile new word with next name )
   tokenDoList ,
-  ] ;
+  ] ;         ( Set state to compiling )
+
+: :NONAME ( -- xt )
+  NP @ CELL- 0 OVER ! DUP NP !
+  ($,n)
+  HERE            \\ Returns xt 
+  tokenDoList , 
+  ] 
+;
 
 ?test\\ : foo 1 ; foo 1 1 TEST
 
@@ -1575,6 +1548,59 @@ VARIABLE leave-ptr
   \\ 0 ?DO COUNT BASE @ DIGIT? WHILE accumulate LOOP 0 ELSE DROP 1- I-MAX I - UNLOOP THEN 
   0 SWAP 0 ?DO DROP COUNT BASE @ DIGIT? 0= IF DROP 1- I-MAX I - LEAVE THEN accumulate 0 LOOP ; 
 
+
+: (charbase) ( c -- c n ; Check if character represents a base, if so return)
+  DUP 35 = IF 10 EXIT THEN ( # )
+  DUP 36 = IF 16 EXIT THEN ( $ )
+  DUP 37 = IF 2 EXIT THEN ( % )
+  0
+  \\ DUP 39 = IF 0 EXIT THEN ( '  - handled specially 
+;
+
+( EFORTH-ZEN-ERRATA it doesnt return 'n T' it returns 'n a' on success
+: NUMBER? ( a -- n T, a F ; Convert a number string to integer. Push a flag on tos.)
+  DUP BASE @ >R         ( save the current radix in BASE )
+  COUNT OVER >R >R  ( a a' R: base0 a+1 n ; a' always points to next char to read )
+  COUNT             ( a a' c )
+  (charbase)        ( a a' c base|0 ) 
+  ?DUP IF           ( Did we change base ?)
+    BASE !
+    DROP            ( a a' )
+    COUNT           ( a a' c )
+  THEN              ( a a' c )
+  DUP 39 = IF       ( Compare to "'" )
+    DROP
+    COUNT           ( a a' c ; Get single character )
+    SWAP COUNT 39 <> ( a c a' f ; Get ending quote and check )
+    IF ( a c a' f R: base0 a+1 n )
+      2DROP 2RDROP FALSE ( a a F R: base0 )
+    ELSE
+      DROP NIP TRUE     ( c T )
+      2RDROP
+    THEN            ( a a F | c T R: base0 )
+    R> BASE !
+    EXIT 
+  THEN ( a' c )
+  45 = TUCK         ( a sign a' sign R: base0 a+1 n ; check if matches '-')
+  0= IF 1- THEN     ( a sign a' ; back up to point at first digit)
+  0 0 ROT           ( a sign 0 0 a' )
+  R> R> + OVER -    ( a sign 0 0 a' n+a+1-a' R: base0 )
+  >NUMBER           ( a sign ud a' u ; convert and see if anything left )
+  IF ( its not a number )
+    2DROP 2DROP FALSE  ( a F R: base0 )
+  ELSE DROP ROT         ( a ud sign )
+    IF DNEGATE THEN DROP NIP TRUE ( n T )
+  THEN
+  R> BASE !         ( n T | a F )
+;
+
+?test\\ 50 10 DIGIT? 2 -1 2 TEST
+?test\\ BL PARSE 1234 PAD PACK$ NUMBER? DROP 1234 1 TEST
+\\ ' NUMBER? 'NUMBER !
+?test\\ 123 123 1 TEST
+
+
+
 ( === Text input from terminal Zen pg 78: ^H TAP kTAP ACCEPT EXPECT QUERY )
 
 ( Errata Zen doesnt match the signature) 
@@ -1664,17 +1690,11 @@ VARIABLE leave-ptr
       CATCH             ( execute commands with error handler)
       ?DUP
     UNTIL ( a)          ( exit if an error occurred )
-    ." XXX prompt Q1 is " 'PROMPT @ . CR
     'PROMPT @ >R          ( EFORTH-ZEN and EFORTH-V5 save and restore current prompt address, Staapl doesnt)
-    ." XXX prompt Q2 is " 'PROMPT @ . CR
     CONSOLE             ( Initialize for terminal interaction)
-    ." XXX prompt Q4 is " 'PROMPT @ . CR
-    Fbreak
-    ." XXX prompt Q5 is " 'PROMPT @ . CR
+    \\ Fbreak
     quitError           ( Report error and reset data stack, source/TIB and vectored I/O ) 
-    ." XXX prompt Q6 is " 'PROMPT @ . CR
     R> ?DUP IF 'PROMPT ! THEN ( Restore Prompt)
-    ." XXX prompt Q7 is " 'PROMPT @ . CR
     ( V5 and ZEN also send "ERR" to file handler if prompt is not OK which is a little off )
   AGAIN ;               ( go back get another command line )
 
@@ -2556,6 +2576,7 @@ class Forth {
   isTestFlags(bb) { return (this.Ufetch(testFlagsOffset) & bb); }
   // Put Fbreak in a definition.
   Fbreak() {
+    console.log("S:", this.debugStack());
     console.log('\nbreak in a FORTH word'); } // Put a breakpoint in your IDE at this line
   // debugPrintTIB will print the current TIB.
   debugPrintTIB() {
@@ -3196,7 +3217,7 @@ class Forth {
     this.SPpush(np); // Note that NP is not updated, the same buffer will be used for each word until hit ':'
   }
 
-  NUMBERQ() { // Same footprint as NUMBER?, this will be stored vectored from 'NUMBER
+  NUMBERQ() { // Same footprint as NUMBER?,but less functionality (Decimal only) this will be stored vectored from 'NUMBER
     // TODO-backport simple number conversion from Arduino
     const a = this.SPpop();
     const w = this.countedToJS(a);
