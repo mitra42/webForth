@@ -757,6 +757,10 @@ BL 32 1 TEST
 : DIGIT? ( c base -- u t ; Convert a character to its numeric value. A flag indicates success.)
   >R                    ( save radix )
   48 -          ( character offset from digit 0 - would be better as '[ CHAR 0 ] LITERAL' but dont have '[')
+  42 OVER < 
+  IF 
+    32 -                ( convert lower case to upper case )
+  THEN
   9 OVER <              ( is offset greater than 9? )
   IF 7 -                ( yes. offset it from digit A )
     DUP                 ( n n )
@@ -1357,7 +1361,7 @@ CREATE I/O  ' ?RX , ' TX! , ( Array to store default I/O vectors. )
   DUP @ IF        ( Dont store if LAST is 0 as in :NONAME)
     CURRENT @  ! ( link it to current vocabulary )
   ELSE
-    NP @ 3 CELLS + NP !
+    DROP NP @ 3 CELLS + NP !
   THEN ;
 
 : ; ( -- ) ( redefining code/javascript word)
@@ -1596,7 +1600,7 @@ VARIABLE leave-ptr
 
 ?test\\ 50 10 DIGIT? 2 -1 2 TEST
 ?test\\ BL PARSE 1234 PAD PACK$ NUMBER? DROP 1234 1 TEST
-\\ ' NUMBER? 'NUMBER !
+' NUMBER? 'NUMBER !
 ?test\\ 123 123 1 TEST
 
 
