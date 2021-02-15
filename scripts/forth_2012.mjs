@@ -27,6 +27,9 @@ const preTest = `
    CELL+ DUP @ CP ! CELL+ @ NP ! ;  
 
 : BUFFER: CREATE vALLOT ; \\ TODO may need vBUFFER:
+
+\\ VALUE - depends on 
+
 `;
 
 
