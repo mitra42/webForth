@@ -80,6 +80,7 @@ const jsFunctionAttributes = [
   { n: 'tokenUser', token: true },
   { n: 'tokenVar', token: true },
   { n: 'tokenCreate', token: true },
+  { n: 'tokenDefer', token: true }, // Execute payload (like DoList but just one)
   'ALIGNED',
   { n: 'find', f: 'jsFind' }, // Fast version of find - see Forth definition later
   { n: 'OVERT', replaced: true },
@@ -104,7 +105,7 @@ const jsFunctionAttributes = [
   'debugNA', 'testing3', 'Fbreak', 'debugPrintTIB', 'TEST', 'stringBuffer', 'TYPE',
   // TODO-ARDUINO needs from here down - some could be in Forth instead
   'loop', 'I', 'leave', 'RDROP', { n: '2RDROP', f: 'TwoRDROP' }, { n: 'FIND-NAME-IN', f: 'FIND_NAME_IN' }, { n: 'immediate?', f: 'immediateQ' },
-  { n: 'ALIGN', f: 'vpAlign' }, { n: '>BODY', f: 'toBody' },
+  { n: 'ALIGN', f: 'vpAlign' }, { n: '>BODY', f: 'toBODY' }, 'DEFER', 'ROLL', 'ROT',
 ];
 
 // Define the tokens used in the first cell of each word.
@@ -116,6 +117,7 @@ const tokenDoList = 3;
 const tokenUser = 4;
 const tokenVar = 5;
 const tokenCreate = 6;
+const tokenDefer = 7;
 
 // ported to Arduino below to L.115
 // === Memory Map - Zen pg26
@@ -272,6 +274,10 @@ BL 32 1 TEST
 : CREATE tokenCreate create ; ( Note the extra field for DOES> to patch - redefines definition moved up so that it will use new TOKEN etc)
 ( TODO-TEST test of above group non-obvious as writing to dictionary. )
 
+( Words associated with DEFER - from Forth2012)
+: DEFER@ ( xt -- a; ) >BODY @ ;
+: DEFER! ( xt1 xt2 --; ) >BODY ! ;
+
 ( === Control structures - were on Zen pg91 but needed earlier Zen pg 91-92 but moved early )
 ( this version comes from EFORTH-V5 which introduced MARK> >MARK )
 
@@ -301,6 +307,7 @@ BL 32 1 TEST
 ( IF-THEN tested in ?DUP; )
 
 : 0= IF FALSE ELSE TRUE THEN ;
+: 0<> 0= 0= ;
 : D0= OR 0= ;
 : ?\\ ( f -- ; Conditional compilation/interpretation - comment out if f is 0 )
   0= IF [COMPILE] \\ THEN ; IMMEDIATE 
@@ -312,7 +319,6 @@ BL 32 1 TEST
 ( === Multitasking Zen pg48 - not implemented in eForth TODO )
 
 ( === More Stack Words Zen pg49 TODO-OPTIMIZE )
-: ROT >R SWAP R> SWAP ; ( w1, w2, w3 -- w2 w3 w1; Rotate third item to top)
 : -ROT SWAP >R SWAP R> ; ( w1, w2, w3 -- w3 w1 w2; Rotate top item to third)
 : TUCK SWAP OVER ; ( w1 w2 -- w2 w1 w2 ; tuck top of stack under 2nd )
 : 2DUP OVER OVER ; ( w1 w2 -- w1 w2 w1 w2;)
@@ -357,6 +363,7 @@ BL 32 1 TEST
 : = XOR IF FALSE EXIT THEN TRUE ; ( w w -- t)
 : <> XOR IF TRUE EXIT THEN FALSE ; ( w w -- t; from ANS not eForth)
 : U< 2DUP XOR 0< IF NIP 0< EXIT THEN - 0< ;
+: U> SWAP U< ;
 : ud< ( ud ud -- f ) ROT SWAP U< IF 2DROP TRUE ELSE U< THEN ;
 : < 2DUP XOR 0< IF DROP 0< EXIT THEN - 0< ;
 : > SWAP < ;
@@ -1265,7 +1272,14 @@ CREATE I/O  ' ?RX , ' TX! , ( Array to store default I/O vectors. )
 : vALLOT ( n -- ) VP @ IF VP +! ELSE ALLOT THEN ; ( EPROM ALLOT - not part of eForth)
 
 : [COMPILE] ( -- ; <string> ) ' , ; IMMEDIATE ( Needs redefining to use new "'" )
-
+: IS STATE @ \\ https://forth-standard.org/standard/core/IS (nasty state dependent word)
+  IF [COMPILE] ['] COMPILE DEFER!
+  ELSE ' DEFER!
+  THEN ; IMMEDIATE
+: ACTION-OF STATE @ \\ https://forth-standard.org/standard/core/ACTION-OF (nasty state dependent word)
+  IF [COMPILE] ['] COMPILE DEFER@
+  ELSE ' DEFER@
+  THEN ; IMMEDIATE
 ( ERRATA Staapl & Zen do 'CURRENT @ !', v5 does 'NAME> ,' this is fundamentally different usage, ANS matches latter )
 : RECURSE ( -- ) LAST @ NAME> , ; IMMEDIATE
 
@@ -1768,6 +1782,10 @@ VARIABLE leave-ptr
   ."  <sp " ;    ( print stack pointer )
 
 ?test\\ 1 2 .S 1 2 2 TEST
+
+( === More Forth2012 words === 
+: UNUSED ( -- u ; https://forth-standard.org/standard/core/UNUSED )
+  NP @ CP @ - ;
 
 ( === Stack Checking Zen pg101 !CSP ?CSP )
 
@@ -2346,7 +2364,7 @@ class Forth {
     this.ramSP = this.ramSPP;  // Data Stack Pointer but in MEM units rather than bytes
     this.ramRP = this.m.ramAddr(RP0);  // Return Stack Pointer (aka BP in 8086)
     this.ramUP = this.m.ramAddr(this.UPP);  // User Area Pointer // TODO-28-MULTI will move this around
-    this._USER = 0; // Incremented by this.CELLL as define USER's
+    this._USER = 0; // Incremented as define USER's
     // ported to Arduino above
 
     // Ported to Android below to L.1898
@@ -2903,6 +2921,10 @@ class Forth {
     this.IP = this.PAYLOAD; // Point at first word in the definition
   }
 
+  tokenDefer() { // TODO-ARDUINO needed
+    // Payload contains XT of word to be executed, nothing goes on return stack as not unwound
+    this.threadtoken(this.Mfetch(this.PAYLOAD));
+  }
   // Leaves an address in the user area, note it doesnt compile the actual address since UP will change when multi-tasking
   tokenUser() { this.SPpush(this.m.fromRamAddr(this.Mfetch(this.PAYLOAD) + this.ramUP)); }
 
@@ -2920,9 +2942,9 @@ class Forth {
     this._tokenDoes();
   }
 
-  toBody(xt = this.SPpop()) { // xt -- a; push address of data space for something built with VARIABLE or CREATE
+  toBODY(xt = this.SPpop()) { // xt -- a; push address of data space for something built with VARIABLE or CREATE or DEFER
     const token = this.Mfetch(xt); // token - ideally tokenCreate or tokenVar
-    let dataSpace = xt + (this.CELLL * 2);
+    let dataSpace = (token === tokenDefer) ? xt + this.CELLL : xt + (this.CELLL * 2);
     if (token === tokenVar) {
       dataSpace = this.Mfetch(dataSpace);
     }
@@ -3117,14 +3139,20 @@ class Forth {
   SPbang() { this.ramSP = this.m.ramAddr(this.SPpop()); } //SP! must be aligned
 
   // Classic Data stack words eForthAndZen#42
+  _roll(n) { // _roll(2) is like ROT TODO-ARDUINO needed
+    let bottom = this.ramSP + n
+    const val = this.m.cellRamFetch(bottom);
+    for (; n > 0; n--) {
+      this.m.cellRamStore(bottom, this.m.cellRamFetch(bottom - 1));
+      bottom--;
+    }
+    this.m.cellRamStore(bottom, val);
+  }
+  ROLL() { this._roll(this.SPpop()); } // TODO-ARDUINO needed
   DROP() { this.ramSP++; }
   DUP() { this.SPpush(this.SPfetch()); }
-  SWAP() {
-    const x = this.SPpop();
-    const y = this.SPpop();
-    this.SPpush(x);
-    this.SPpush(y);
-  }
+  SWAP() { this._roll(1); } // TODO-ARDUINO rewrote
+  ROT() { this._roll(2); } // TODO-ARDUINO rewrote
   OVER() {
     const x = this.SPpop();
     const y = this.SPfetch();
@@ -3375,13 +3403,14 @@ class Forth {
     this.Ustore(STATEoffset, l.TRUE); } // uses JS dINTERPRET
 
   // : : TOKEN $,n [ ' doLIST ] LITERAL ] ; see Zen pg96
-  colon() {
+  _colon(tok) {
     this.TOKEN();  // a; (counted string in named space)
     this.cpAlign(); // Before dollarCommaN so code field in Name dictionary correct
     this.dollarCommaN();
-    this.DW(tokenDoList); // Must be after creating the name and links etc
-    this.closeBracket();
+    this.DW(tok); // Must be after creating the name and links etc
   }
+  colon() { this._colon(tokenDoList); this.closeBracket(); }
+  DEFER() {  this._colon(tokenDefer); this.DW(0); this.OVERT(); } //TODO-ARDUINO needs this
 
   // : ; doLIT EXIT , OVERT [ ; IMMEDIATE
   semicolon() { // Zen pg95
