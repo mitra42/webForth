@@ -74,6 +74,7 @@
 // it is used to build the dictionary in each instance.
 const jsFunctionAttributes = [
   0, // 0 is not a valid token
+  // This next list of token's must match in order the constants defined for tokenCreate etc.
   { n: 'tokenVocabulary', token: true }, // Token used for Vocabularies must be first 1
   { n: 'tokenNextVal', token: true }, // Token used for Constants must be next (2)
   { n: 'tokenDoList', token: true },
@@ -81,6 +82,7 @@ const jsFunctionAttributes = [
   { n: 'tokenVar', token: true },
   { n: 'tokenCreate', token: true },
   { n: 'tokenDefer', token: true }, // Execute payload (like DoList but just one)
+  { n: 'tokenValue', token: true}, // Returns value from a user variable.
   'ALIGNED',
   { n: 'find', f: 'jsFind' }, // Fast version of find - see Forth definition later
   { n: 'OVERT', replaced: true },
@@ -118,6 +120,7 @@ const tokenUser = 4;
 const tokenVar = 5;
 const tokenCreate = 6;
 const tokenDefer = 7;
+const tokenValue = 8;
 
 // ported to Arduino below to L.115
 // === Memory Map - Zen pg26
@@ -139,7 +142,7 @@ l.BL = 32;
 // or the contents of a property of the forth instance (e.g. Forth.prototype.TIB0
 const jsUsers = []; // Note 4 cells skipped for multitasking but that is in init of _USER to 4*CELLL
 function USER(n, v) { jsUsers.push([n, v]); return (jsUsers.length - 1); }
-USER(undefined, 0); // Used for multitasking
+USER('_USER', 0); // Size of user area
 USER(undefined, 0); // Used for multitasking
 USER(undefined, 0); // Used for multitasking
 USER(undefined, 0); // Used for multitasking
@@ -276,7 +279,7 @@ BL 32 1 TEST
 
 ( Words associated with DEFER - from Forth2012)
 : DEFER@ ( xt -- a; ) >BODY @ ;
-: DEFER! ( xt1 xt2 --; ) >BODY ! ;
+: DEFER! ( xt1 xt2 --; ) >BODY ! ; 
 
 ( === Control structures - were on Zen pg91 but needed earlier Zen pg 91-92 but moved early )
 ( this version comes from EFORTH-V5 which introduced MARK> >MARK )
@@ -1272,10 +1275,12 @@ CREATE I/O  ' ?RX , ' TX! , ( Array to store default I/O vectors. )
 : vALLOT ( n -- ) VP @ IF VP +! ELSE ALLOT THEN ; ( EPROM ALLOT - not part of eForth)
 
 : [COMPILE] ( -- ; <string> ) ' , ; IMMEDIATE ( Needs redefining to use new "'" )
-: IS STATE @ \\ https://forth-standard.org/standard/core/IS (nasty state dependent word)
-  IF [COMPILE] ['] COMPILE DEFER!
-  ELSE ' DEFER!
-  THEN ; IMMEDIATE
+: '>BODY! STATE @ \\ https://forth-standard.org/standard/core/IS (nasty state dependent word)
+  IF [COMPILE] ['] COMPILE >BODY!
+  ELSE ' >BODY!
+  THEN ; 
+: IS '>BODY! ; IMMEDIATE
+
 : ACTION-OF STATE @ \\ https://forth-standard.org/standard/core/ACTION-OF (nasty state dependent word)
   IF [COMPILE] ['] COMPILE DEFER@
   ELSE ' DEFER@
@@ -1411,7 +1416,9 @@ CREATE I/O  ' ?RX , ' TX! , ( Array to store default I/O vectors. )
 
 ( EFORTH-DIFF each of V5, Zen and Staapl do this differently - this is different again because of token threaded architecture)
 
-: USER ( u -- ; <string> ) TOKEN $,n OVERT tokenUser , ;
+\\ Deprecated \\ : USER ( u -- ; <string> ) TOKEN $,n OVERT tokenUser , ;
+: VALUE TOKEN $,n OVERT HERE tokenValue , _USER @ , _USER ++ >BODY! ; \\ TODO needs to initialize variable
+: TO '>BODY! ; IMMEDIATE
 
 ( Create a new word that doesnt allocate any space, but will push address of that space. )
 ( redefines definitions moved up so that they will use new TOKEN etc)
@@ -2364,7 +2371,6 @@ class Forth {
     this.ramSP = this.ramSPP;  // Data Stack Pointer but in MEM units rather than bytes
     this.ramRP = this.m.ramAddr(RP0);  // Return Stack Pointer (aka BP in 8086)
     this.ramUP = this.m.ramAddr(this.UPP);  // User Area Pointer // TODO-28-MULTI will move this around
-    this._USER = 0; // Incremented as define USER's
     // ported to Arduino above
 
     // Ported to Android below to L.1898
@@ -2447,21 +2453,22 @@ class Forth {
   }
   buildUser(name, init) {
     if (this.isTestFlags(0x01)) console.log('USER>>', name, init);
+    const _USER = this.Ufetch(0) || 0;
     const initVal = typeof init === 'string'
       ? (typeof this[init] !== 'undefined' ? this[init] : this.JStoXT(init)) // Either field of this, or function
       : typeof init === 'undefined'
-        ? this.Ufetch(this._USER) // Already storing during build (e.g. NP)
+        ? this.Ufetch(_USER) // Already storing during build (e.g. NP)
         : init;
     console.assert(typeof initVal !== 'undefined');
-    this.Ustore(this._USER, initVal);         // Initialize the variable for live compilation
-    const offsetInCells = this._USER;
+    this.Ustore(_USER, initVal);         // Initialize the variable for live compilation
+    const offsetInCells = this.Ufetch(0);
     //UZERO is initialized at userAreaSave
     if (name) {                       // Put into dictionary
       this.CODE(name);
       this.DW(tokenUser, offsetInCells);
       this.OVERT();
     }
-    this._USER++; // Need to skip to next _USER
+    this.Ustore(0, _USER+1); // Need to skip to next _USER
   }
 
   // Add an extension, there are two cases of this
@@ -2928,6 +2935,10 @@ class Forth {
   // Leaves an address in the user area, note it doesnt compile the actual address since UP will change when multi-tasking
   tokenUser() { this.SPpush(this.m.fromRamAddr(this.Mfetch(this.PAYLOAD) + this.ramUP)); }
 
+  tokenValue() { //TODO-83-ARDUINO needs this
+    // Get content of Payload which is offset in cells past ramUP, read that value and push it
+    this.SPpush(this.m.cellRamFetch(this.Mfetch(this.PAYLOAD) + this.ramUP)); }
+
   // Put the address of the payload onto Stack - used for CREATE which is used by VARIABLE
   _tokenDoes() {
     const does = this.Mfetch(this.PAYLOAD);
@@ -2943,10 +2954,15 @@ class Forth {
   }
 
   toBODY(xt = this.SPpop()) { // xt -- a; push address of data space for something built with VARIABLE or CREATE or DEFER
+    // defined for tokenVar, tokenCreate, tokenDefer, tokenValue
     const token = this.Mfetch(xt); // token - ideally tokenCreate or tokenVar
-    let dataSpace = (token === tokenDefer) ? xt + this.CELLL : xt + (this.CELLL * 2);
-    if (token === tokenVar) {
+    // TokenVar and tokenCreate have an extra cell with a possible pointer to DOES>
+    let dataSpace = ([tokenVar, tokenCreate].includes(token)) ? xt + (this.CELLL * 2) : xt + this.CELLL;
+    if ([tokenVar, tokenValue].includes(token)) {
       dataSpace = this.Mfetch(dataSpace);
+    }
+    if (token === tokenValue) {
+      dataSpace = this.m.fromRamAddr(dataSpace + this.ramUP);
     }
     this.SPpush(dataSpace);
   }
@@ -3199,7 +3215,8 @@ class Forth {
   // TODO-28-MULTITASK will need to think carefully about how to move all, or part of the USER space to task-specific space.
   // TODO-28-MULTITASK this is non-trivial since somethings are clearly across all tasks (e.g. CP and NP)
   userAreaInit() {
-    for (let a = 0; a < this._USER; a++) {
+    const _USER = this.m.cellRomFetch(this.UZERO / this.CELLL + 0)
+    for (let a = 0; a < _USER; a++) {
       //console.log(a, this.Ufetch(a), this.Mfetch(this.UZERO + a * this.CELLL));
       this.Ustore(a, this.m.cellRomFetch(this.UZERO / this.CELLL + a));
     }
@@ -3208,7 +3225,8 @@ class Forth {
   // Note it saves the value of LAST which is also in "FORTH", the "OVERT" in COLD restores that
   userAreaSave() {
     this.useRam(); // If were using ROM then switch
-    for (let a = 0; a < this._USER; a++) {
+    const _USER = this.Ufetch(0);
+    for (let a = 0; a < _USER; a++) {
       this.Mstore(this.UZERO + (this.CELLL * a), this.Ufetch(a));
     }
   }
