@@ -68,7 +68,8 @@
    {  n: 'foo'    Name of forth word
       f: bar      Links to Forth.prototype.bar (defaults to same as 'n'
       token: true Create a token word that can be used as first cell of a definition - order must match constants below
-      replaced: true  This word will be replaced by a Forth definition, so check for its being compiled into other definitions.
+      replaced: true  This word will be replaced by a Forth definition, so check for its being compiled into other definitions. TODO-83-DEFER possibly obsoleted by defer
+      defer: true Build a DEFER structure and point at the definition, typically replaced later by Forth word
       jsNeeds: true The execution address of this word is needed by the JS o will be stored in js2xt[n]
  */
 // it is used to build the dictionary in each instance.
@@ -85,9 +86,9 @@ const jsFunctionAttributes = [
   { n: 'tokenValue', token: true}, // Returns value from a user variable.
   'ALIGNED',
   { n: 'find', f: 'jsFind' }, // Fast version of find - see Forth definition later
-  { n: 'OVERT', replaced: true },
+  { n: 'OVERT', replaced: true, defer: true },
   // { n: '?UNIQUE', f: 'qUnique' }, // Not used yet
-  { n: '$,n', f: 'dollarCommaN', replaced: true },
+  { n: '$,n', f: 'dollarCommaN', replaced: true, defer: true },
   { n: '>NAME', f: 'ToNAME' }, // Fast version of >NAME - see Forth definition later
   'MS', 'BYE', { n: 'EXIT', jsNeeds: true }, 'EXECUTE',
   { n: '?RX', f: 'QRX' }, {  n: 'TX!', f: 'TXbang' }, { n: '!IO', f: 'bangIO' },
@@ -100,10 +101,10 @@ const jsFunctionAttributes = [
   { n: '0<', f: 'less0' }, 'AND', 'OR', 'XOR', { n: 'UM+', f: 'UMplus' },
   /* TODO-ARDUINO needs this line */ 'RSHIFT', 'LSHIFT', {n: '2/', f: 'TwoDiv' },
   'userAreaInit', 'userAreaSave',
-  { n: 'PARSE', replaced: true }, { n: 'TOKEN', replaced: true }, { n: 'NUMBER?', f: 'NUMBERQ', replaced: true },
-  { n: '$COMPILE', f: 'dCOMPILE', replaced: true }, { n: '$INTERPRET', f: 'dINTERPRET', replaced: true, jsNeeds: true },
-  { n: '[', f: 'openBracket', immediate: true, replaced: true }, { n: ']', f: 'closeBracket', replaced: true },
-  { n: ':', f: 'colon', replaced: true }, { n: ';', f: 'semicolon', immediate: true, replaced: true }, { n: "'", f: 'tick', replaced: true },
+  { n: 'PARSE', replaced: true, defer: true }, { n: 'TOKEN', replaced: true, defer: true }, { n: 'NUMBER?', f: 'NUMBERQ', replaced: true, defer: true },
+  { n: '$COMPILE', f: 'dCOMPILE', replaced: true, defer: true }, { n: '$INTERPRET', f: 'dINTERPRET', replaced: true, jsNeeds: true, defer: true },
+  { n: '[', f: 'openBracket', immediate: true, replaced: true, defer: true }, { n: ']', f: 'closeBracket', replaced: true, defer: true },
+  { n: ':', f: 'colon', replaced: true, defer: true }, { n: ';', f: 'semicolon', immediate: true, replaced: true, defer: true }, { n: "'", f: 'tick', replaced: true, defer: true },
   'debugNA', 'testing3', 'Fbreak', 'debugPrintTIB', 'TEST', 'stringBuffer', 'TYPE',
   // TODO-ARDUINO needs from here down - some could be in Forth instead
   'loop', 'I', 'leave', 'RDROP', { n: '2RDROP', f: 'TwoRDROP' }, { n: 'FIND-NAME-IN', f: 'FIND_NAME_IN' }, { n: 'immediate?', f: 'immediateQ' },
@@ -151,7 +152,7 @@ const RP0offset = USER('RP0', undefined);      // (--a) Pointer to bottom of the
 USER("'?KEY", '?RX');    // Execution vector of ?KEY. Default to ?rx.
 USER("'EMIT", 'TX!');  // Execution vector of EMIT. Default to TX!
 // eForth difference - this next one is 'EXPECT in EFORTH )
-USER("'READ-LINE", 0);    // Execution vector of READ-LINE - needed as forward definition only present on systems with file
+USER("SPARE", 0);
 // TODO-34-FILES consider if still want vectored I/O or prefer decision based on SOURCE-ID
 USER("'TAP", 0);       // Execution vector of TAP. Default to kTAP.
 USER("'ECHO", 'TX!');  // Execution vector of ECHO. Default to tx! but changed to ' EMIT later.
@@ -166,7 +167,7 @@ USER('CSP', 0);        // Hold the stack pointer for error checking.
 // eFORTH diff - eFORTH uses EVAL as vector to either $INTERPRET or $COMPILE, ANS uses a variable called STATE
 const STATEoffset = USER('STATE', l.FALSE); // True if compiling - only changed by [ ] : ; ABORT QUIT https://forth-standard.org/standard/core/STATE
 //const EVALoffset = USER("'EVAL", 0);      // Initialized when have JS $INTERPRET, this switches between $INTERPRET and $COMPILE
-const NUMBERoffset = USER("'NUMBER", 'NUMBER?');    // Execution vector of number conversion. Default to NUMBER?.
+USER("SPARE2", 0);
 USER('HLD', 0);        // Hold a pointer in building a numeric output string.
 USER('HANDLER', 0);    // Hold the return stack pointer for error handling.
 // this is set to result of currentFetch
@@ -188,7 +189,6 @@ const NPoffset = USER('NP', undefined);  // normally set on Zen pg106 but we are
 const LASToffset = USER('LAST', undefined); // normally set on Zen pg106 but using live
 const VPoffset = USER('VP', undefined);  // not part of eForth, pointer into Data space for EPROMability
 USER('SOURCE-ID', 0);  // 0 for terminal, -1 for string, fd for files
-USER("'unreadFile", 0); // TODO-34-FILES temporary till have files compilation choice //TODO-2ARDUINO
 const testFlagsOffset = USER('testFlags', 0); // bit field: 1 trace interpreter 2 trace threading 4 safety checks 8 tests TODO-67-TESTING - see unreadFile above //TODO-2ARDUINO
 const testDepthOffset = USER('testDepth', 0);  // Needs to autoadjust //TODO-2ARDUINO
 // ported to Arduino above
@@ -263,7 +263,7 @@ BL 32 1 TEST
 : , ( w --; Compile an integer into the code dictionary. Zen pg 89)
   HERE ALIGNED DUP CELL+ CP ! ! ;
 
-: [COMPILE] ( -- ; <string> ) ' , ; IMMEDIATE ( Needs redefining pg87 to use new "'" )
+: [COMPILE] ( -- ; <string> ) ' , ; IMMEDIATE
 
 : COMPILE ( --; Compile the next address in colon list to code dictionary. Zen pg 90)
   R> DUP @ , CELL+ >R ; COMPILE-ONLY
@@ -272,14 +272,11 @@ BL 32 1 TEST
   COMPILE doLIT ( compile doLIT to head lit )
   , ; IMMEDIATE ( compile literal itself )
 
-( This definition of CREATE is redefined pg97 to use new, rather than JS versions of TOKEN $,n OVERT and COMPILE)
 : create TOKEN $,n OVERT , 0 , ; 
+( Create a new word that doesnt allocate any space, but will push address of that space. )
+( redefines definitions moved up so that they will use new TOKEN etc)
 : CREATE tokenCreate create ; ( Note the extra field for DOES> to patch - redefines definition moved up so that it will use new TOKEN etc)
 ( TODO-TEST test of above group non-obvious as writing to dictionary. )
-
-( Words associated with DEFER - from Forth2012)
-: DEFER@ ( xt -- a; ) >BODY @ ;
-: DEFER! ( xt1 xt2 --; ) >BODY ! ; 
 
 ( === Control structures - were on Zen pg91 but needed earlier Zen pg 91-92 but moved early )
 ( this version comes from EFORTH-V5 which introduced MARK> >MARK )
@@ -517,6 +514,29 @@ BL 32 1 TEST
 ?test\\ 123 CELL- CELLL + 123 1 TEST
 ?test\\ 123 CELLS CELLL / 123 1 TEST
 
+: ($,n)  ( na -- )
+    ( na) DUP LAST !          ( save na for vocabulary link for OVERT)
+    ( na) HERE ALIGNED SWAP   ( align code address )
+    ( cp na) CELL-            ( link address )
+    ( cp la) CURRENT @ @      ( link to current vocab)
+    ( cp la na') OVER !
+    ( cp la) CELL- DUP NP !   ( adjust name pointer )
+    ( ptr) !                  ( save code pointer )
+;
+: :NONAME ( -- xt )
+  NP @ CELL- 0 OVER ! DUP NP !
+  ($,n)
+  HERE            \\ Returns xt 
+  tokenDoList , 
+  ] 
+;
+( Words associated with DEFER - from Forth2012)
+: DEFER@ ( xt -- a; ) >BODY @ ;
+: >BODY! >BODY ! ;
+: DEFER! ( xt1 xt2 --; ) >BODY! ; 
+
+
+
 \\ Math routines from Forth2012
 ( see also in functions e.g. RSHIFT )
 
@@ -568,6 +588,7 @@ BL 32 1 TEST
   VP @ ?DUP IF ALIGNED DUP CELL+ VP ! ! ELSE , THEN ;
 ( vCREATE is like CREATE but if VP is set it makes space in the writable DATA area) 
 : vALIGN VP @ ALIGNED VP ! ; 
+( vCREATE is like CREATE but if VP is set it makes space in the writable DATA area) 
 : vCREATE ( -- ; <string> ) VP @ ?DUP IF tokenVar create vALIGN , ELSE CREATE THEN ; ( Compile pointer to data area )
 : PAD ( -- a; Return address of a temporary buffer above code dic)
   HERE 80 + ;
@@ -887,13 +908,14 @@ BL 32 1 TEST
 
 : SOURCE TIB #TIB @ ; ( Repurposing TIB and #TIB for the pointer to buffer and length whatever input source )
 
-: PARSE ( c -- b u ; <string> ) ( Scan input stream and return counted string delimited by c.)
+:NONAME ( c -- b u ; <string> ) ( Scan input stream and return counted string delimited by c.)
   >R              ( save the delimiting character )
   SOURCE          ( a u )
   SWAP >IN @ +    ( u a' ; address in TIB to start parsing )
   SWAP >IN @ -    ( a' u' ; length of remaining string in TIB )
   R> parse        ( a" u" delta ; parse the desired string )
   >IN +! ;        ( a" u" ; move parser pointer to end of string )
+' PARSE DEFER! \\ IS PARSE
 
 ( === Parsing Words Zen pg74 .( ( \\ CHAR TOKEN WORD )
 
@@ -908,12 +930,12 @@ BL 32 1 TEST
   TYPE ; IMMEDIATE         ( type the string to terminal )
 ?test\\ .( on consecutive ) CR .( lines )
 
-( Note there is this.TOKEN which does same thing )
-: TOKEN ( -- a ; <string> ; Parse a word from input stream and copy it to name dictionary.)
+:NONAME ( -- a ; <string> ; Parse a word from input stream and copy it to name dictionary. : TOKEN )
   BL PARSE            ( parse out next space delimited string )
   BYTEMASK MIN              ( truncate it to 31 characters = nameMaxLength )
   NP @                ( word buffer below name dictionary )
   OVER - CELLL - PACK$ ;  ( copy parsed string to word buffer )
+' TOKEN DEFER!
 
 : WORD ( c -- a ; <string> ) ( Parse a word from input stream and copy it to code dictionary. Not if not in definition it will be overwritten by next)
   PARSE         ( parse out a string delimited by c )
@@ -1189,9 +1211,9 @@ CREATE NULL$ 0 , ( EFORTH-ZEN-ERRATA inserts a string "coyote" after this, no id
 
 : [CHAR] ( "name" <spaces> -- ) CHAR POSTPONE LITERAL ; IMMEDIATE
 
-: $INTERPRET ( a -- )
+:NONAME ( a -- ; : $INTERPRET )
   ( Note js $INTERPRET has same signature as this except for THROW
-                                                           ( Interpret a word. If failed, try to convert it to an integer.)
+  ( Interpret a word. If failed, try to convert it to an integer.)
   NAME?                   ( search dictionary for word just parsed )
     ?DUP                    ( is it a defined word? )
   IF C@                    ( yes. examine the lexicon ) ( ERRATA Zen, V5 and Staapl use @, it should be C@)
@@ -1199,9 +1221,10 @@ CREATE NULL$ 0 , ( EFORTH-ZEN-ERRATA inserts a string "coyote" after this, no id
   ABORT" compile ONLY"  ( if so, abort with the proper message )
   EXECUTE EXIT          ( not compile-only, execute it and exit )
   THEN                    ( not defined in the dictionary )
-  'NUMBER @EXECUTE        ( convert it to a number ) ( TODO-NUMBER-5 merge with number in js)
+  NUMBER?                 ( convert it to a number ) ( TODO-NUMBER-5 merge with number in js)
   IF EXIT THEN            ( exit if conversion is successful )
   THROW ;                 ( else generated the error condition )
+' $INTERPRET DEFER!
 
 : .OK ( -- )
   ( Display 'ok' only while interpreting.)
@@ -1217,9 +1240,10 @@ CREATE NULL$ 0 , ( EFORTH-ZEN-ERRATA inserts a string "coyote" after this, no id
 
 ( This switches to use new interpreter, its still using old js $COMPILE )
 
-: [ ( -- ; Start the text interpreter.) ( Replaces JS version )
+:NONAME ( -- ; Start the text interpreter : [ )
   FALSE STATE !                 ( ANS version)
   ; IMMEDIATE               ( must be done even while compiling )
+' [ DEFER!
 
 ?test\\ [ 1 2 3 ROT 2 3 1 3 TEST
 
@@ -1269,12 +1293,11 @@ CREATE I/O  ' ?RX , ' TX! , ( Array to store default I/O vectors. )
 ( === Interpreter and Compiler Zen pg 88-90: [ ] ' ALLOT , [COMPILE] COMPILE LITERAL $," RECURSE )
 
 ( "," COMPILE LITERAL $," are moved earlier, redefinition of ] is moved later as needs $COMPILE )
-: ' ( -- ca ) TOKEN NAME? IF EXIT THEN THROW ;
+:NONAME ( -- ca ) TOKEN NAME? IF EXIT THEN THROW ; ' ' DEFER!
 : ['] ' POSTPONE LITERAL ; IMMEDIATE
 : ALLOT ( n -- ) CP +! ; ( ERRATA Zen has +1 instead of +! fixed in V5 and Staapl)
 : vALLOT ( n -- ) VP @ IF VP +! ELSE ALLOT THEN ; ( EPROM ALLOT - not part of eForth)
 
-: [COMPILE] ( -- ; <string> ) ' , ; IMMEDIATE ( Needs redefining to use new "'" )
 : '>BODY! STATE @ \\ https://forth-standard.org/standard/core/IS (nasty state dependent word)
   IF [COMPILE] ['] COMPILE >BODY!
   ELSE ' >BODY!
@@ -1323,17 +1346,7 @@ CREATE I/O  ' ?RX , ' TX! , ( Array to store default I/O vectors. )
 
 ?test\\ TOKEN foo DUP ?UNIQUE - 0 1 TEST
 
-: ($,n)  ( na -- )
-    ( na) DUP LAST !          ( save na for vocabulary link for OVERT)
-    ( na) HERE ALIGNED SWAP   ( align code address )
-    ( cp na) CELL-            ( link address )
-    ( cp la) CURRENT @ @      ( link to current vocab)
-    ( cp la na') OVER !
-    ( cp la) CELL- DUP NP !   ( adjust name pointer )
-    ( ptr) !                  ( save code pointer )
-;
-
-: $,n ( na -- ) ( See also this.dollarCommaN above)
+:NONAME ( na -- ; : $,n )
   ( Build a new dictionary name using the string at na.)
   DUP C@            ( null input?)
   IF ?UNIQUE        ( duplicate name? )
@@ -1341,8 +1354,9 @@ CREATE I/O  ' ?RX , ' TX! , ( Array to store default I/O vectors. )
     EXIT            ( exit )
   THEN              ( here if null input )
   $" name" THROW ;  ( this is an error return )
+' $,n DEFER!
 
-: $COMPILE ( a -- ) ( Redefining code word js $COMPILE in Forth)
+:NONAME  ( a -- : $COMPILE) ( Redefining code word js $COMPILE in Forth)
   ( Compile next word to code dictionary as a token or literal.)
   NAME?         ( parse the next word out )
   ?DUP          ( successful? )
@@ -1353,11 +1367,12 @@ CREATE I/O  ' ?RX , ' TX! , ( Array to store default I/O vectors. )
     THEN
     EXIT        ( done. exit )
   THEN          ( not a valid word )
-  'NUMBER @EXECUTE ( convert it to a number )
+  NUMBER?       ( convert it to a number )
   IF  [COMPILE] LITERAL ( successful. compile a literal number )
     EXIT        ( done )
   THEN          ( not a number either )
   THROW ;       ( generate an error condition )
+' $COMPILE DEFER!
 
 : EVAL ( -- )
   ( Interpret the input stream.)
@@ -1374,7 +1389,7 @@ CREATE I/O  ' ?RX , ' TX! , ( Array to store default I/O vectors. )
 
 ( === TODO-TEST TODO-IO test EVAL, not that .OK wont work here since not yet using $INTERPRET )
 
-: OVERT ( -- ) ( Redefining code word in Forth)
+:NONAME  ( -- : OVERT)
   ( Link a successfully defined word into the current vocabulary. )
   LAST @        ( name field address of last word )
   DUP @ IF        ( Dont store if LAST is 0 as in :NONAME)
@@ -1382,30 +1397,25 @@ CREATE I/O  ' ?RX , ' TX! , ( Array to store default I/O vectors. )
   ELSE
     DROP NP @ 3 CELLS + NP !
   THEN ;
+' OVERT DEFER!
 
-: ; ( -- ) ( redefining code/javascript word)
+:NONAME ( -- : ; )
   ( Terminate a colon definition. )
   COMPILE EXIT  ( compile exit code )
   [COMPILE] [   ( return to interpreter state )
   OVERT ;       ( restore current vocabulary )
-  COMPILE-ONLY IMMEDIATE
+' ; DEFER! COMPILE-ONLY IMMEDIATE
 
-: ] ( -- ; Start compiling the words in the input stream - replaces JS word) ( TODO-FILES maybe retire this, and maybe retires some things that use it)
+:NONAME ( -- ; Start compiling the words in the input stream : ] )
   TRUE STATE ! ;
+' ] DEFER!
 
-: : ( -- ; <string> ) ( redefining code word)
+:NONAME ( -- ; <string> ) ( redefining javascript word ':' = colon )
   ( Start a new colon definition using next word as its name.)
   TOKEN $,n   ( compile new word with next name )
   tokenDoList ,
   ] ;         ( Set state to compiling )
-
-: :NONAME ( -- xt )
-  NP @ CELL- 0 OVER ! DUP NP !
-  ($,n)
-  HERE            \\ Returns xt 
-  tokenDoList , 
-  ] 
-;
+' : DEFER!
 
 ?test\\ : foo 1 ; foo 1 1 TEST
 
@@ -1419,13 +1429,6 @@ CREATE I/O  ' ?RX , ' TX! , ( Array to store default I/O vectors. )
 \\ Deprecated \\ : USER ( u -- ; <string> ) TOKEN $,n OVERT tokenUser , ;
 : VALUE TOKEN $,n OVERT HERE tokenValue , _USER @ , _USER ++ >BODY! ; \\ TODO needs to initialize variable
 : TO '>BODY! ; IMMEDIATE
-
-( Create a new word that doesnt allocate any space, but will push address of that space. )
-( redefines definitions moved up so that they will use new TOKEN etc)
-: create TOKEN $,n OVERT , 0 , ; 
-: CREATE tokenCreate create ; ( Note the extra field for DOES> to patch ) ( redefines definition moved up so that it will use new TOKEN etc)
-( vCREATE is like CREATE but if VP is set it makes space in the writable DATA area) 
-: vCREATE ( -- ; <string> ) VP @ ?DUP 0= IF CREATE ELSE tokenVar create , THEN ; ( Compile pointer to data area )
 
 ?test\\ : foo CREATE 123 , DOES> @ ; foo BAR BAR 123 1 TEST
 
@@ -1560,8 +1563,7 @@ VARIABLE leave-ptr
 \\ ---------
 
 ( === ANS number input === )
-\\ TODO-83 convert eFORTH's NUMBER? to use 2012's >NUMBER, 
-\\    but note order of definitions tricky though NUMBER? called thru 'NUMBER
+\\ TODO-83 convert eFORTH's NUMBER? to use 2012's >NUMBER, but note order of definitions tricky
 \\ note that >NUMBER requires ?DO and UNLOOP
 \\ note that eFORTH's NUMBER? is broader - handles sign and '$' for hex.
 : accumulate ( +d0 addr digit - +d1 addr )
@@ -1583,7 +1585,7 @@ VARIABLE leave-ptr
 ;
 
 ( EFORTH-ZEN-ERRATA it doesnt return 'n T' it returns 'n a' on success
-: NUMBER? ( a -- n T, a F ; Convert a number string to integer. Push a flag on tos.)
+:NONAME ( a -- n T, a F ; Convert a number string to integer. Push a flag on tos. : NUMBER? )
   DUP BASE @ >R         ( save the current radix in BASE )
   COUNT OVER >R >R  ( a a' R: base0 a+1 n ; a' always points to next char to read )
   COUNT             ( a a' c )
@@ -1618,10 +1620,10 @@ VARIABLE leave-ptr
   THEN
   R> BASE !         ( n T | a F )
 ;
+' NUMBER? DEFER!
 
 ?test\\ 50 10 DIGIT? 2 -1 2 TEST
 ?test\\ BL PARSE 1234 PAD PACK$ NUMBER? DROP 1234 1 TEST
-' NUMBER? 'NUMBER !
 ?test\\ 123 123 1 TEST
 
 
@@ -1653,15 +1655,17 @@ VARIABLE leave-ptr
 8 4 * stack sourceStack ( sourceStack holds 8 * [ SOURCE-ID buff len >IN ] )
 
 : 0> DUP 0= SWAP 0< OR 0= ;
+DEFER unreadFile
 : sourcePush sourceStack >R 
   SOURCE-ID @ 
-[ rqFiles ] ?\\ DUP 0> IF DUP 'unreadFile @EXECUTE THROW THEN ( Check if a file and if so unread any buffered )
+[ rqFiles ] ?\\ DUP 0> IF DUP unreadFile THROW THEN ( Check if a file and if so unread any buffered )
   SOURCE >IN @ R@ spush R@ spush R@ spush R> spush ;
 : source! ( source-id buff len in ) 
   >IN ! #TIB ! #TIB CELL+ ! DUP SOURCE-ID ! 
   IF FILE ELSE HAND THEN ; ( Set prompt - same for String or File )
 : sourcePop sourceStack >R R@ spop R@ spop R@ spop R> spop ( source-id buff len in ) source! ; 
 
+DEFER READ-LINE
 : REFILL ( https://forth-standard.org/standard/core/REFILL )
   0 >IN ! ( initialized parsing pointer )
   SOURCE-ID @ ( source )
@@ -1669,7 +1673,7 @@ VARIABLE leave-ptr
 [ rqFiles ] ?\\ DUP -1 = IF 
       DROP FALSE ( String - Always false )
 [ rqFiles ] ?\\ ELSE  
-[ rqFiles ] ?\\   TIB 1024 ROT 'READ-LINE @EXECUTE ( u2 flag ior )
+[ rqFiles ] ?\\   TIB 1024 ROT READ-LINE ( u2 flag ior )
 [ rqFiles ] ?\\   THROW SWAP #TIB ! ( flag ; True if more )
 [ rqFiles ] ?\\ THEN
   ELSE
@@ -2442,10 +2446,20 @@ class Forth {
     this.OVERT();
   }
   buildCode(name, tok, attribs) {
-    this.CODE(name);
-    const xt = this.cpFetch();
-    this.DW(tok);  // The entire definition is the token for the JS function
-    this.OVERT();                          // Make the name usable
+    let xt;
+    if (attribs.defer) {
+      const xtCode = this.cpFetch();
+      this.DW(tok); // Entire definition is token for JS function
+      this.CODE(name); // Will point at next byte of dict (not the tok)
+      xt = this.cpFetch();
+      this.DW(tokenDefer);
+      this.DW(xtCode);
+    } else {
+      this.CODE(name);
+      xt = this.cpFetch();
+      this.DW(tok);  // The entire definition is the token for the JS function
+    }
+    this.OVERT();
     if (attribs.immediate) {
       this.setHeaderBits(l.IMED);
     }
@@ -2930,7 +2944,8 @@ class Forth {
 
   tokenDefer() { // TODO-ARDUINO needed
     // Payload contains XT of word to be executed, nothing goes on return stack as not unwound
-    this.threadtoken(this.Mfetch(this.PAYLOAD));
+    const xt = this.Mfetch(this.PAYLOAD);
+    if (xt) this.threadtoken(xt);
   }
   // Leaves an address in the user area, note it doesnt compile the actual address since UP will change when multi-tasking
   tokenUser() { this.SPpush(this.m.fromRamAddr(this.Mfetch(this.PAYLOAD) + this.ramUP)); }
@@ -3267,7 +3282,7 @@ class Forth {
     this.SPpush(np); // Note that NP is not updated, the same buffer will be used for each word until hit ':'
   }
 
-  NUMBERQ() { // Same footprint as NUMBER?,but less functionality (Decimal only) this will be stored vectored from 'NUMBER
+  NUMBERQ() { // Same footprint as NUMBER?,but less functionality (Decimal only)
     // TODO-backport simple number conversion from Arduino
     const a = this.SPpop();
     const w = this.countedToJS(a);
@@ -3312,7 +3327,8 @@ class Forth {
       const inDefOf = this.countedToJS(this.lastFetch());
       if (!['[COMPILE]', '(', 'create', 'CREATE', 'vCREATE'].includes(inDefOf)) { // Intentionally redefine ( so ok with redefinition
         console.log('Compiling', this.countedToJS(na), 'in', inDefOf, 'when code will be deleted');
-        console.assert(false); // Break here, shouldn't be happening.
+        console.log("XXXX TODO-83");
+        //console.assert(false); // Break here, shouldn't be happening.
       }
     }
   }
@@ -3337,7 +3353,7 @@ class Forth {
         this.DW(xt);
       }
     } else { // a
-      await this.runXT(this.Ufetch(NUMBERoffset)); // n T | a F // Works as long as NUMBER is code, OR this is called from code.
+      this.NUMBERQ();
       if (this.SPpop()) {
         this.DW(this.js2xt.doLIT, this.SPpop());
       } else {
@@ -3354,7 +3370,7 @@ class Forth {
       const xt = this.SPpop();
       await this.runXT(xt); //TODO-ASYNC maybe should be threadToken - but that won't work if this isn't running inside run already
     } else {
-      await this.runXT(this.Ufetch(NUMBERoffset)); // n T | a F
+      this.NUMBERQ(); // n T | a F
       if (!this.SPpop()) {
         // TODO-32-ERRORS handle error in Forth-ish way (via Throw) - this is harder than it looks !
         console.log('Number conversion of', this.countedToJS(this.SPpop()), 'failed');

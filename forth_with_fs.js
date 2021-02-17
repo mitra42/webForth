@@ -180,16 +180,16 @@ const filesExtension = `
   ( ud ud' ^ fd )
   D+ R> REPOSITION-FILE ( ior )
 ;
-: unreadFile ( fd - ior; Move fd back to >IN, so reading will start where left off  )
+:NONAME ( fd - ior; Move fd back to >IN, so reading will start where left off : unreadFile )
   SOURCE + 1024 SOURCE NIP - ( fd TIB+#TIB 1024-#TIB)
   skipCRLF ( ptr after crlf, number to end of buf)
   NIP 1024 SWAP - >IN @ - 0 DNEGATE ROT  ( ud fd ; size of remaining buf + crlf* ) 
   0 >IN ! 0 #TIB ! ( Reset pointers so dont try and read it)
   reposRelativeFile ( ior )
 ;
-' unreadFile 'unreadFile ! ( vector forward reference ) 
+' unreadFile DEFER! ( vector forward reference ) 
 
-: READ-LINE ( caddr umax fd -- u2 flag ior ; https://forth-standard.org/standard/file/READ-LINE)
+:NONAME ( caddr umax fd -- u2 flag ior ; https://forth-standard.org/standard/file/READ-LINE : READ-LINE)
   DUP eof? IF DROP 2DROP 0 0 0 EXIT THEN
   ( caddr umax fd )
   >R OVER SWAP R@
@@ -203,7 +203,7 @@ const filesExtension = `
   NIP 0 DNEGATE R> reposRelativeFile ( position file to after crlf )
   >R NIP TRUE R> ( u~ T ior )
 ;
-' READ-LINE 'READ-LINE ! 
+' READ-LINE DEFER! 
    
 vCREATE buf 1024 vALLOT
 
