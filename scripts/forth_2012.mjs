@@ -20,7 +20,7 @@ const preTest = `
 \\ ( testing multi line comment
 \\   second line )
 
-\\ TODO-35-VOCAB this will definately need attention
+\\ TODO-35-VOCAB this will definitely need attention
 : MARKER NP @ CP @ CONTEXT @ DUP @ SWAP CURRENT @ DUP @ SWAP CREATE , , , , , ,
   DOES> DUP @ CURRENT ! CELL+ DUP @ CURRENT @ !
    CELL+ DUP @ CONTEXT ! CELL+ DUP @ CONTEXT @ ! 
@@ -32,14 +32,11 @@ const preTest = `
 
 `;
 
-
-
-
 const forth = new Forth_with_fs({ CELLL, MEM, ROMSIZE, RAMSIZE, extensions, testFlags, memClass });
 forth.initialize()
-  .then(() => console.log("Forth with FS built"))
+  .then(() => console.log('Forth with FS built'))
   .then(() => forth.interpret(preTest))
   // TODO-83 next line fails because it only switches SOURCE-ID, so it returns immediately.
   //.then(() => forth.interpret('REQUIRE prelimtest.fth'))
-  .then(() => forth.console())
+  .then(() => forth.console());
   // .then(() => console.log('EXITING AFTER TEST'));

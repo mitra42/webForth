@@ -14,5 +14,5 @@ const memClass = undefined; // Define to override default based on CELLL and MEM
 
 const forth = new Forth_with_fs({ CELLL, MEM, ROMSIZE, RAMSIZE, extensions, memClass });
 forth.initialize()
-  .then(() => console.log("Forth with FS built"))
+  .then(() => console.log('Forth with FS built'))
   .then(() => forth.interpret('WARM'));

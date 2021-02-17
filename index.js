@@ -83,7 +83,7 @@ const jsFunctionAttributes = [
   { n: 'tokenVar', token: true },
   { n: 'tokenCreate', token: true },
   { n: 'tokenDefer', token: true }, // Execute payload (like DoList but just one)
-  { n: 'tokenValue', token: true}, // Returns value from a user variable.
+  { n: 'tokenValue', token: true }, // Returns value from a user variable.
   'ALIGNED',
   { n: 'find', f: 'jsFind' }, // Fast version of find - see Forth definition later
   { n: 'OVERT', replaced: true, defer: true },
@@ -99,7 +99,7 @@ const jsFunctionAttributes = [
   { n: 'SP@', f: 'SPat' }, { n: 'SP!', f: 'SPbang' },
   'DROP', 'DUP', 'SWAP', 'OVER',
   { n: '0<', f: 'less0' }, 'AND', 'OR', 'XOR', { n: 'UM+', f: 'UMplus' },
-  /* TODO-ARDUINO needs this line */ 'RSHIFT', 'LSHIFT', {n: '2/', f: 'TwoDiv' },
+  /* TODO-ARDUINO needs this line */ 'RSHIFT', 'LSHIFT', { n: '2/', f: 'TwoDiv' },
   'userAreaInit', 'userAreaSave',
   { n: 'PARSE', replaced: true, defer: true }, { n: 'TOKEN', replaced: true, defer: true }, { n: 'NUMBER?', f: 'NUMBERQ', replaced: true, defer: true },
   { n: '$COMPILE', f: 'dCOMPILE', replaced: true, defer: true }, { n: '$INTERPRET', f: 'dINTERPRET', replaced: true, jsNeeds: true, defer: true },
@@ -152,7 +152,7 @@ const RP0offset = USER('RP0', undefined);      // (--a) Pointer to bottom of the
 USER("'?KEY", '?RX');    // Execution vector of ?KEY. Default to ?rx.
 USER("'EMIT", 'TX!');  // Execution vector of EMIT. Default to TX!
 // eForth difference - this next one is 'EXPECT in EFORTH )
-USER("SPARE", 0);
+USER('SPARE', 0);
 // TODO-34-FILES consider if still want vectored I/O or prefer decision based on SOURCE-ID
 USER("'TAP", 0);       // Execution vector of TAP. Default to kTAP.
 USER("'ECHO", 'TX!');  // Execution vector of ECHO. Default to tx! but changed to ' EMIT later.
@@ -167,7 +167,7 @@ USER('CSP', 0);        // Hold the stack pointer for error checking.
 // eFORTH diff - eFORTH uses EVAL as vector to either $INTERPRET or $COMPILE, ANS uses a variable called STATE
 const STATEoffset = USER('STATE', l.FALSE); // True if compiling - only changed by [ ] : ; ABORT QUIT https://forth-standard.org/standard/core/STATE
 //const EVALoffset = USER("'EVAL", 0);      // Initialized when have JS $INTERPRET, this switches between $INTERPRET and $COMPILE
-USER("SPARE2", 0);
+USER('SPARE', 0);
 USER('HLD', 0);        // Hold a pointer in building a numeric output string.
 USER('HANDLER', 0);    // Hold the return stack pointer for error handling.
 // this is set to result of currentFetch
@@ -1008,7 +1008,7 @@ BL 32 1 TEST
   SWAP ;              ( reorder and return.  -- ca na )
 
 : FIND-NAME ( caddr u -- na | F; see https://forth-standard.org/proposals/find-name#contribution-58)
-  ( Note this ONLY currently workds if caddr-- is a counted string )
+  ( Note this ONLY currently works if caddr-- is a counted string )
   ( Search all context vocabularies for a string.)
   CONTEXT       ( address of context vocabulary stack )
   DUP 2@ XOR    ( are two top vocabularies the same? )
@@ -1696,7 +1696,7 @@ DEFER READ-LINE
   ( Reset data stack pointer and the terminal input buffer. )
   SP0 @ SP!   ( initialize data stack )
   sourceStack sempty ( empty any nested files
-  0 TIB0 0 0 source!  ( and read from terminal - resets PROMPT and vetored I/O )
+  0 TIB0 0 0 source!  ( and read from terminal - resets PROMPT and vectored I/O )
   ;
 : quitError ( f -- )
   ( Handle a possible error returned by EVAL - common to QUIT and quit1 )
@@ -1942,7 +1942,7 @@ class FlashXX_XX {
   cellRomFetch(cellAddr) {
     if (cellAddr >= this.romCells) {
       console.log('Attempt to read above top of Rom at', cellAddr);
-    } // TODO-OP TIMIZE comment out
+    } // TODO-OPTIMIZE comment out
     return this.rom[cellAddr];
   }
   cellRamFetch(cellAddr) {
@@ -2482,7 +2482,7 @@ class Forth {
       this.DW(tokenUser, offsetInCells);
       this.OVERT();
     }
-    this.Ustore(0, _USER+1); // Need to skip to next _USER
+    this.Ustore(0, _USER + 1); // Need to skip to next _USER
   }
 
   // Add an extension, there are two cases of this
@@ -2619,7 +2619,7 @@ class Forth {
   isTestFlags(bb) { return (this.Ufetch(testFlagsOffset) & bb); }
   // Put Fbreak in a definition.
   Fbreak() {
-    console.log("S:", this.debugStack());
+    console.log('S:', this.debugStack());
     console.log('\nbreak in a FORTH word'); } // Put a breakpoint in your IDE at this line
   // debugPrintTIB will print the current TIB.
   debugPrintTIB() {
@@ -2749,7 +2749,7 @@ class Forth {
     // Drop through not found
     return l.FALSE;
   }
-  FIND_NAME_IN() { // caddr u va -- na; Note this ONLY currently workds if caddr-- is a counted string
+  FIND_NAME_IN() { // caddr u va -- na; Note this ONLY currently works if caddr-- is a counted string
     const va = this.SPpop();
     const u = this.SPpop();
     const caddr = this.SPpop();
@@ -2767,7 +2767,7 @@ class Forth {
     //const na = this._find(va, a);  // return matching na or 0
 
     const charCount = this.Mfetch8(a) & l.BYTEMASK;
-    const na = this._findNameIn(a+1, charCount, va);
+    const na = this._findNameIn(a + 1, charCount, va);
     if (na) {
       this.SPpush(this.na2xt(na));
       this.SPpush(na);
@@ -3005,6 +3005,7 @@ class Forth {
   async runXT(xt) {
     let waitFrequency = 0;
     //console.assert(xt && this.IP === 0); // Cant nest runXT()
+    // eslint-disable-next-line no-constant-condition
     while (true) {
       try {
         await this.threadtoken(xt);
@@ -3023,12 +3024,12 @@ class Forth {
           }
         }
         return;
-        } catch(err) {
-          console.log("Error caught in runXT");
-          console.error(err);
-          xt = this.JStoXT('THROW', true);
-          console.log("Looping back for a good throw")
-        }
+      } catch (err) {
+        console.log('Error caught in runXT');
+        console.error(err);
+        xt = this.JStoXT('THROW', true);
+        console.log('Looping back for a good throw');
+      }
     }
   }
 
@@ -3130,7 +3131,7 @@ class Forth {
       this.RPpop();
     }
   }
-  I() { this.SPpush(this.RPfetch()) }
+  I() { this.SPpush(this.RPfetch()); }
 
   // Jump if flag on stack is zero to destn in dictionary
   qBranch() {
@@ -3171,7 +3172,7 @@ class Forth {
 
   // Classic Data stack words eForthAndZen#42
   _roll(n) { // _roll(2) is like ROT TODO-ARDUINO needed
-    let bottom = this.ramSP + n
+    let bottom = this.ramSP + n;
     const val = this.m.cellRamFetch(bottom);
     for (; n > 0; n--) {
       this.m.cellRamStore(bottom, this.m.cellRamFetch(bottom - 1));
@@ -3230,7 +3231,7 @@ class Forth {
   // TODO-28-MULTITASK will need to think carefully about how to move all, or part of the USER space to task-specific space.
   // TODO-28-MULTITASK this is non-trivial since somethings are clearly across all tasks (e.g. CP and NP)
   userAreaInit() {
-    const _USER = this.m.cellRomFetch(this.UZERO / this.CELLL + 0)
+    const _USER = this.m.cellRomFetch(this.UZERO / this.CELLL); // 0th item in user space is its size
     for (let a = 0; a < _USER; a++) {
       //console.log(a, this.Ufetch(a), this.Mfetch(this.UZERO + a * this.CELLL));
       this.Ustore(a, this.m.cellRomFetch(this.UZERO / this.CELLL + a));
@@ -3327,7 +3328,7 @@ class Forth {
       const inDefOf = this.countedToJS(this.lastFetch());
       if (!['[COMPILE]', '(', 'create', 'CREATE', 'vCREATE'].includes(inDefOf)) { // Intentionally redefine ( so ok with redefinition
         console.log('Compiling', this.countedToJS(na), 'in', inDefOf, 'when code will be deleted');
-        console.log("XXXX TODO-83");
+        console.log('XXXX TODO-83');
         //console.assert(false); // Break here, shouldn't be happening.
       }
     }

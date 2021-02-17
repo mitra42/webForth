@@ -65,7 +65,7 @@ anything built with vCREATE will use memory in the Ram area, as do anything buil
 In ROM goes: User Save; Code Dictionary; Name dictionary
 and in RAM (Stacks, TIB, PAD, User variables; data parts of CREATE DOES> words).
 
-A word "useRam" does the correct manipluation of pointers 
+A word "useRam" does the correct manipulation of pointers 
 so that the Flashed dictionaries point to Ram for a continuation. 
 
 #### Memory map to Javascript

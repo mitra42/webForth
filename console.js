@@ -113,7 +113,7 @@ class ForthConsole extends HTMLElement {
     this.input = EL('forth-input', { stack: this.stack });
     // Define hooks for IO to these areas
     const extensions = [{ f: (function TXbangS(s) {
-        this.output.TXbangS_web(s); }).bind(this) }]; // Note this is instance of ForthConsole not Forth
+      this.output.TXbangS_web(s); }).bind(this) }]; // Note this is instance of ForthConsole not Forth
     // Load Forth can also define CELL, EM, memClass
     const CELLL = 2;
     const MEM = 8;
