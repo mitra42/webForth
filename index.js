@@ -108,7 +108,7 @@ const jsFunctionAttributes = [
   'debugNA', 'testing3', 'Fbreak', 'debugPrintTIB', 'TEST', 'stringBuffer', 'TYPE',
   // TODO-ARDUINO needs from here down - some could be in Forth instead
   'loop', 'I', 'leave', 'RDROP', { n: '2RDROP', f: 'TwoRDROP' }, { n: 'FIND-NAME-IN', f: 'FIND_NAME_IN' }, { n: 'immediate?', f: 'immediateQ' },
-  { n: 'ALIGN', f: 'vpAlign' }, { n: '>BODY', f: 'toBODY' }, 'DEFER', 'ROLL', 'ROT',
+  { n: 'ALIGN', f: 'vpAlign' }, { n: '>BODY', f: 'toBODY' }, 'DEFER', 'ROLL', 'ROT', 'of',
 ];
 
 // Define the tokens used in the first cell of each word.
@@ -167,7 +167,7 @@ USER('CSP', 0);        // Hold the stack pointer for error checking.
 // eFORTH diff - eFORTH uses EVAL as vector to either $INTERPRET or $COMPILE, ANS uses a variable called STATE
 const STATEoffset = USER('STATE', l.FALSE); // True if compiling - only changed by [ ] : ; ABORT QUIT https://forth-standard.org/standard/core/STATE
 //const EVALoffset = USER("'EVAL", 0);      // Initialized when have JS $INTERPRET, this switches between $INTERPRET and $COMPILE
-USER('SPARE', 0);
+USER('SPARE2', 0);
 USER('HLD', 0);        // Hold a pointer in building a numeric output string.
 USER('HANDLER', 0);    // Hold the return stack pointer for error handling.
 // this is set to result of currentFetch
@@ -245,7 +245,9 @@ const forthInForth = `
 
 BL 32 1 TEST
 : NIP SWAP DROP ;
+: TUCK SWAP OVER ; ( w1 w2 -- w2 w1 w2 ; tuck top of stack under 2nd )
 1 2 NIP 2 1 TEST
+1 2 TUCK 2 1 2 3 TEST
 
 ( Note failure on this line, can be for three reasons )
 ( a: its the first execution of an immediate word inside a compilation )
@@ -302,6 +304,14 @@ BL 32 1 TEST
 : WHILE ( a -- A a )    [COMPILE] IF SWAP ; IMMEDIATE
 : ?DUP DUP IF DUP THEN ; ( w--ww|0) ( Dup top of stack if its is not zero.)
 : >RESOLVES ( 0 A* -- ) BEGIN ?DUP WHILE >RESOLVE REPEAT ; ( Resolve zero or more forward branches e.g. from multiple LEAVE )
+: >MARKSTART 0 ;
+: >MARKTHREAD ( A -- A' ) HERE SWAP , ; \\ Leave a space for a jump destination, but mark a jump back 
+: >RESOLVETHREAD ( A -- ) \\ Resolve a set of forward jumps
+  BEGIN ?DUP WHILE DUP @ SWAP >RESOLVE REPEAT ; 
+: CASE >MARKSTART ; IMMEDIATE \\ Leave head of >MARKTHREAD chain
+: OF COMPILE of >MARK ; IMMEDIATE
+: ENDOF COMPILE branch SWAP >MARKTHREAD SWAP >RESOLVE ; IMMEDIATE
+: ENDCASE COMPILE DROP >RESOLVETHREAD ; IMMEDIATE
 
 ( TODO-TEST of above group non-obvious as writing to dictionary. )
 ( IF-THEN tested in ?DUP; )
@@ -320,7 +330,6 @@ BL 32 1 TEST
 
 ( === More Stack Words Zen pg49 TODO-OPTIMIZE )
 : -ROT SWAP >R SWAP R> ; ( w1, w2, w3 -- w3 w1 w2; Rotate top item to third)
-: TUCK SWAP OVER ; ( w1 w2 -- w2 w1 w2 ; tuck top of stack under 2nd )
 : 2DUP OVER OVER ; ( w1 w2 -- w1 w2 w1 w2;)
 : 2OVER >R >R 2DUP R> -ROT R> -ROT ; ( w1 w2 w3 w4 -- w1 w2 w3 w4 w1 w2 )
 : 2SWAP >R -ROT R> -ROT ; ( w1 w2 w3 w4 -- w3 w4 w1 w2 )
@@ -1325,6 +1334,7 @@ CREATE I/O  ' ?RX , ' TX! , ( Array to store default I/O vectors. )
 : $" ( compile time: <string> --; interpret time: -- addr ; Compile an inline string literal that puts counted string on stack.)
   COMPILE $"|     ( compile string runtime code)
   $," ; IMMEDIATE ( compile string itself )
+: C" [COMPILE] $" ; IMMEDIATE ( Forth2012 version of $")
 : S" ( compile time: <string> ; interpret time: -- caddr u ; ANS version puts address and length ) 
   STATE @ 
   IF COMPILE S"| $,"
@@ -3144,6 +3154,15 @@ class Forth {
   // Unconditional jump to destn in dictionary
   branch() { this.IP = this.IPnext(); }
   leave() { this.RPpop(); this.RPpop(); this.branch(); }
+
+  of() { // TODO-ARDUINO needs this
+    const destn = this.IPnext();
+    if (this.SPpop() !== this.SPfetch()) {
+      this.IP = destn;
+    } else {
+      this.ramSP++; // DROP value
+    }
+  }
 
   // === Primitive words for memory, stack and return access.
 
