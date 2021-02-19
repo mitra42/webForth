@@ -264,6 +264,7 @@ BL 32 1 TEST
 ( ERRATA v5 skips ALIGNED form this definition)
 : , ( w --; Compile an integer into the code dictionary. Zen pg 89)
   HERE ALIGNED DUP CELL+ CP ! ! ;
+: COMPILE, , ; ( Forth2012 version)
 
 : [COMPILE] ( -- ; <string> ) ' , ; IMMEDIATE
 
@@ -842,29 +843,6 @@ BL 32 1 TEST
   13 EMIT 10 EMIT ;
 ( CR tested after .( )
 
-( === String Literal Zen pg71 do$ $"| ."| )
-
-: do$ ( --a)
-  ( Return the address of a compiled string.)
-  ( Relies on assumption that do$ is part of definition of something e.g. $"| or ."|  that is run time code for the string )
-  R>                  ( this return address must be preserved S: R0; R: R1... )
-  R@                  ( get address of the compiled string S: R0 R1; R: R1... )
-  R>                  ( get another copy S: R0 R1 R1; R: R2... )
-  COUNT + ALIGNED >R  ( replace it with addr after string; S: R0 R1; R: R1' R2... )
-  SWAP  ( get saved address to top; S: R1 R0; R: R1' R2...)
-  >R ;  ( restore the saved return address S: R1; R: R0 R1' R2 ...)
-
-: $"| ( -- a) ( Run time routine compiled by $". Return address of a compiled string.)
-  do$ ; ( return string address only)
-: ."| ( -- ) ( Run time routine of ." . Output a compiled string.)
-  do$        ( get string address)
-  .$ ;       ( print the compiled string)
-: S"| ( -- caddr u; ANS version )
-  do$ COUNT ;
-
-
-( ."| tested by ."; $"| tested by $" )
-
 ( === Word Parser Zen pg72-73 PARSE parse )
 ( ERRATA Zen this doesnt set >IN past the string, but the callers clearly assume it does.)
 ( ERRATA Zen pg72 is obviously broken as it doesn't even increment the pointer in the FOR loop)
@@ -1157,6 +1135,53 @@ BL 32 1 TEST
   DROP              ( discard bot and eot )
   NIP DUP ;         ( bot cur cur;  duplicate cur to force ACCEPT to exit, Key not stored )
 
+\\ ==== STRING HANDLING ===== 
+\\ In order to handle Forth2012 strings which are typically addr+count, and traditional Forth (addr pointing to length)
+\\ We define:
+\\   $," that compiles a string into a dictionary
+\\   do$ that pulls the string out of the dictionary, 
+\\   $"| S"| ."| abort" handlers that do something with a compiled string that immediately follows
+\\   $"(C") S" ." ABORT" which compile a string, plus the handler 
+\\ See Zen pg71 and 93 and abort",ABORT" further down.
+
+: do$ ( --a)
+  ( Return the address of a compiled string.)
+  ( Relies on assumption that do$ is part of definition of something e.g. $"| or ."|  that is run time code for the string )
+  R>                  ( this return address must be preserved S: R0; R: R1... )
+  R@                  ( get address of the compiled string S: R0 R1; R: R1... )
+  R>                  ( get another copy S: R0 R1 R1; R: R2... )
+  COUNT + ALIGNED >R  ( replace it with addr after string; S: R0 R1; R: R1' R2... )
+  SWAP  ( get saved address to top; S: R1 R0; R: R1' R2...)
+  >R ;  ( restore the saved return address S: R1; R: R0 R1' R2 ...)
+
+( Staapl has alternate definition: : $," [ CHAR " ] LITERAL PARSE HERE PACK$ C@ 1 + ALLOT ;)
+( ERRATA v5 has obvious errata missing the + after COUNT; Zen ok; Staapl different )
+: $," ( --) ( Moved earlier from Zen pg90)
+  ( Compile a literal string up to next " .)
+  34 WORD ( move string to code dictionary)
+  COUNT + ALIGNED ( calculate aligned end of string)
+  CP ! ; ( adjust the code pointer)
+
+: $"| ( -- a) do$ ; ( return string address only)
+: ."| ( -- ) do$ .$ ; ( print compiled string )
+: S"| ( -- caddr u) do$ COUNT ; ( Forth2012 version )
+
+: $" ( -- addr) COMPILE $"| $," ; IMMEDIATE ( counted string)
+: C" [COMPILE] $" ; IMMEDIATE ( Forth2012 name for $")
+( Moved earlier from Zen pg93 )
+: ." ( -- ) COMPILE ."| $," ; IMMEDIATE ( compile string that will be printed )
+( S" is more complex as it can comile, or just return a string )
+: S" ( compile time: <string> ; interpret time: -- caddr u ; ANS version puts address and length ) 
+  STATE @ 
+  IF COMPILE S"| $,"
+  ELSE 34 PARSE stringBuffer PACK$ COUNT \\ Buffer is above used memory but always in Ram
+  THEN
+  ; IMMEDIATE
+
+?test\\ : foo $" hello" COUNT NIP ; foo 5 1 TEST
+?test\\ S" foo" TUCK + 1- C@ 3 CHAR o 2 TEST
+?test\\ : foo ." hello" ; foo 0 TEST
+
 ( === Error Handling Zen pg80-82 NULL$ ABORT abort" ?STACK )
 
 CREATE NULL$ 0 , ( EFORTH-ZEN-ERRATA inserts a string "coyote" after this, no idea why! )
@@ -1175,31 +1200,16 @@ CREATE NULL$ 0 , ( EFORTH-ZEN-ERRATA inserts a string "coyote" after this, no id
   do$ DROP  ( skip over the next string )
   ;  COMPILE-ONLY
 
-
-( Staapl has alternate definition: : $," [ CHAR " ] LITERAL PARSE HERE PACK$ C@ 1 + ALLOT ;)
-( ERRATA v5 has obvious errata missing the + after COUNT; Zen ok; Staapl different )
-: $," ( --) ( Moved earlier from Zen pg90)
-  ( Compile a literal string up to next " .)
-  34 WORD ( move string to code dictionary)
-  COUNT + ALIGNED ( calculate aligned end of string)
-  CP ! ; ( adjust the code pointer)
-
 ( Moved earlier from Zen pg93 )
 : ABORT" ( C: -- ; I: f --; <string> )
   ( Conditional abort with an error message.)
   COMPILE abort"  ( compile runtime abort code )
   $," ; IMMEDIATE ( compile abort message )
 
-( Moved earlier from Zen pg93 )
-: ." ( -- ; <string> )
-  ( Compile an inline string literal to be typed out at run time.)
-  COMPILE ."| ( compile print string code )
-  $," ; IMMEDIATE ( compile print string )
 
 ( Test is tricky - the "3" in bar is thrown away during hte "THROW" while 5 is argument to THROW )
 ?test\\ : bar 3 5 THROW 4 ; : foo 1 [ ' bar ] LITERAL CATCH 2 ; foo 1 5 2 3 TEST
 ?test\\ : bar 3 ; : foo 1 [ ' bar ] LITERAL CATCH 2 ; foo 1 3 0 2 4 TEST
-?test\\ : foo ." hello" ; foo 0 TEST
 ( Note that abort restores the stack, so shouldn't have consumed something else will have random noise on stack )
 ?test\\ : bar ?DUP ABORT" test" 3 ; : foo [ ' bar ] LITERAL CATCH ; 1 foo C@ 0 foo 1 4 3 0 4 TEST
 ( $," and abort" are implicitly tested by ABORT")
@@ -1328,22 +1338,6 @@ CREATE I/O  ' ?RX , ' TX! , ( Array to store default I/O vectors. )
 ( === Control Structures Zen pg91-92: FOR BEGIN NEXT UNTIL AGAIN IF AHEAD REPEAT THEN AFT ELSE WHILE )
 ( All moved earlier )
 
-
-( === String Literals Zen pg93: ABORT" $" ." ( ABORT" ." moved to Zen pg84 where used )
-
-: $" ( compile time: <string> --; interpret time: -- addr ; Compile an inline string literal that puts counted string on stack.)
-  COMPILE $"|     ( compile string runtime code)
-  $," ; IMMEDIATE ( compile string itself )
-: C" [COMPILE] $" ; IMMEDIATE ( Forth2012 version of $")
-: S" ( compile time: <string> ; interpret time: -- caddr u ; ANS version puts address and length ) 
-  STATE @ 
-  IF COMPILE S"| $,"
-  ELSE 34 PARSE stringBuffer PACK$ COUNT
-  THEN
-  ; IMMEDIATE
-
-?test\\ : foo $" hello" COUNT NIP ; foo 5 1 TEST
-?test\\ S" foo" TUCK + 1- C@ 3 CHAR o 2 TEST
 
 ( === Name Dictionary Compiler Zen pg94-96: ?UNIQUE $,n $COMPILE OVERT ; ] call, : IMMEDIATE  (see this.dollarCommaN)
 
@@ -1660,20 +1654,24 @@ VARIABLE leave-ptr
 : stack CREATE HERE 0 , OVER , vHERE SWAP ! 0 v, CELLS vALLOT ;
 : spop @ DUP @ CELLS OVER + @ SWAP --  ;
 : spush @ DUP @ 1+ 2DUP SWAP ! CELLS + ! ;
+: spushes ( x1..xn n a -- ) OVER >R SWAP 0 DO TUCK spush LOOP R> SWAP spush ; 
+: spops ( a -- x1 ... xn n ) 
+  DUP spop ( a count )
+  >R R@ 0 DO DUP spop SWAP LOOP DROP R> ; 
 : sempty @ 0 SWAP ! ; 
 
 8 4 * stack sourceStack ( sourceStack holds 8 * [ SOURCE-ID buff len >IN ] )
 
 : 0> DUP 0= SWAP 0< OR 0= ;
 DEFER unreadFile
-: sourcePush sourceStack >R 
-  SOURCE-ID @ 
-[ rqFiles ] ?\\ DUP 0> IF DUP unreadFile THROW THEN ( Check if a file and if so unread any buffered )
-  SOURCE >IN @ R@ spush R@ spush R@ spush R> spush ;
-: source! ( source-id buff len in ) 
-  >IN ! #TIB ! #TIB CELL+ ! DUP SOURCE-ID ! 
+: SAVE-INPUT SOURCE-ID @ SOURCE >IN @ 4 ;
+: sourcePush 
+[ rqFiles ] ?\\ SOURCE-ID @ 0> IF SOURCE-ID @ unreadFile THROW THEN ( Check if a file and if so unread any buffered )
+  SAVE-INPUT sourceStack spushes ;
+: RESTORE-INPUT ( source-id buff len in 4 -- ) 
+  DROP >IN ! #TIB ! #TIB CELL+ ! DUP SOURCE-ID ! 
   IF FILE ELSE HAND THEN ; ( Set prompt - same for String or File )
-: sourcePop sourceStack >R R@ spop R@ spop R@ spop R> spop ( source-id buff len in ) source! ; 
+: sourcePop sourceStack spops ( source-id buff len in 4 ) RESTORE-INPUT ; 
 
 DEFER READ-LINE
 : REFILL ( https://forth-standard.org/standard/core/REFILL )
@@ -1706,7 +1704,7 @@ DEFER READ-LINE
   ( Reset data stack pointer and the terminal input buffer. )
   SP0 @ SP!   ( initialize data stack )
   sourceStack sempty ( empty any nested files
-  0 TIB0 0 0 source!  ( and read from terminal - resets PROMPT and vectored I/O )
+  0 TIB0 0 0 4 RESTORE-INPUT  ( and read from terminal - resets PROMPT and vectored I/O )
   ;
 : quitError ( f -- )
   ( Handle a possible error returned by EVAL - common to QUIT and quit1 )
