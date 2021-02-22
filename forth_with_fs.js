@@ -208,12 +208,11 @@ const filesExtension = `
 vCREATE buf 1024 vALLOT
 
 : EVALUATE ( xxx caddr u -- yyy;  https://forth-standard.org/standard/core/EVALUATE )
-  sourcePush -1 -ROT 0 4 RESTORE-INPUT quit1  ; \\ TODO may not want the prompt at the end - which quit1 does
+  sourcePush -1 -ROT 0 4 RESTORE-INPUT THROW quit1  ; \\ TODO may not want the prompt at the end - which quit1 does
 : INCLUDE-FILE ( i * x fileid -- j * x ; https://forth-standard.org/standard/file/INCLUDE-FILE )
-  sourcePush buf 0 0 4 RESTORE-INPUT ; ( currently empty )
+  sourcePush buf 0 0 4 RESTORE-INPUT THROW ;
 : INCLUDED ( caddr u -- ; https://forth-standard.org/standard/file/INCLUDED e.g. $" filename" INCLUDED )
   R/O OPEN-FILE ( fileid ior ) THROW INCLUDE-FILE ;
-: PARSE-NAME BL WORD COUNT ; ( TODO look in index.js for other places it does part of this - 34 WORD)
 : INCLUDE PARSE-NAME INCLUDED ; ( i*x "name" -- j*x ; https://forth-standard.org/standard/file/INCLUDE )
 
 ( TODO-34-FILES blocks - this would be handled in SOURCE I think https://forth-standard.org/standard/block)

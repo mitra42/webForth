@@ -73,6 +73,7 @@
       jsNeeds: true The execution address of this word is needed by the JS o will be stored in js2xt[n]
  */
 // it is used to build the dictionary in each instance.
+// TODO-83 replace "replaced" with "defer" - check all deferred, and check any use of "replaced"
 const jsFunctionAttributes = [
   0, // 0 is not a valid token
   // This next list of token's must match in order the constants defined for tokenCreate etc.
@@ -188,7 +189,7 @@ const CPoffset = USER('CP', undefined);  // eForth initializes to CTOP but we ha
 const NPoffset = USER('NP', undefined);  // normally set on Zen pg106 but we are using it live. Its the bottom of what compiled in name space.
 const LASToffset = USER('LAST', undefined); // normally set on Zen pg106 but using live
 const VPoffset = USER('VP', undefined);  // not part of eForth, pointer into Data space for EPROMability
-USER('SOURCE-ID', 0);  // 0 for terminal, -1 for string, fd for files
+USER('source-id', 0);  // Variable holding 0 for terminal, -1 for string, fd for files
 const testFlagsOffset = USER('testFlags', 0); // bit field: 1 trace interpreter 2 trace threading 4 safety checks 8 tests TODO-67-TESTING - see unreadFile above //TODO-2ARDUINO
 const testDepthOffset = USER('testDepth', 0);  // Needs to autoadjust //TODO-2ARDUINO
 // ported to Arduino above
@@ -234,7 +235,7 @@ const forthInForth = `
 ( Next test is contrived to work with any CELLL size )
 -1 -1 UM+ -2 1 2 TEST
 ( IMMEDIATE implicitly tested )
-32 PARSE ABC SWAP DROP 3 1 TEST
+BL PARSE ABC SWAP DROP 3 1 TEST
 !IO 62 TX! 0 TEST ( Should output > )
 : FOO 10 EXIT 20 ; FOO 10 1 TEST
 ' FOO EXECUTE 30 10 30 2 TEST
@@ -560,7 +561,7 @@ BL 32 1 TEST
   127 BL WITHIN ( if its a control character)
   IF DROP 95 THEN ; ( replace with an underscore)
 
-?test\\ 41 >CHAR 23 >CHAR BL >CHAR 41 95 32 3 TEST
+?test\\ 41 >CHAR 23 >CHAR BL >CHAR 41 95 BL 3 TEST
 
 ( === Managing Data Stack Zen pg59 DEPTH PICK )
 
@@ -649,6 +650,8 @@ BL 32 1 TEST
     THEN
   NEXT 2DROP ;    ( done, discard c and b)
 
+: ERASE 0 FILL ; ( https://forth-standard.org/standard/core/ERASE )
+
 ( DIFF: Staapl has FOR AFT DUP R@ + C@ BL XOR IF R> 1 + EXIT THEN THEN NEXT 0; which only strips BL )
 : -TRAILING ( b u -- b u ; Adjust the count to eliminate trailing white space.)
   FOR                 ( scan u+1 characters)
@@ -709,6 +712,9 @@ BL 32 1 TEST
      HLD @          ( get the digit pointer in HLD)
      1- DUP HLD !  ( decrement HLD)
      C! ;           ( store c where HLD pointed to)
+
+: HOLDS  ( c u -- ; https://forth-standard.org/standard/core/HOLDS; prepend string to buffer )
+  BEGIN DUP WHILE 1- 2DUP + C@ HOLD REPEAT 2DROP ; 
 
 : # ( u -- u; Extract one digit from u and append the digit to output string.- ANS/eForth conflict eForth used single, ANS double )
   \\ eFORTH: BASE @ EXTRACT HOLD
@@ -843,70 +849,50 @@ BL 32 1 TEST
   13 EMIT 10 EMIT ;
 ( CR tested after .( )
 
+( === Moved up as needed for PARSE-NAME )
+: ['] ' [COMPILE] LITERAL ; IMMEDIATE
+: SOURCE TIB #TIB @ ; ( Repurposing TIB and #TIB for the pointer to buffer and length whatever input source )
+
 ( === Word Parser Zen pg72-73 PARSE parse )
 ( ERRATA Zen this doesnt set >IN past the string, but the callers clearly assume it does.)
 ( ERRATA Zen pg72 is obviously broken as it doesn't even increment the pointer in the FOR loop)
 ( This version is based on v5, Staapl is significantly different )
+( Also adapting to use code in https://forth-standard.org/standard/core/PARSE-NAME )
 
-: parse ( b u c -- b u delta ; <string> ) ( TODO evaluate control structures here)
-  ( Scan string delimited by c. Return found string and its offset. )
-  ( EFORTH-ZEN-ERRATA - delta appears to be to end of string, not start )
-  temp !            ( save delimiter in temp )
-  OVER >R DUP       ( b u u)
-  IF                ( if string length u=0, nothing to parse )
-    1-             ( u>0, decrement it for FOR-NEXT loop )
-    temp @ BL =     ( is delimiter a space? )
-    IF              ( b u' --, skip over leading spaces )
-      FOR BL        ( EFORTH-ZEN-ERRATA says BLANK )
-        OVER C@       ( get the next character )
-        - 0<          ( is it a space? )
-        INVERT
-      WHILE
-        1+           ( EFORTH-ZEN-ERRATA - correct in eForthOverviewv5.pdf )
-      NEXT            ( b -- , if space, loop back and scan further)
-        R> DROP       ( end of buffer, discard count )
-        0 DUP EXIT    ( exit with -- b 0 0, end of line)
-     THEN
-     ( EFORTH-ZEN-ERRATA - correct in eForthOverview5.pdf: 1 -              ( back up the parser pointer to non-space )
-     R>               ( retrieve the length of remaining string )
-    THEN
-    OVER SWAP           ( b' b' u' -- , start parsing non-space chars )
-    FOR
-      temp @            ( get delimiter )
-      OVER C@ -         ( get next character )
-      temp @ BL =
-      IF 0<
-      ( EFORTH-ZEN-ERRATA ELSE 1 + )
-      THEN
-    WHILE               ( if delimiter, exit the loop )
-      1+
-    NEXT                ( not delimiter, keep on scanning )
-      DUP >R            ( save a copy of b at the end of the loop)
-    ELSE                ( early exit, discard the loop count )
-      R> DROP           ( discard count )
-      DUP 1+ >R        ( save a copy of b'+1)
-    THEN
-    OVER -              ( length of the parsed string )
-    R> R> -             ( and its offset in the buffer )
-    EXIT
-  THEN ( b u)
-  OVER                  ( buffer length is 0 )
-  R> - ;                ( the offset is 0 also )
-
-: SOURCE TIB #TIB @ ; ( Repurposing TIB and #TIB for the pointer to buffer and length whatever input source )
-
-:NONAME ( c -- b u ; <string> ) ( Scan input stream and return counted string delimited by c.)
-  >R              ( save the delimiting character )
-  SOURCE          ( a u )
-  SWAP >IN @ +    ( u a' ; address in TIB to start parsing )
-  SWAP >IN @ -    ( a' u' ; length of remaining string in TIB )
-  R> parse        ( a" u" delta ; parse the desired string )
-  >IN +! ;        ( a" u" ; move parser pointer to end of string )
+: /STRING ( a u n -- a'+n u-n ) TUCK - >R + R> ;
+( See https://forth-standard.org/standard/core/PARSE-NAME)
+: isspace? ( c -- f ) BL 1+ U< ; 
+: isnotspace? isspace? 0= ;
+\\ TODO merge code from https://forth-standard.org/standard/core/PARSE-NAME note double WHILE
+: xt-skip ( a n xt -- a' n'; Skip over any characters satisfying xt)
+  >R 
+  BEGIN DUP
+  WHILE OVER C@ R@ EXECUTE
+  WHILE 1 /STRING
+  REPEAT THEN
+  R> DROP ;
+: skip-till ( a n c -- a' n' )
+  >R BEGIN DUP
+  WHILE OVER C@ R@ = 0=
+  WHILE 1 /STRING 
+  REPEAT THEN R> DROP ;
+  
+:NONAME ( delim <string> -- c-addr u )
+  >R
+  SOURCE >IN @ /STRING ( a u ret: delim )
+  R@ BL = IF ['] isspace? xt-skip THEN ( a' u' ret: delim )
+  OVER SWAP  ( a' a' u' ret: delim )
+  R@ BL = IF ['] isnotspace? xt-skip ELSE R@ skip-till THEN R> DROP ( a' a" u")
+  2DUP 1 MIN + SOURCE DROP - >IN !  
+  DROP OVER - ;
+  
 ' PARSE DEFER! \\ IS PARSE
+: PARSE-NAME BL PARSE ;
 
 ( === Parsing Words Zen pg74 .( ( \\ CHAR TOKEN WORD )
 
-: CHAR BL PARSE DROP C@ ; ( Parse a word and return its first character )
+: CHAR PARSE-NAME DROP C@ ; ( Parse a word and return its first character )
+: [CHAR] ( "name" <spaces> -- ) CHAR [COMPILE] LITERAL ; IMMEDIATE
 : CTRL CHAR 31 AND ; ( Parse a word, return first character as a control )
 ?test\\ CHAR ) 41 1 TEST
 ?test\\ CTRL H 8 1 TEST
@@ -918,9 +904,9 @@ BL 32 1 TEST
 ?test\\ .( on consecutive ) CR .( lines )
 
 :NONAME ( -- a ; <string> ; Parse a word from input stream and copy it to name dictionary. : TOKEN )
-  BL PARSE            ( parse out next space delimited string )
-  BYTEMASK MIN              ( truncate it to 31 characters = nameMaxLength )
-  NP @                ( word buffer below name dictionary )
+  PARSE-NAME              ( parse out next space delimited string )
+  BYTEMASK MIN            ( truncate it to 31 characters = nameMaxLength )
+  NP @                    ( word buffer below name dictionary )
   OVER - CELLL - PACK$ ;  ( copy parsed string to word buffer )
 ' TOKEN DEFER!
 
@@ -960,39 +946,7 @@ BL 32 1 TEST
     THEN            ( a1 a2 R: u-n)
   NEXT              ( loop u times if strings are the same ) ( a1 a2;  R: u-n-1)
   FALSE ;               ( then push the 0 flag on the stack ) ( a1 a2 0)
-
 ( This can replace the code definition of find, however it is approx 8x slower )
-: FORTHfind ( a va -- ca na, a F )
-  ( Search a vocabulary for a string. Return ca and na if succeeded.)
-  SWAP                ( va a )
-  DUP C@ CELLL / temp !   ( va a -- , get cell count ) ( EFORTH-ZEN-ERRATA was '2 /'
-  DUP @ >R            ( va a -- , save 1st cell of string )
-  CELL+ SWAP          ( a' va -- , compare string with names )
-  BEGIN               ( fast test, compare only 1st cells )
-    @ DUP             ( a' na na -- )
-    ( debugNA )       ( uncomment for debugging find - will report each name as checked)
-    IF                ( na=0 at the end of a vocabulary )
-      DUP @           ( not end of vocabulary, test 1st cell )
-      [ CELLMASK ] LITERAL AND ( mask off lexicon bits - note CELLMASK is endian dependent )
-      R@ XOR          ( compare with 1st cell in string )
-      IF              ( 1st cells do not match )
-        CELL+ TRUE      ( try the next name in the vocabulary )
-      ELSE CELL+      ( get address of the 2nd cell )
-        temp @        ( get the length of string )
-        SAME?         ( string=name? )
-      THEN
-    ELSE              ( end of vocabulary )
-      R> DROP         ( discard the 1st cell )
-      SWAP CELL- SWAP ( restore the string address ERRATA v2 & Staapl misses this - Zen has it)
-      EXIT            ( exit with ca na, na=0 is false flag )
-    THEN
-  WHILE               ( if the name does not match the string )
-    CELL- CELL-       ( a' la --, move to next word in vocab)
-  REPEAT              ( repeat until vocabulary is exhausted )
-  R> DROP NIP         ( a match is found, discard 1st and va )
-  CELL-               ( restore name field address )
-  DUP NAME>           ( find code field address )
-  SWAP ;              ( reorder and return.  -- ca na )
 
 : FIND-NAME ( caddr u -- na | F; see https://forth-standard.org/proposals/find-name#contribution-58)
   ( Note this ONLY currently works if caddr-- is a counted string )
@@ -1050,9 +1004,17 @@ BL 32 1 TEST
       0
     THEN ;
 
+
+\\ TODO-35-VOCAB this will definitely need attention
+: MARKER NP @ CP @ CONTEXT @ DUP @ SWAP CURRENT @ DUP @ SWAP CREATE , , , , , ,
+  DOES> DUP @ CURRENT ! CELL+ DUP @ CURRENT @ !
+   CELL+ DUP @ CONTEXT ! CELL+ DUP @ CONTEXT @ ! 
+   CELL+ DUP @ CP ! CELL+ @ NP ! ;  
+
 ?test\\ BL WORD TOKEN CONTEXT @ find DROP ( xt ) -1 BL WORD TOKEN FIND ( xt -1 ) 2 TEST ( not immediate )
 ?test\\ BL WORD XYZZY 0 OVER FIND 2 TEST ( failure case)
 ?test\\ BL WORD THEN CONTEXT @ find DROP ( xt ) 1 BL WORD THEN FIND 2 TEST ( immediate)
+
 
 ( === Error Handling Zen pg80-82 CATCH THROW = moved in front of Text input )
 
@@ -1171,12 +1133,84 @@ BL 32 1 TEST
 ( Moved earlier from Zen pg93 )
 : ." ( -- ) COMPILE ."| $," ; IMMEDIATE ( compile string that will be printed )
 ( S" is more complex as it can comile, or just return a string )
+
 : S" ( compile time: <string> ; interpret time: -- caddr u ; ANS version puts address and length ) 
   STATE @ 
   IF COMPILE S"| $,"
   ELSE 34 PARSE stringBuffer PACK$ COUNT \\ Buffer is above used memory but always in Ram
   THEN
   ; IMMEDIATE
+
+: bu+@ ( b1 u -- b' u' c ) 1- >R COUNT R> SWAP ;
+: c+! ( c a -- a+1 ) TUCK C! 1+ ;
+: cmove\\ ( a b u -- u' ; Copy u bytes from a to b)
+  SWAP DUP >R >R   ( a u r:b b )
+  BEGIN ( a' u' ret: b' b" )
+  ?DUP WHILE ( a' u' r: b' b )
+    bu+@ ( a'++ u'-- c ret: b' b )
+  DUP [CHAR] " <> WHILE
+    CASE
+      [CHAR] \\ OF
+        bu+@ ( a' u' c' ret: b' b )
+        CASE
+          [CHAR] m OF 13 R> c+! 10 SWAP c+! >R ENDOF
+          [CHAR] x OF bu+@ 16 DIGIT? DROP 16 * >R bu+@ 16 DIGIT? DROP R> + R> c+! >R ENDOF
+          \\ Now the default group that add a single character
+          CASE
+            [CHAR] a OF 7 ENDOF
+            [CHAR] b OF 8 ENDOF
+            [CHAR] e OF 27 ENDOF
+            [CHAR] f OF 12 ENDOF
+            [CHAR] l OF 10 ENDOF
+            [CHAR] n OF 10 ENDOF
+            [CHAR] q OF [CHAR] " ENDOF
+            [CHAR] r OF 13 ENDOF
+            [CHAR] t OF 9 ENDOF
+            [CHAR] v OF 11 ENDOF
+            [CHAR] z OF 0 ENDOF
+            [CHAR] " OF [CHAR] " ENDOF
+            [CHAR] \\ OF [CHAR] \\ ENDOF
+            DUP ( default ambiguous condition but dont barf )
+          ENDCASE ( a' u' c ret: b' b)
+          DUP R> c+! >R
+        ENDCASE ( a' u' ret: b' b" )
+      ENDOF
+      DUP R> c+! >R ( normal character)
+    ENDCASE ( a' u' ret b' b" )
+  REPEAT
+  ( a' u' c ret: b' b ;  Ended because matched " )
+  2DROP
+  THEN ( a' r: b' b )
+  R> R> -
+;
+
+: pack\\$ ( b u a -- b' a; Build a counted and escaped string with u characters from b. Null fill.)
+  ALIGNED             ( noop on JS celll=2 where not requiring alignment)
+  >R R@               ( b u a ret: a)
+  1+ SWAP cmove\\     ( b' u' ret: a; Pack in above count either u characters or terminated by " )
+  DUP R@ C!           ( b' u' ret: a; Store count )
+  DUP R@ + 1+ SWAP    ( b' a' u' ret: a; find address after last char )
+  0 CELLL UM/MOD DROP ( b' a' r ret: a; Check if not full cell at end )
+  BEGIN ?DUP WHILE SWAP 0 OVER C! 1+ SWAP 1- REPEAT ( b' a' ; Fill last cell zeros )
+  DROP R> ;                ( b' a; Leave buffer )
+
+\\ TODO-83 merge S\\" into S" with a common base once tested
+\\ TODO-83 need in $," as well
+: S\\" ( compile time: <string> ; interpret time: -- caddr u ; ANS version puts address and length )
+  STATE @
+  \\ TODO merge IF and ELSE
+  IF COMPILE S"| HERE
+  ELSE stringBuffer
+  THEN
+    SOURCE >IN @ /STRING
+    ROT
+    pack\\$ ( b' a )
+    SWAP SOURCE DROP - >IN !
+    COUNT
+  STATE @
+  IF + ALIGNED CP ! THEN
+  ; IMMEDIATE
+
 
 ?test\\ : foo $" hello" COUNT NIP ; foo 5 1 TEST
 ?test\\ S" foo" TUCK + 1- C@ 3 CHAR o 2 TEST
@@ -1228,7 +1262,6 @@ CREATE NULL$ 0 , ( EFORTH-ZEN-ERRATA inserts a string "coyote" after this, no id
   NAME> ,
 ; IMMEDIATE
 
-: [CHAR] ( "name" <spaces> -- ) CHAR POSTPONE LITERAL ; IMMEDIATE
 
 :NONAME ( a -- ; : $INTERPRET )
   ( Note js $INTERPRET has same signature as this except for THROW
@@ -1253,8 +1286,8 @@ CREATE NULL$ 0 , ( EFORTH-ZEN-ERRATA inserts a string "coyote" after this, no id
   ( Abort if the data stack underflows.)
   DEPTH 0< ABORT" underflow" ; ( Note Staapl uses $" THROW, v5 uses ABORT)
 
-?test\\ BL PARSE 123 PAD PACK$ $INTERPRET 123 1 TEST
-?test\\ 123 BL PARSE DUP PAD PACK$ $INTERPRET  123 123 2 TEST
+?test\\ PARSE-NAME 123 PAD PACK$ $INTERPRET 123 1 TEST
+?test\\ 123 PARSE-NAME DUP PAD PACK$ $INTERPRET  123 123 2 TEST
 ?test\\ : foo 1 2DROP ?STACK ; : bar [ ' foo ] LITERAL CATCH ; bar C@ 9 1 TEST
 
 ( This switches to use new interpreter, its still using old js $COMPILE )
@@ -1313,9 +1346,9 @@ CREATE I/O  ' ?RX , ' TX! , ( Array to store default I/O vectors. )
 
 ( "," COMPILE LITERAL $," are moved earlier, redefinition of ] is moved later as needs $COMPILE )
 :NONAME ( -- ca ) TOKEN NAME? IF EXIT THEN THROW ; ' ' DEFER!
-: ['] ' POSTPONE LITERAL ; IMMEDIATE
 : ALLOT ( n -- ) CP +! ; ( ERRATA Zen has +1 instead of +! fixed in V5 and Staapl)
 : vALLOT ( n -- ) VP @ IF VP +! ELSE ALLOT THEN ; ( EPROM ALLOT - not part of eForth)
+: BUFFER: CREATE vALLOT ;
 
 : '>BODY! STATE @ \\ https://forth-standard.org/standard/core/IS (nasty state dependent word)
   IF [COMPILE] ['] COMPILE >BODY!
@@ -1627,7 +1660,7 @@ VARIABLE leave-ptr
 ' NUMBER? DEFER!
 
 ?test\\ 50 10 DIGIT? 2 -1 2 TEST
-?test\\ BL PARSE 1234 PAD PACK$ NUMBER? DROP 1234 1 TEST
+?test\\ PARSE-NAME 1234 PAD PACK$ NUMBER? DROP 1234 1 TEST
 ?test\\ 123 123 1 TEST
 
 
@@ -1660,35 +1693,38 @@ VARIABLE leave-ptr
   >R R@ 0 DO DUP spop SWAP LOOP DROP R> ; 
 : sempty @ 0 SWAP ! ; 
 
-8 4 * stack sourceStack ( sourceStack holds 8 * [ SOURCE-ID buff len >IN ] )
+: SOURCE-ID source-id @ ; ( strangely SOURCE-ID is not a variable - https://forth-standard.org/standard/core/SOURCE-ID)
+8 4 * stack sourceStack ( sourceStack holds 8 * [ source-id buff len >IN ] )
 
 : 0> DUP 0= SWAP 0< OR 0= ;
 DEFER unreadFile
-: SAVE-INPUT SOURCE-ID @ SOURCE >IN @ 4 ;
+: SAVE-INPUT SOURCE-ID SOURCE >IN @ 4 ;
 : sourcePush 
-[ rqFiles ] ?\\ SOURCE-ID @ 0> IF SOURCE-ID @ unreadFile THROW THEN ( Check if a file and if so unread any buffered )
+[ rqFiles ] ?\\ SOURCE-ID 0> IF SOURCE-ID unreadFile THROW THEN ( Check if a file and if so unread any buffered )
   SAVE-INPUT sourceStack spushes ;
-: RESTORE-INPUT ( source-id buff len in 4 -- ) 
-  DROP >IN ! #TIB ! #TIB CELL+ ! DUP SOURCE-ID ! 
-  IF FILE ELSE HAND THEN ; ( Set prompt - same for String or File )
-: sourcePop sourceStack spops ( source-id buff len in 4 ) RESTORE-INPUT ; 
+: RESTORE-INPUT ( source-id buff len in 4 -- f ; https://forth-standard.org/standard/core/RESTORE-INPUT )
+  DROP >IN ! #TIB ! #TIB CELL+ ! DUP source-id ! 
+  IF FILE ELSE HAND THEN  ( Set prompt - same for String or File )
+  0 ; \\ Always successful - at least for now (but tested by all callers)
+: sourcePop sourceStack spops ( source-id buff len in 4 ) RESTORE-INPUT THROW ; 
 
 DEFER READ-LINE
 : REFILL ( https://forth-standard.org/standard/core/REFILL )
-  0 >IN ! ( initialized parsing pointer )
-  SOURCE-ID @ ( source )
+  SOURCE-ID ( source )
   ?DUP IF ( not a terminal )  
 [ rqFiles ] ?\\ DUP -1 = IF 
       DROP FALSE ( String - Always false )
 [ rqFiles ] ?\\ ELSE  
 [ rqFiles ] ?\\   TIB 1024 ROT READ-LINE ( u2 flag ior )
 [ rqFiles ] ?\\   THROW SWAP #TIB ! ( flag ; True if more )
+  0 >IN ! ( initialized parsing pointer )
 [ rqFiles ] ?\\ THEN
   ELSE
     ( Accept input stream to terminal input buffer.)
     TIB 80 ( addr and size of terminal input buffer)
     ACCEPT ( u ; )
     #TIB !  ( store number of characters received )
+    0 >IN ! ( initialized parsing pointer )
     TRUE    ( return true, never unwind from terminal )
   THEN
 ;
@@ -1704,7 +1740,7 @@ DEFER READ-LINE
   ( Reset data stack pointer and the terminal input buffer. )
   SP0 @ SP!   ( initialize data stack )
   sourceStack sempty ( empty any nested files
-  0 TIB0 0 0 4 RESTORE-INPUT  ( and read from terminal - resets PROMPT and vectored I/O )
+  0 TIB0 0 0 4 RESTORE-INPUT THROW ( and read from terminal - resets PROMPT and vectored I/O )
   ;
 : quitError ( f -- )
   ( Handle a possible error returned by EVAL - common to QUIT and quit1 )
@@ -2763,7 +2799,7 @@ class Forth {
     const caddr = this.SPpop();
     this.SPpush(this._findNameIn(caddr, u, va));
   }
-  //TODO-84-ARDUINO needs change from _find to _findNameIn and usage in jsFind
+  //TODO-84-ARDUINO needs change from _find to _findNameIn and usage in jsFind to match higher level find and FIND-NAME-IN etc
   // Search a single vocabulary for a string
   // This has same footprint as eForth's 'find' but we do not replace it since this is approx 8x faster
   // Note the string must be aligned to CELLL boundary even if using a non-aligned mem (e.g. celll=2 mem=8)

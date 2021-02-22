@@ -20,15 +20,6 @@ const preTest = `
 \\ ( testing multi line comment
 \\   second line )
 
-\\ TODO-35-VOCAB this will definitely need attention
-: MARKER NP @ CP @ CONTEXT @ DUP @ SWAP CURRENT @ DUP @ SWAP CREATE , , , , , ,
-  DOES> DUP @ CURRENT ! CELL+ DUP @ CURRENT @ !
-   CELL+ DUP @ CONTEXT ! CELL+ DUP @ CONTEXT @ ! 
-   CELL+ DUP @ CP ! CELL+ @ NP ! ;  
-
-: BUFFER: CREATE vALLOT ; \\ TODO may need vBUFFER:
-
-\\ VALUE - depends on 
 
 `;
 
