@@ -166,6 +166,7 @@ const fsExtensions = [
 
 ];
 const filesExtension = `
+: BIN ; \\ No-op its always binary
 : WRITE-LINE ( c-addr u fileid -- ior ; https://forth-standard.org/standard/file/WRITE-LINE )
   DUP >R WRITE-FILE R> SWAP ?DUP 0= IF write-cr ELSE DROP THEN ;
 
