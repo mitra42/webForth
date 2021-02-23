@@ -21,6 +21,36 @@ const preTest = `
 \\   second line )
 
 
+\\ Copied from forth2012 test suite tester.fs
+VARIABLE testActualDepth        \\ STACK RECORD
+CREATE testResults 20 CELLS ALLOT
+
+: testReset   SP0 @ SP! ;  ( Re-initialize data stack )
+: testError \\ ( C-ADDR U -- ) DISPLAY AN ERROR MESSAGE FOLLOWED BY THE LINE THAT HAD THE ERROR.
+   CR TYPE SOURCE TYPE       \\ DISPLAY LINE CORRESPONDING TO ERROR
+   testReset                  \\ THROW AWAY EVERY THING ELSE
+   QUIT  \\ *** Uncomment this line to QUIT on an error
+;
+
+:NONAME \\ Different from tester, allows stack to be non-empty and treats as comment if testFlags!&8  : T{
+  testFlags @ 8 AND IF [COMPILE] ?\\ THEN ;
+' T{ DEFER!
+:NONAME \\ ( ... -- ) Record depth and content of stack : ->
+   DEPTH DUP testActualDepth ! \\ RECORD DEPTH since T{
+   ?DUP IF 0 DO testResults I CELLS + ! LOOP THEN ;
+' -> DEFER! 
+:NONAME }T \\ ( ... -- ) COMPARE STACK (EXPECTED) CONTENTS WITH SAVED (ACTUAL) CONTENTS.
+   DEPTH testActualDepth @ = IF      \\ IF DEPTHS MATCH
+      DEPTH ?DUP IF         \\ IF THERE IS SOMETHING ON THE STACK
+         0  DO            \\ FOR EACH STACK ITEM
+           testResults I CELLS + @   \\ COMPARE ACTUAL WITH EXPECTED
+           = 0= IF S" INCORRECT RESULT: " testError LEAVE THEN
+         LOOP
+      THEN
+   ELSE               \\ DEPTH MISMATCH
+      S" WRONG NUMBER OF RESULTS: " testError
+   THEN ;
+' ?T DEFER!
 `;
 
 const forth = new Forth_with_fs({ CELLL, MEM, ROMSIZE, RAMSIZE, extensions, testFlags, memClass });

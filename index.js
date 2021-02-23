@@ -1,20 +1,5 @@
 /*
- *
- * const Forth = require('webforth');   // The class or obj with functions
- * foo = new Forth()                    // Instantiate a new, but incomplete instance
- * foo.compileForthInForth()            // Load the parts of Forth written in Forth
- * .then(() => foo.interpret("1 2 DUP .S")); // Run some Forth words in the instance
- * .then(() => forth.console());        // Go interactive
- * new Forth({ CELLL: 2, MEM: 16, RAMSIZE: 0x4000);  // parameterizable
- *
- * And some ideas ... not yet implemented
- * .then(() => foo.load('foo.f'))       // TODO-34-FILES Load file into the class
- * .then(() => foo.load('https://....')) // TODO-34-FILES remote file it into the instance
- * boo = forth.rot([1,2,3]);  // Returns [2,3,1] - will depend what can do with JS API
- */
-
-/*
- * References see FORTH.md
+ * See README.md and for references see FORTH.md an
  */
 
 /* Naming conventions and abbreviations
@@ -28,38 +13,12 @@
  * n: word - 16 bit signed
  *
  * For routines defined in Javascript there are typically
- * c.foo = func // If the functionary is to be discarded after bootstrap it will be in 'c' else just a function
  * this.jsFunctions[tok] = func // An array that maps the tokens used in the Forth space to the addresses of the function in JS address space
  * jsFunctionsAttributes[tok] = { name, replaced } // Some attributes to allow management of the functions
  * Name Dictionary:  na-2*CELLL: <xt><link><name> // In the name directory it looks like any other word
  * Code Dictionary:  xt: <tok> // In the code directory its a single cell with the token.
  */
 
-/* Sections below in order
- * jsFunctionAttributes: maps JS functions to Forth names and other attributes
- * Memory Map - constants that lay out the memory array
- * Other key constants - especially bitmasks
- * Data table used to build users.
- * Forth written in Forth - loaded after the functions in the class
- * Support for Debugging - constants, variables, arrays, functions used by tools
- * Javascript structures - implement the memory map and record the full state.
- * Standard Pointers used - esp IP, SP, RP, UP
- * Build dictionary, mostly from jsFunctionAttributes
- * Support for Debugging
- * Code words to support debugging on the console
- * Functions to simplify storing and retrieving 16 bit values into 8 bit stacks etc.
- * Access to the USER variables before they are defined
- * Functions related to building 'find' and its wrappers
- * JS Functions to be able to define words
- * Define this tokens used for each kind of defining word
- * INNER INTERPRETER YES THIS IS IT !
- * Basic low level key I/O and links to OS
- * Literals and Branches - using next value in dictionary
- * Primitive words for memory, stack and return access, arithmetic and logic
- * Define and initialize User variable
- * JS interpreter - could be discarded when done or built out
- * A group of words required for the JS interpreter redefined later
-*/
 //eslint-env node
 
 /*
@@ -110,6 +69,7 @@ const jsFunctionAttributes = [
   // TODO-ARDUINO needs from here down - some could be in Forth instead
   'loop', 'I', 'leave', 'RDROP', { n: '2RDROP', f: 'TwoRDROP' }, { n: 'FIND-NAME-IN', f: 'FIND_NAME_IN' }, { n: 'immediate?', f: 'immediateQ' },
   { n: 'ALIGN', f: 'vpAlign' }, { n: '>BODY', f: 'toBODY' }, 'DEFER', 'ROLL', 'ROT', 'of',
+  { n: 'T{', f: 'Tbrace', defer: true }, { n: 'DEPTH', defer: true }, { n: '}T', f: 'Tunbrace', defer: true }, { n: '->', f: 'Tarrow', defer: true }
 ];
 
 // Define the tokens used in the first cell of each word.
@@ -195,9 +155,9 @@ const testDepthOffset = USER('testDepth', 0);  // Needs to autoadjust //TODO-2AR
 // ported to Arduino above
 
 const forthInForth = `
-0 TEST
+T{ -> }T
 : 2DROP DROP DROP ;
-1 2 2DROP 0 TEST
+T{ 1 2 2DROP -> }T
 
 : setHeaderBits LAST @ C@ OR LAST @ C! ;
 : COMPILE-ONLY COMP setHeaderBits ;
@@ -566,11 +526,12 @@ BL 32 1 TEST
 ( === Managing Data Stack Zen pg59 DEPTH PICK )
 
 ( ERRATA Staapl, v5, zen, has 2/ )
-: DEPTH ( -- n)
+:NONAME ( -- n ; : DEPTH)
   ( Return the depth of the data stack)
   SP@           ( current stack pointer)
   SP0 @ SWAP -  ( distance from stack origin)
   CELLL / ;     ( divide by bytes/cell)
+' DEPTH DEFER!
 
 : PICK ( ... +n -- ... w)
   ( Copy the nth stack item to tos)
@@ -988,7 +949,7 @@ BL 32 1 TEST
 ?test\\ BL WORD xxx DUP C@ 1+ PAD SWAP CMOVE PAD BL WORD xzx 4 SAME? >R 2DROP R> 0= 0 1 TEST
 ?test\\ FORTH 0 TEST
 
-?test\\ BL WORD TOKEN CONTEXT @ find BL WORD TOKEN CONTEXT @ FORTHfind 2 TEST
+\\ TODO replace: ?test\\ BL WORD TOKEN CONTEXT @ find BL WORD TOKEN CONTEXT @ FORTHfind 2 TEST
 ?test\\ BL WORD TOKEN CONTEXT @ find NIP BL WORD TOKEN COUNT CONTEXT @ FIND-NAME-IN 1 TEST
 ?test\\ BL WORD TOKEN CONTEXT @ find NIP BL WORD TOKEN COUNT FIND-NAME 1 TEST ( FIND-NAME searches all vocabs)
 ?test\\ BL WORD TOKEN CONTEXT @ find BL WORD TOKEN NAME? 2 TEST ( Name searches all vocabs )
@@ -2672,6 +2633,7 @@ class Forth {
   }
   // TEST will (destructively) check the stack matches expected result, used for testing the compiler.
   // e.g. this.interpret(`10 DUP 10 10 2 TEST`); // Confirm stack finishes with 2 items (10 10)
+  // TODO TEST() is obsolete
   TEST() { //  a1 a2 a3 b1 b2 b3 n -- ; Check n parameters on stack
     // eslint-disable-next-line no-unused-vars
     const stackDepth = this.SPpop();
@@ -2687,6 +2649,34 @@ class Forth {
       console.assert(this.SPpop() === b.pop());
     }
     this.debugClear(); // Reset Debug Stack as can be mucked up by THROW and CATCH
+  }
+  _DEPTH() {
+    this.m.ramAddr(this.Ufetch(SP0offset)) - this.ramSP;
+  }
+  DEPTH() { this.SPpush(this._DEPTH()); }
+  Tbrace() { // : T{ testFlags @ 8 AND IF [COMPILE] ?\ THEN ;
+    // Skip rest of line if not testing
+    if (! this.isTestFlags(8)) {
+      this.Ustore(INoffset,this.Ufetch(nTIBoffset));
+    }
+  }
+  Tarrow() { // : -> DEPTH DUP testActualDepth ! ?DUP IF 0 DO testResults I CELLS + ! LOOP THEN ;
+    this.testActualDepth = this._DEPTH()
+    this.testResults = []
+    for (let i = 0; i < this.testActualDepth; i++) {
+      this.testResults.push(this.SPpop());
+    }
+  }
+  Tunbrace() {
+    // DEPTH testActualDepth @ = IF DEPTH ?DUP IF 0 DO testResults I CELLS + @ = 0= IF S" INCORRECT RESULT: " testError LEAVE THEN LOOP THEN ELSE S" WRONG NUMBER OF RESULTS: " testError THEN ;
+    if (this._DEPTH() != this.testActualDepth) {
+      console.log("WRONG NUMBER OF RESULTS: "); //TODO replace this and all console.log and console.assert with a string output
+      testError();
+    } else if (this.testActualDepth) {
+      for (let i = 0; i < this.testActualDepth; i++) {
+        console.assert(this.SPpop() === this.testResults.pop());
+      }
+    }
   }
 
   // === Functions to simplify storing and retrieving 16 bit values into 8 bit stacks etc.
