@@ -14,7 +14,7 @@
  *
  * For routines defined in Javascript there are typically
  * this.jsFunctions[tok] = func // An array that maps the tokens used in the Forth space to the addresses of the function in JS address space
- * jsFunctionsAttributes[tok] = { name, replaced } // Some attributes to allow management of the functions
+ * jsFunctionsAttributes[tok] = { n, defer} // Some attributes to allow management of the functions
  * Name Dictionary:  na-2*CELLL: <xt><link><name> // In the name directory it looks like any other word
  * Code Dictionary:  xt: <tok> // In the code directory its a single cell with the token.
  */
@@ -27,12 +27,10 @@
    {  n: 'foo'    Name of forth word
       f: bar      Links to Forth.prototype.bar (defaults to same as 'n'
       token: true Create a token word that can be used as first cell of a definition - order must match constants below
-      replaced: true  This word will be replaced by a Forth definition, so check for its being compiled into other definitions. TODO-83-DEFER possibly obsoleted by defer
       defer: true Build a DEFER structure and point at the definition, typically replaced later by Forth word
       jsNeeds: true The execution address of this word is needed by the JS o will be stored in js2xt[n]
  */
 // it is used to build the dictionary in each instance.
-// TODO-83 replace "replaced" with "defer" - check all deferred, and check any use of "replaced"
 const jsFunctionAttributes = [
   0, // 0 is not a valid token
   // This next list of token's must match in order the constants defined for tokenCreate etc.
@@ -45,11 +43,10 @@ const jsFunctionAttributes = [
   { n: 'tokenDefer', token: true }, // Execute payload (like DoList but just one)
   { n: 'tokenValue', token: true }, // Returns value from a user variable.
   'ALIGNED',
-  { n: 'find', f: 'jsFind' }, // Fast version of find - see Forth definition later
-  { n: 'OVERT', replaced: true, defer: true },
-  // { n: '?UNIQUE', f: 'qUnique' }, // Not used yet
-  { n: '$,n', f: 'dollarCommaN', replaced: true, defer: true },
-  { n: '>NAME', f: 'ToNAME' }, // Fast version of >NAME - see Forth definition later
+  { n: 'find-name-in', f: 'findNameIn' }, // Fast version of find
+  { n: 'overt', defer: true },
+  { n: '$,n', f: 'dollarCommaN', defer: true },
+// TODO-83 =X=X=X=X=X=X=X=X=X=X=X=X=X=X=X=X=X=X=X=X SCAN COMPLETED TO HERE =X=X=X=X=X=X=X=X=X=X=X=X=X=X=X=X
   'MS', 'BYE', { n: 'EXIT', jsNeeds: true }, 'EXECUTE',
   { n: '?RX', f: 'QRX' }, {  n: 'TX!', f: 'TXbang' }, { n: '!IO', f: 'bangIO' },
   { n: 'doLIT', jsNeeds: true }, { n: 'DOES>', f: 'DOES' }, 'next', { n: '?branch', f: 'qBranch' }, 'branch',
@@ -61,13 +58,13 @@ const jsFunctionAttributes = [
   { n: '0<', f: 'less0' }, 'AND', 'OR', 'XOR', { n: 'UM+', f: 'UMplus' },
   /* TODO-ARDUINO needs this line */ 'RSHIFT', 'LSHIFT', { n: '2/', f: 'TwoDiv' },
   'userAreaInit', 'userAreaSave',
-  { n: 'PARSE', replaced: true, defer: true }, { n: 'TOKEN', replaced: true, defer: true }, { n: 'NUMBER?', f: 'NUMBERQ', replaced: true, defer: true },
-  { n: '$COMPILE', f: 'dCOMPILE', replaced: true, defer: true }, { n: '$INTERPRET', f: 'dINTERPRET', replaced: true, jsNeeds: true, defer: true },
-  { n: '[', f: 'openBracket', immediate: true, replaced: true, defer: true }, { n: ']', f: 'closeBracket', replaced: true, defer: true },
-  { n: ':', f: 'colon', replaced: true, defer: true }, { n: ';', f: 'semicolon', immediate: true, replaced: true, defer: true }, { n: "'", f: 'tick', replaced: true, defer: true },
+  { n: 'PARSE', defer: true }, { n: 'TOKEN', defer: true }, { n: 'NUMBER?', f: 'NUMBERQ', defer: true },
+  { n: '$COMPILE', f: 'dCOMPILE', defer: true }, { n: '$INTERPRET', f: 'dINTERPRET', jsNeeds: true, defer: true },
+  { n: '[', f: 'openBracket', immediate: true, defer: true }, { n: ']', f: 'closeBracket', defer: true },
+  { n: ':', f: 'colon', defer: true }, { n: ';', f: 'semicolon', immediate: true, defer: true }, { n: "'", f: 'tick', defer: true },
   'debugNA', 'testing3', 'Fbreak', 'debugPrintTIB', 'TEST', 'stringBuffer', 'TYPE',
   // TODO-ARDUINO needs from here down - some could be in Forth instead
-  'loop', 'I', 'leave', 'RDROP', { n: '2RDROP', f: 'TwoRDROP' }, { n: 'FIND-NAME-IN', f: 'FIND_NAME_IN' }, { n: 'immediate?', f: 'immediateQ' },
+  'loop', 'I', 'leave', 'RDROP', { n: '2RDROP', f: 'TwoRDROP' }, { n: 'immediate?', f: 'immediateQ' },
   { n: 'ALIGN', f: 'vpAlign' }, { n: '>BODY', f: 'toBODY' }, 'DEFER', 'ROLL', 'ROT', 'of',
   { n: 'T{', f: 'Tbrace', defer: true }, { n: 'DEPTH', defer: true }, { n: '}T', f: 'Tunbrace', defer: true }, { n: '->', f: 'Tarrow', defer: true }
 ];
@@ -236,7 +233,7 @@ BL 32 1 TEST
   COMPILE doLIT ( compile doLIT to head lit )
   , ; IMMEDIATE ( compile literal itself )
 
-: create TOKEN $,n OVERT , 0 , ; 
+: create TOKEN $,n overt , 0 , ; 
 ( Create a new word that doesnt allocate any space, but will push address of that space. )
 ( redefines definitions moved up so that they will use new TOKEN etc)
 : CREATE tokenCreate create ; ( Note the extra field for DOES> to patch - redefines definition moved up so that it will use new TOKEN etc)
@@ -486,7 +483,7 @@ BL 32 1 TEST
 ?test\\ 123 CELLS CELLL / 123 1 TEST
 
 : ($,n)  ( na -- )
-    ( na) DUP LAST !          ( save na for vocabulary link for OVERT)
+    ( na) DUP LAST !          ( save na for vocabulary link for overt)
     ( na) HERE ALIGNED SWAP   ( align code address )
     ( cp na) CELL-            ( link address )
     ( cp la) CURRENT @ @      ( link to current vocab)
@@ -883,7 +880,7 @@ BL 32 1 TEST
 
 ( === Dictionary Search Zen pg75-77 NAME> SAME? find NAME? )
 
-: NAME> ( na -- ca )
+: NAME> ( na -- xt )
   ( Return a code address given a name address.)
   2 CELLS - ( move to code pointer field )
   @ ; ( get code field address )
@@ -923,7 +920,7 @@ BL 32 1 TEST
     R@ @        ( is this a valid vocabulary? )
   WHILE         ( caddr u R: va' ; yes)
     2DUP R@ @    ( caddr u caddr u va' R: va' )
-    FIND-NAME-IN ( caddr u na R: va' | caddr u F R: va')
+    find-name-in ( caddr u na R: va' | caddr u F R: va')
     ?DUP        ( word found here? )
   UNTIL         ( if not, go searching next vocabulary )
                 ( caddr u na R: va)
@@ -950,7 +947,7 @@ BL 32 1 TEST
 ?test\\ FORTH 0 TEST
 
 \\ TODO replace: ?test\\ BL WORD TOKEN CONTEXT @ find BL WORD TOKEN CONTEXT @ FORTHfind 2 TEST
-?test\\ BL WORD TOKEN CONTEXT @ find NIP BL WORD TOKEN COUNT CONTEXT @ FIND-NAME-IN 1 TEST
+?test\\ BL WORD TOKEN CONTEXT @ find NIP BL WORD TOKEN COUNT CONTEXT @ find-name-in 1 TEST
 ?test\\ BL WORD TOKEN CONTEXT @ find NIP BL WORD TOKEN COUNT FIND-NAME 1 TEST ( FIND-NAME searches all vocabs)
 ?test\\ BL WORD TOKEN CONTEXT @ find BL WORD TOKEN NAME? 2 TEST ( Name searches all vocabs )
 
@@ -1333,7 +1330,7 @@ CREATE I/O  ' ?RX , ' TX! , ( Array to store default I/O vectors. )
 ( All moved earlier )
 
 
-( === Name Dictionary Compiler Zen pg94-96: ?UNIQUE $,n $COMPILE OVERT ; ] call, : IMMEDIATE  (see this.dollarCommaN)
+( === Name Dictionary Compiler Zen pg94-96: ?UNIQUE $,n $COMPILE overt ; ] call, : IMMEDIATE  (see this.dollarCommaN)
 
 : ?UNIQUE ( a -- a ) ( Redefining code word qUNIQUE in Forth)
   ( Display a warning message if the word already exists.)
@@ -1387,7 +1384,7 @@ CREATE I/O  ' ?RX , ' TX! , ( Array to store default I/O vectors. )
 
 ( === TODO-TEST TODO-IO test EVAL, not that .OK wont work here since not yet using $INTERPRET )
 
-:NONAME  ( -- : OVERT)
+:NONAME  ( -- : overt)
   ( Link a successfully defined word into the current vocabulary. )
   LAST @        ( name field address of last word )
   DUP @ IF        ( Dont store if LAST is 0 as in :NONAME)
@@ -1395,13 +1392,13 @@ CREATE I/O  ' ?RX , ' TX! , ( Array to store default I/O vectors. )
   ELSE
     DROP NP @ 3 CELLS + NP !
   THEN ;
-' OVERT DEFER!
+' overt DEFER!
 
 :NONAME ( -- : ; )
   ( Terminate a colon definition. )
   COMPILE EXIT  ( compile exit code )
   [COMPILE] [   ( return to interpreter state )
-  OVERT ;       ( restore current vocabulary )
+  overt ;       ( restore current vocabulary )
 ' ; DEFER! COMPILE-ONLY IMMEDIATE
 
 :NONAME ( -- ; Start compiling the words in the input stream : ] )
@@ -1424,15 +1421,15 @@ CREATE I/O  ' ?RX , ' TX! , ( Array to store default I/O vectors. )
 
 ( EFORTH-DIFF each of V5, Zen and Staapl do this differently - this is different again because of token threaded architecture)
 
-\\ Deprecated \\ : USER ( u -- ; <string> ) TOKEN $,n OVERT tokenUser , ;
-: VALUE TOKEN $,n OVERT HERE tokenValue , _USER @ , _USER ++ >BODY! ; \\ TODO needs to initialize variable
+\\ Deprecated \\ : USER ( u -- ; <string> ) TOKEN $,n overt tokenUser , ;
+: VALUE TOKEN $,n overt HERE tokenValue , _USER @ , _USER ++ >BODY! ; \\ TODO needs to initialize variable
 : TO '>BODY! ; IMMEDIATE
 
 ?test\\ : foo CREATE 123 , DOES> @ ; foo BAR BAR 123 1 TEST
 
 : VARIABLE ( -- ; <string> ) vCREATE 0 v, ;
 
-: CONSTANT ( u -- ; <string> ) TOKEN $,n OVERT tokenNextVal , , ;
+: CONSTANT ( u -- ; <string> ) TOKEN $,n overt tokenNextVal , , ;
 
 ?test\\ VARIABLE foo 0 TEST
 ?test\\ 12 foo ! 0 TEST
@@ -1843,7 +1840,9 @@ DEFER READ-LINE
 ?test\\ WORDS 0 TEST ( Commented out as expensive )
 
 ( === Search Token Name Zen pg103 >NAME )
-: FORTH>NAME ( ca -- na, F ) (
+\\ Note can also define fast version: toName() { this.SPpush(this.xt2na(this.SPpop())); }
+
+: >NAME ( ca -- na, F ) (
   ( Convert code address to a name address. )
   CURRENT             ( search only the current vocab )
   BEGIN CELL+ @ ?DUP  ( end of vocabulary? )
@@ -1855,9 +1854,9 @@ DEFER READ-LINE
     THEN NIP ?DUP
   UNTIL NIP NIP EXIT  ( found.  return name address )
   THEN DROP FALSE ;       ( end of vocabulary, failure )
-?test\\ BL WORD DUP NAME? SWAP >NAME = -1 1 TEST ( Test FAST JS version )
-( : >NAME FORTH>NAME ; ) ( Uncomment to use FORTH version of >NAME )
-?test\\ BL WORD DUP NAME? SWAP FORTH>NAME = -1 1 TEST
+
+  
+?test\\ BL WORD DUP NAME? SWAP >NAME = -1 1 TEST
 
 ( === The simplest Decompiler Zen pg104 SEE )
 : SEE ( -- ; <string> )
@@ -1882,7 +1881,7 @@ DEFER READ-LINE
   THEN
   DROP ;
 
-?test\\ SEE FORTH>NAME 0 TEST
+?test\\ SEE >NAME 0 TEST
 
 ( ERRATA Zen uses CONSTANT but doesnt define it )
 ( === Signon Message Zen pg105 VER hi )
@@ -1898,7 +1897,7 @@ DEFER READ-LINE
   version ; COMPILE-ONLY
 
 ( === Hardware Reset Zen pg106 COLD )
-( ERRATA v5 adds "6 CP 3 MOVE OVERT" without defining MOVE, and unclear what it does, Zen & Staapl dont have EMPTY)
+( ERRATA v5 adds "6 CP 3 MOVE overt" without defining MOVE, and unclear what it does, Zen & Staapl dont have EMPTY)
 : EMPTY ( -- )
   ( Empty out any definitions)
   FORTH CONTEXT @ DUP CURRENT 2! ;
@@ -1914,9 +1913,9 @@ CREATE 'BOOT  ' hi , ( application vector )
     PRESET        ( Initialize TIB and SP )
     CONSOLE
     'BOOT @EXECUTE ( Vectored Boot routine, defaults to hi)
-    ( EPROM: EMPTY OVERT will initialize LAST (from usersave -> FORTH -> CONTEXT & CURRENT )
+    ( EPROM: EMPTY overt will initialize LAST (from usersave -> FORTH -> CONTEXT & CURRENT )
     EMPTY          ( Make FORTH context vocabulary -and empty out definitions )
-    OVERT         ( And Reset FORTH definition to last definition from the userAreaInit  )
+    overt         ( And Reset FORTH definition to last definition from the userAreaInit  )
     QUIT          ( Invoke Forth "operating system" )
   AGAIN ;         ( Safeguard the Forth interpreter )
 
@@ -2417,7 +2416,7 @@ class Forth {
     this.Ustore(CURRENToffset, vocabPtr); // Initialize Current. Context & Current+CELLL initialized in USER process Zen pg46
     this.Ustore(CURRENToffset + 1, vocabPtr); // Initialize Current. Context & Current+CELLL initialized in USER process Zen pg46
     this.Ustore(CONTEXToffset, vocabPtr); // Initialize Current. Context & Current+CELLL initialized in USER process Zen pg46
-    this.OVERT(); // Uses the initialization done by this.Ustore(CURRENToffset) above.
+    this.overt(); // Uses the initialization done by this.Ustore(CURRENToffset) above.
 
     // copy constants over
     ['CELLL', 'CELLbits', 'CELLMASK', 'TIB0', 'rqFiles'].forEach((k) => this.buildConstant(k, this[k]));
@@ -2448,7 +2447,7 @@ class Forth {
     this.CODE(name);
     // Note assumption that token for constants is 1, i.e. its the 2nd tokenFunction defined
     this.DW(tokenNextVal, val);
-    this.OVERT();
+    this.overt();
   }
   buildCode(name, tok, attribs) {
     let xt;
@@ -2464,7 +2463,7 @@ class Forth {
       xt = this.cpFetch();
       this.DW(tok);  // The entire definition is the token for the JS function
     }
-    this.OVERT();
+    this.overt();
     if (attribs.immediate) {
       this.setHeaderBits(l.IMED);
     }
@@ -2485,7 +2484,7 @@ class Forth {
     if (name) {                       // Put into dictionary
       this.CODE(name);
       this.DW(tokenUser, offsetInCells);
-      this.OVERT();
+      this.overt();
     }
     this.Ustore(0, _USER + 1); // Need to skip to next _USER
   }
@@ -2579,7 +2578,7 @@ class Forth {
     // Cleanup - remove routines that shouldnt be being used
     jsFunctionAttributes.forEach((attribs, i) => {
       // noinspection JSUnresolvedVariable
-      if (attribs.replaced) {
+      if (attribs.defer) {
         this.jsFunctions[i] = null;
       }
     });
@@ -2605,10 +2604,11 @@ class Forth {
   }
   debugThread(xt) { //TODO comment out call to this, its expensive even to test flag in the middle of loop
     if (this.isTestFlags(0x02)) {
-      this.debugName = this.xt2name(xt); // Expensive so only done when testing
+      const na = this._toName(xt); // Expensive so only done when testing
+      this.debugName = na ? this.countedToJS(na) : 'undefined';
       if (this.Ufetch(testDepthOffset) > this.debugExcecutionStack.length) {
         //TODO-28-MULTITASK RPP(RP0) and SPP will move
-        console.log('R:', this.debugReturnStack(), this.debugExcecutionStack, this.xt2name(xt), 'S:', this.ramSPP === this.ramSP ? '' : this.debugStack(),
+        console.log('R:', this.debugReturnStack(), this.debugExcecutionStack, debugName, 'S:', this.ramSPP === this.ramSP ? '' : this.debugStack(),
           this.padTestLength ? ('pad: ' + (this.padTestLength > 0 ? this.m.decodeString(this.padPtr(), this.padPtr() + this.padTestLength) : this.m.decodeString(this.padPtr() + this.padTestLength, this.padPtr()))) : '');
       }
     }
@@ -2686,10 +2686,14 @@ class Forth {
   // 8 bit equivalents
   Mfetch8(a) { return this.m.fetch8(a); } // Returns byte at a
   Mstore8(a, v) { this.m.store8(a, v); }
-  ALIGNED() { this.SPpush(this.m.cellAlign(this.SPpop())); }
+  // TODO-83-SCANNED BELOW
+  ALIGNED() { this.SPpush(this.m.cellAlign(this.SPpop())); } // https://forth-standard.org/standard/core/ALIGNED
+  // TODO-83-SCANNED ABOVE
   SPfetch() { return this.m.cellRamFetch(this.ramSP); }
-  SPpop() { return this.m.cellRamFetch(this.ramSP++); }
-  SPpush(v) { this.m.cellRamStore(--this.ramSP, v); }
+  SPpop() {
+    return this.m.cellRamFetch(this.ramSP++); }
+  SPpush(v) {
+    this.m.cellRamStore(--this.ramSP, v); }
   RPfetch() { return this.m.cellRamFetch(this.ramRP); }
   RPpop() { return this.m.cellRamFetch(this.ramRP++); }
   RPpush(v) { this.m.cellRamStore(--this.ramRP, v); }
@@ -2764,8 +2768,8 @@ class Forth {
     return true;
   }
 
-  //TODO-84-ARDUINO needs
-  _findNameIn(caddr, u, va) { // c-addr u va -- nt | 0 ; https://forth-standard.org/proposals/find-name#contribution-58
+  // TODO-83-SCANNED BELOW
+  _findNameIn(va, u, caddr) { // c-addr u va -- nt | 0 ; https://forth-standard.org/proposals/find-name#contribution-58
     const cellCount = (u / this.CELLL) >> 0; // Count of cells after first one
     const na = caddr--; // Point at count
     const cell1 = this.Mfetch(na);  // Could be little or big-endian
@@ -2783,25 +2787,23 @@ class Forth {
     // Drop through not found
     return l.FALSE;
   }
-  FIND_NAME_IN() { // caddr u va -- na; Note this ONLY currently works if caddr-- is a counted string
-    const va = this.SPpop();
-    const u = this.SPpop();
-    const caddr = this.SPpop();
-    this.SPpush(this._findNameIn(caddr, u, va));
+  findNameIn() { // caddr u va -- na|0; Note this ONLY currently works if caddr-- is a counted string
+    this.SPpush(this._findNameIn(this.SPpop(), this.SPpop(), this.SPpop()));
   }
-  //TODO-84-ARDUINO needs change from _find to _findNameIn and usage in jsFind to match higher level find and FIND-NAME-IN etc
   // Search a single vocabulary for a string
   // This has same footprint as eForth's 'find' but we do not replace it since this is approx 8x faster
+  // It only appears in JS that is replaced by Forth so does not nee porting to Arduino etc
   // Note the string must be aligned to CELLL boundary even if using a non-aligned mem (e.g. celll=2 mem=8)
-  jsFind() { // a va -- ca na | a 0
-    const va = this.SPpop();
+  // TODO-29-VOCABULARY This just looks up a in the Context vocabulary, it makes no attempt to use multiple vocabularies
+  // If required then fixing this to iterate over the context array should not break anything (this is what NAME? does)
+  findName() { // a -- xt na | a F
+    const va = this.Ufetch(CONTEXToffset);
     const a = this.SPpop();
     //this.m.assertAlign(a);
     //console.log('find: Looking for', name) // comment out except when debugging find
     //const na = this._find(va, a);  // return matching na or 0
-
     const charCount = this.Mfetch8(a) & l.BYTEMASK;
-    const na = this._findNameIn(a + 1, charCount, va);
+    const na = this._findNameIn(va, charCount, a + 1);
     if (na) {
       this.SPpush(this.na2xt(na));
       this.SPpush(na);
@@ -2811,8 +2813,12 @@ class Forth {
     }
   }
 
+
+  // TODO-83-SCANNED ABOVE
+
   // Traverse dictionary to convert xt back to a na (for decompiler or debugging)
-  xt2na(xt) {
+  // Could also define fast version of >NAME but not used: ToNAME() { this.SPpush(this.xt2na(this.SPpop())); }
+  _toName(xt) {
     let p = this.currentFetch(); // vocabulary
     while (p = this.Mfetch(p)) {
       //console.log('_find: comparing:', this.countedToJS(p)) // comment out except when debugging find
@@ -2824,24 +2830,6 @@ class Forth {
     // Drop through not found
     return l.FALSE;
   }
-  // ported to Arduino above L.2177-
-
-  // Convert xt to a Javascript string of its name or 'undefined' (only used for debugging).
-  xt2name(xt) {
-    const na = this.xt2na(xt);
-    return na ? this.countedToJS(na) : 'undefined';
-  }
-
-  // ported below L.2180-
-  ToNAME() { this.SPpush(this.xt2na(this.SPpop())); }  // Fast version of >NAME see Forth definition below
-
-  // TODO-29-VOCABULARY This just looks up a in the Context vocabulary, it makes no attempt to use multiple vocabularies
-  // If required then fixing this to iterate over the context array should not break anything (this is what NAME? does)
-  findName() { // a -- xt na | a F
-    this.SPpush(this.Ufetch(CONTEXToffset));  // a va
-    this.jsFind();                           // xt na | a F
-  }
-  // ported to Arduino above L.2180-
 
   // -- a; Push a Javascript string to a temporary location as a counted string, and put its address on the stack
   JStoCounted(s) {
@@ -2889,25 +2877,27 @@ class Forth {
   // a -- a; Check if a definition of the word at 'a' would be unique and display warning (but continue) if it would not be.
   // Same profile as ?UNIQUE but not turned into a code word as not used prior to
   qUnique() {
-    this.SPpush(this.SPfetch());      // DUP
-    this.SPpush(this.currentFetch()); // a a va; dictionary to search
-    this.jsFind();                 // a xt na | a a F
-    if (this.SPpop()) {
-      const xt = this.SPpop();              // Discard xt
+    let a = this.SPfetch();
+    const c = this.Mfetch8(a++);
+    this.SPpush(a);
+    this.SPpush(c);               // a a' c va
+    this.SPpush(this.currentFetch()); // a a' c va; dictionary to search
+    this.findNameIn();                 // a na | a F
+    if (this.SPpop()) {                // a
       const name = this.countedToJS(this.SPfetch());
       if (!['foo', 'bar'].includes(name)) {
-        console.log(jsFunctionAttributes[this.Mfetch(xt)].replaced ? 'Expected' : '', 'Duplicate definition of', this.countedToJS(this.SPfetch())); // Catch duplicates - report, but allow
+        console.log('Duplicate definition of', name); // Catch duplicates - report, but allow
       }
-    } else {
-      this.SPpop(); // DROP a
     }
   }
 
+  // TODO-83-SCANNED BELOW
   // na -- ; Builds bytes around a newly entered name. Same function as $,n on Zen pg94 used by all defining words (this.CODE ':')
   // expects in Name dictionary: <count><string><opt padding>
   // prepends:   <aligned address of next cell of code><address of na of last definition in vocabulary>...
   // Side effects are important: specifically.
   // LAST <= na
+  // Not ported to Arduino as everything that uses it has a Forth version
   dollarCommaN() {
     if (this.Mfetch8(this.SPfetch())) {         // DUP C@ IF  ; test for no word
       this.qUnique();
@@ -2926,12 +2916,11 @@ class Forth {
       console.log('name error'); // This is an error - in FORTH equivalent its a THROW
     }
   }
-
   // Make the most recent definition available in the directory. This is part of closing every 'defining word'
-  OVERT() {
+  overt() {
     this.Mstore(this.currentFetch(), this.lastFetch()); // LAST @ CURRENT @ !
   }
-  // ported to Arduino above here
+  // TODO-83-SCANNED ABOVE
 
   //  Build a new definition - part of all defining words.
   CODE(name) {
@@ -3281,7 +3270,7 @@ class Forth {
     }
   }
   // The opposite of userAreaInit - save values for restoration at COLD
-  // Note it saves the value of LAST which is also in "FORTH", the "OVERT" in COLD restores that
+  // Note it saves the value of LAST which is also in "FORTH", the "overt" in COLD restores that
   userAreaSave() {
     this.useRam(); // If were using ROM then switch
     const _USER = this.Ufetch(0);
@@ -3365,18 +3354,6 @@ class Forth {
     */
   }
 
-  // If we are going to compile it, then check its not compiling into the dict, code we plan on replacing. (See same code on "'")
-  checkNotCompilingReplaceable(xt, na) {
-    if (jsFunctionAttributes[this.Mfetch(xt)].replaced) {
-      const inDefOf = this.countedToJS(this.lastFetch());
-      if (!['[COMPILE]', '(', 'create', 'CREATE', 'vCREATE'].includes(inDefOf)) { // Intentionally redefine ( so ok with redefinition
-        console.log('Compiling', this.countedToJS(na), 'in', inDefOf, 'when code will be deleted');
-        console.log('XXXX TODO-83');
-        //console.assert(false); // Break here, shouldn't be happening.
-      }
-    }
-  }
-
   _immediateQ(na) {
     const ch = this.Mfetch8(na);
     return ch & l.IMED;
@@ -3392,7 +3369,6 @@ class Forth {
       if (this._immediateQ(na)) {
         await this.runXT(xt); // This will work as long as this $INTERPRET never called from Forth as cant nest 'run' even indirectly
       } else {
-        this.checkNotCompilingReplaceable(xt, na);
         if (this.isTestFlags(0x02)) console.log('COMPILING:', this.countedToJS(na));
         this.DW(xt);
       }
@@ -3488,12 +3464,12 @@ class Forth {
     this.DW(tok); // Must be after creating the name and links etc
   }
   colon() { this._colon(tokenDoList); this.closeBracket(); }
-  DEFER() {  this._colon(tokenDefer); this.DW(0); this.OVERT(); } //TODO-ARDUINO needs this
+  DEFER() {  this._colon(tokenDefer); this.DW(0); this.overt(); } //TODO-ARDUINO needs this
 
-  // : ; doLIT EXIT , OVERT [ ; IMMEDIATE
+  // : ; doLIT EXIT , overt [ ; IMMEDIATE
   semicolon() { // Zen pg95
     this.DW(this.js2xt.EXIT);
-    this.OVERT();
+    this.overt();
     this.openBracket();
   }
 
@@ -3505,9 +3481,6 @@ class Forth {
     const na = this.SPpop();
     if (!na) {
       console.error(this.countedToJS(this.SPpop()), "not found during '");
-    } else {
-      // For debugging need to make sure we are not including code that will replaced by Forth versions.
-      this.checkNotCompilingReplaceable(this.SPfetch(), na);
     }
   }
 
@@ -3537,7 +3510,7 @@ class Forth {
 {  n: 'foo'    Name of forth word - do NOT specify a name if this also appears in
   f: bar      Links to Forth.prototype.bar (defaults to same as 'n'
   token: true Create a token word that can be used as first cell of a definition - order must match constants below
-  replaced: true  This word will be replaced by a Forth definition, so check for its being compiled into other definitions.
+  defer: true  This word will be indirected via a "defer" which will then be replaced by a Forth definition
   jsNeeds: true The execution address of this word is needed by the JS o will be stored in js2xt[n]
 */
 const ForthNodeExtensions = [

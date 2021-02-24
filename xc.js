@@ -80,7 +80,7 @@ class ForthXC extends Forth {
       const name = this.countedToJS(p);
       const xt = this.na2xt(p);
       const funcNumber = this.Mfetch(xt); // Typically 3 for colon words
-      if (!jsFunctionAttributes[funcNumber].replaced) { await this.xcXTdef(name, xt, fd); }
+      if (!jsFunctionAttributes[funcNumber].defer) { await this.xcXTdef(name, xt, fd); }
       p -= this.CELLL; // point at link address and loop for next word
     }
   }
@@ -89,7 +89,6 @@ class ForthXC extends Forth {
     for (let token = 0; token < this.jsFunctions.length; token++) {
       const func = this.jsFunctions[token];
       if (func) {
-        //if (func && !jsFunctionAttributes[token].replaced) // TODO only output non-replaced tokens, but then have to catch in CODE DICT and callers of those
         await this.xcLine(`\n#define ${this.xcFuncIdentifier(func, token)} ${token}`, fd);
       }
     }
@@ -98,12 +97,12 @@ class ForthXC extends Forth {
     await this.xcLine('\n/* === Function table - maps tokens to functions === */', fd);
     for (let token = 0; token < this.jsFunctions.length; token++) {
       const func = this.jsFunctions[token];
-      if (func && !jsFunctionAttributes[token].replaced) {
+      if (func && !jsFunctionAttributes[token].defer) {
         const arduinoFuncName = this.xcNameEncode(func.name);
         await this.xcLine(`\nextern void ${arduinoFuncName}();`, fd);
       }
     }
-    // This is the actual array of functions - will have 0 for replaced ones
+    // This is the actual array of functions - will have 0 for defered ones
     // On Arduino uno `const void (*f[62])() = {` worked, but ESP8266 required `void (* const f[])() PROGMEM = {`
     await this.xcLine(`\nvoid (* const f[FUNCTIONSLENGTH])()${processor === 'esp8266' ? ' PROGMEM' : ''} = {`, fd);
     const itemsPerLine = 4;
@@ -111,7 +110,7 @@ class ForthXC extends Forth {
     for (let token = 0; token < this.jsFunctions.length; token++) {
       const func = this.jsFunctions[token];
       if (!itemsToGoOnLine--) { itemsToGoOnLine = itemsPerLine - 1; await this.xcLine('\n', fd); }
-      if (!func || jsFunctionAttributes[token].replaced) {
+      if (!func || jsFunctionAttributes[token].defer) {
         await this.xcLine('0, ', fd);
       } else {
         const arduinoFuncName = this.xcNameEncode(func.name);
@@ -145,7 +144,7 @@ class ForthXC extends Forth {
 
     while (CP < romTop) { // Only need to go to ROMNAMEE - above is in Ram
       const val = this.Mfetch(CP);
-      const na = this.xt2na(val);
+      const na = this._toName(val);
       const value = na
         ? this.xcXTIdentifier(this.countedToJS(na))
         : (definitionName && (definitionXT < val) && (val < (definitionXT + longestDef)))
@@ -162,7 +161,7 @@ class ForthXC extends Forth {
         await this.xcLine(`\n/* ${this.xcNum(CP)} ${jsUsers[(CP - this.ROM0) / this.CELLL] ? jsUsers[(CP - this.ROM0) / this.CELLL][0] : 'unused'} */ ${value},`, fd);
       // Code definitions area
       } else if (CP < this.romCodeTop) {
-        const defNa = this.xt2na(CP);
+        const defNa = this._toName(CP);
         if (defNa) {
           definitionXT = CP;
           definitionName = this.countedToJS(defNa);

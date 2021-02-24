@@ -11,7 +11,7 @@ const ROMSIZE = 0x2000 * CELLL;
 const RAMSIZE = 0x2000 * CELLL;
 const extensions = ForthNodeExtensions; // especially IO while in node
 const memClass = undefined; // Usually undefined nad handled automagically by `new Forth`, override for experimentation
-const testFlags = 0x9;
+const testFlags = 0x0; // 1 trace 8 test
 const forth = new Forth({ CELLL, ROMSIZE, RAMSIZE, MEM, testFlags, extensions, memClass });
 forth.compileForthInForth()
   .then(() => console.log('===forthInForth compiled'))

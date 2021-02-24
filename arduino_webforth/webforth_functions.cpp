@@ -245,25 +245,25 @@ void jsFind() { // a va -- ca na | a 0
   }
 }
 // Traverse dictionary to convert xt back to a na (for decompiler or debugging)
-CELLTYPE xt2na(const CELLTYPE xt) {
+CELLTYPE _toName(const CELLTYPE xt) {
   CELLTYPE p = currentFetch(); // vocabulary
   if (!Mfetch(p)) { p = lastFetch() - CELLL; } // Note this is not quite correct, it will miss the first definition (WARM)
-  //Serial.print("xt2na: p="); Serial.println(p);
+  //Serial.print("_toName: p="); Serial.println(p);
   while (p = Mfetch(p)) {
-    //Serial.print("xt2na comparing"); Serial.print(na2xt(p)),Serial.print(" "); Serial.println(xt);
+    //Serial.print("_toName comparing"); Serial.print(na2xt(p)),Serial.print(" "); Serial.println(xt);
     if (na2xt(p) == xt) {
-      //Serial.println("xt2na: Got it");
+      //Serial.println("_toName: Got it");
       return p;
     }
     p -= CELLL; // point at link address and loop for next word
   }
-  //Serial.println("xt2na: Drop through");
+  //Serial.println("_toName: Drop through");
   // Drop through not found
   return 0;
 }
 
 //L.2180-
-void ToNAME() { SPpush(xt2na(SPpop())); }  // Fast version of >NAME see Forth definition below
+void toNAME() { SPpush(_toName(SPpop())); }  // Fast version of >NAME see Forth definition below
 
 // TODO-29-VOCABULARY This just looks up a in the Context vocabulary, it makes no attempt to use multiple vocabularies
 // If required then fixing this to iterate over the context array should not break anything (this is what NAME? does)
@@ -282,60 +282,6 @@ void DW(const CELLTYPE word) {
   cp += CELLL;
   Ustore(CPoffset, cp);
 }
-
-/* REPLACED BY FORTH DEFINITION
-// a -- a; Check if a definition of the word at 'a' would be unique and display warning (but continue) if it would not be.
-// Same profile as ?UNIQUE but not turned into a code word as not used prior to
-void qUnique() {
-  SPpush(SPfetch());      // DUP
-  SPpush(currentFetch()); // a a va; dictionary to search
-  jsFind();                 // a xt na | a a F
-  if (SPpop()) {
-    const CELLTYPE xt = SPpop();              // Discard xt
-    Serial.println(F("Duplicate definition of")); // Catch duplicates - report, but allow
-    //TODO-ARDUINO
-    //  const char* name = countedToJS(SPfetch());
-    //  if (!['foo', 'bar'].includes(name)) {
-    //    Serial.println(F("Duplicate definition of"), name); // Catch duplicates - report, but allow
-    //    //Serial.println(jsFunctionAttributes[Mfetch(xt)].replaced ? 'Expected' : '', 'Duplicate definition of', countedToJS(SPfetch())); // Catch duplicates - report, but allow
-    //  }
-    //
-  } else {
-    SPpop(); // DROP a
-  }
-}
-
-// na -- ; Builds bytes around a newly entered name. Same function as $,n on Zen pg94 used by all defining words (CODE ':')
-// expects in Name dictionary: <count><string><opt padding>
-// prepends:   <aligned address of next cell of code><address of na of last definition in vocabulary>...
-// Side effects are important: specifically.
-// LAST <= na
-void dollarCommaN() {
-  if (Mfetch8(SPfetch())) {         // DUP C@ IF  ; test for no word
-    qUnique();
-    CELLTYPE a = SPpop();
-    Ustore(LASToffset, a);    // DUP LAST ! ; a=na  ; LAST=na
-    // Link address points to previous NA (prev value of LAST)
-    // Note that first time this is run, it gets a 0 (CURRENT is 0, @0 is 0) if that changes will need to test Current here.
-    a -= CELLL; // CURRENT @ @ OVER ! ; a = la = top of current dic
-    Mstore(a, Mfetch(currentFetch())); // CURRENT @ @ OVER ! ; a = la = top of current dic
-    // Push CP (code field to where will build in dictionary) into ca, below a and store that ca into NP
-    a -= CELLL;
-    Mstore(a, cpFetch()); // ca=CP ;
-    Ustore(NPoffset, a); // ca=CP ;
-  } else {                    // THEN $" name" THROW ;
-    Serial.println(F("name error")); // This is an error - in FORTH equivalent its a THROW
-  }
-}
-*/
-
-/* REPLACED BY FORTH DEFINITION
-// Make the most recent definition available in the directory. This is part of closing every 'defining word'
-// See also forth version
-void OVERT() {
-  Mstore(currentFetch(), lastFetch()); // LAST @ CURRENT @ !
-}
-*/
 
 //L.2278-
 void tokenVocabulary() {
@@ -388,7 +334,7 @@ void tokenVar() {
 void debugThreadToken(const CELLTYPE tok) {
   const CELLTYPE xt = PAYLOAD-CELLL;
   Serial.print(IP-CELLL); Serial.print(F(":"));
-  //if (CELLTYPE p = xt2na(xt)) {
+  //if (CELLTYPE p = _toName(xt)) {
   //  printCounted(p);
   //} else {
     Serial.print(xt);
@@ -456,15 +402,16 @@ void EXECUTE() { threadtoken(SPpop()); }
  * ?RX  read one char if present
  * ?KEY via '?KEY to ?RX
  * KEY loop till ?KEY
- * accept read a line via KEY, processing control chars via 'TAP  to kTAP
- * QUERY read a line via 'EXPECT to accept into TIB and reset >IN
+ * ACCEPT read a line via KEY, processing control chars via 'TAP  to kTAP
+ * REFILL reads a line, where depends on SOURCE-ID/SOURCE
+ * QUERY read a line via ACCEPT into TIB and reset >IN
  * que read an evaluate a line
  * QUIT loop over que, handling errors
  *
  * See https://github.com/mitra42/webForth/issues/17 for strategy for async version
  */
 
-// Call chain is ?RX < '?KEY  < ?KEY < KEY < accept < 'EXPECT < QUERY < que < QUIT
+// Call chain is ?RX < '?KEY  < ?KEY < KEY < ACCEPT < 'EXPECT < QUERY < que < QUIT
 // -- char T | F
 void QRX() { // ?RX
    if (Serial.available() > 0) {
@@ -660,4 +607,6 @@ void TEST() { //  a1 a2 a3 b1 b2 b3 n -- ; Check n parameters on stack
   }
   //this.debugClear(); // Reset Debug Stack as can be mucked up by THROW and CATCH
 }
+
+// ==== FORTH Interpreter - words that have no Forth equivalent ====
 
