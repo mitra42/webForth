@@ -484,14 +484,15 @@ BL 32 1 TEST
 
 : ($,n)  ( na -- )
     ( na) DUP LAST !          ( save na for vocabulary link for overt)
-    ( na) HERE ALIGNED SWAP   ( align code address )
-    ( cp na) CELL-            ( link address )
-    ( cp la) CURRENT @ @      ( link to current vocab)
-    ( cp la na') OVER !
-    ( cp la) CELL- DUP NP !   ( adjust name pointer )
-    ( ptr) !                  ( save code pointer )
+    ( na) HERE ALIGNED 
+    ( na cp') DUP CP ! SWAP    ( align code address )
+    ( cp' na) CELL-            ( link address )
+    ( cp' la) CURRENT @ @      ( find last definition )
+    ( cp' la na') OVER !       ( cp' na- ; link to last definition ) 
+    ( cp' la) CELL- DUP NP !   ( cp' na-- ; adjust name pointer )
+    ( cp' ca) !                  ( save aligned code pointer in definition )
 ;
-: :NONAME ( -- xt )
+: :NONAME ( -- xt ) ( TODO this appears to waste 3 cells in name dict, maybe rework)
   NP @ CELL- 0 OVER ! DUP NP !
   ($,n)
   HERE            \\ Returns xt 
@@ -878,7 +879,7 @@ BL 32 1 TEST
 ?test\\ BL WORD yyyy DUP C@ SWAP CP @ - 4 0 2 TEST
 ?test\\ : foo .( output at compile time) ; 0 TEST
 
-( === Dictionary Search Zen pg75-77 NAME> SAME? find NAME? )
+( === Dictionary Search Zen pg75-77 NAME> SAME? NAME? )
 
 : NAME> ( na -- xt )
   ( Return a code address given a name address.)
@@ -947,9 +948,9 @@ BL 32 1 TEST
 ?test\\ FORTH 0 TEST
 
 \\ TODO replace: ?test\\ BL WORD TOKEN CONTEXT @ find BL WORD TOKEN CONTEXT @ FORTHfind 2 TEST
-?test\\ BL WORD TOKEN CONTEXT @ find NIP BL WORD TOKEN COUNT CONTEXT @ find-name-in 1 TEST
-?test\\ BL WORD TOKEN CONTEXT @ find NIP BL WORD TOKEN COUNT FIND-NAME 1 TEST ( FIND-NAME searches all vocabs)
-?test\\ BL WORD TOKEN CONTEXT @ find BL WORD TOKEN NAME? 2 TEST ( Name searches all vocabs )
+\\ TODO replace: ?test\\ BL WORD TOKEN CONTEXT @ find NIP BL WORD TOKEN COUNT CONTEXT @ find-name-in 1 TEST
+\\ TODO replace: ?test\\ BL WORD TOKEN CONTEXT @ find NIP BL WORD TOKEN COUNT FIND-NAME 1 TEST ( FIND-NAME searches all vocabs)
+\\ TODO replace: ?test\\ BL WORD TOKEN CONTEXT @ find BL WORD TOKEN NAME? 2 TEST ( Name searches all vocabs )
 
 : FIND ( caddr -- c-addr 0 | xt 1 | xt -1 ; https://forth-standard.org/standard/core/FIND )
     DUP COUNT ( caddr caddr' u )
@@ -969,9 +970,9 @@ BL 32 1 TEST
    CELL+ DUP @ CONTEXT ! CELL+ DUP @ CONTEXT @ ! 
    CELL+ DUP @ CP ! CELL+ @ NP ! ;  
 
-?test\\ BL WORD TOKEN CONTEXT @ find DROP ( xt ) -1 BL WORD TOKEN FIND ( xt -1 ) 2 TEST ( not immediate )
-?test\\ BL WORD XYZZY 0 OVER FIND 2 TEST ( failure case)
-?test\\ BL WORD THEN CONTEXT @ find DROP ( xt ) 1 BL WORD THEN FIND 2 TEST ( immediate)
+\\ TODO replace: ?test\\ BL WORD TOKEN CONTEXT @ find DROP ( xt ) -1 BL WORD TOKEN FIND ( xt -1 ) 2 TEST ( not immediate )
+\\ TODO replace: ?test\\ BL WORD XYZZY 0 OVER FIND 2 TEST ( failure case)
+\\ TODO replace: ?test\\ BL WORD THEN CONTEXT @ find DROP ( xt ) 1 BL WORD THEN FIND 2 TEST ( immediate)
 
 
 ( === Error Handling Zen pg80-82 CATCH THROW = moved in front of Text input )
@@ -1345,7 +1346,7 @@ CREATE I/O  ' ?RX , ' TX! , ( Array to store default I/O vectors. )
   ( Build a new dictionary name using the string at na.)
   DUP C@            ( null input?)
   IF ?UNIQUE        ( duplicate name? )
-    ($,n)
+    ($,n)           ( align CP)
     EXIT            ( exit )
   THEN              ( here if null input )
   $" name" THROW ;  ( this is an error return )
@@ -2774,7 +2775,7 @@ class Forth {
   // TODO-83-SCANNED BELOW
   _findNameIn(va, u, caddr) { // c-addr u va -- nt | 0 ; https://forth-standard.org/proposals/find-name#contribution-58
     const cellCount = (u / this.CELLL) >> 0; // Count of cells after first one
-    const na = caddr--; // Point at count
+    const na = --caddr; // Point at count
     const cell1 = this.Mfetch(na);  // Could be little or big-endian
     let p = va;
     while (p = this.Mfetch(p)) {
@@ -2912,6 +2913,7 @@ class Forth {
       this.Mstore(a, this.Mfetch(this.currentFetch())); // CURRENT @ @ OVER ! ; a = la = top of current dic
       // Push CP (code field to where will build in dictionary) into ca, below a and store that ca into NP
       a -= this.CELLL;
+      this.cpAlign();
       this.Mstore(a, this.cpFetch()); // ca=CP ;
       this.Ustore(NPoffset, a); // ca=CP ;
     } else {                    // THEN $" name" THROW ;
@@ -2929,7 +2931,6 @@ class Forth {
   CODE(name) {
     console.assert(name.length <= nameMaxLength);
     // <NP-after>CPh CPl <_LINK> LINKh LINKl count name... <NP-BEFORE>
-    this.cpAlign(); // If required by memory store, align to boundary.
     // Note this is going to give the name string an integral number of cells.
     const a = this.m.cellAlign(this.npFetch() - name.length - this.CELLL);
     this.Ustore(NPoffset, a);
@@ -2937,7 +2938,7 @@ class Forth {
     // This byte will be updated by this.IMMEDIATE() IMMEDIATE or COMPILE-ONLY
     // Note that the result of m.encodeString may not be same as name.length because of unicode issues
     this.Mstore8(a, this.m.encodeString(a + 1, name));
-    this.dollarCommaN(); // Build the headers that precede the name
+    this.dollarCommaN(); // Build the headers that precede the name, store aligned CP
   }
 
   // ERRATA ZEN IMMEDIATE COMPILE-ONLY COMP IMED is not defined, in EFORTHv5 its defined as 0x80
@@ -2978,8 +2979,7 @@ class Forth {
 
   tokenValue() { //TODO-83-ARDUINO needs this
     // Get content of Payload which is offset in cells past ramUP, read that value and push it
-    this.SPpush(this.m.cellRamFetch(this.Mfetch(this.PAYLOAD) + this.ramUP)); }
-
+    this.SPpush(this.Ufetch(this.Mfetch(this.PAYLOAD))); }
   // Put the address of the payload onto Stack - used for CREATE which is used by VARIABLE
   _tokenDoes() {
     const does = this.Mfetch(this.PAYLOAD);
@@ -3250,13 +3250,16 @@ class Forth {
     }
   }
 
+  //TODO-83 SCANNED BELOW HERE
   // Math from Forth2012 - could probably define in Forth but efficiency important
-  RSHIFT(u = this.SPpop(), x = this.SPpop()) {
-    this.SPpush(x >> u);
+  RSHIFT(u = this.SPpop(), x = this.SPpop()) { // https://forth-standard.org/standard/core/RSHIFT
+    // Note this needs to 0 fill
+    this.SPpush(x >>> u);
   }
-  LSHIFT(u = this.SPpop(), x = this.SPpop()) {
+  LSHIFT(u = this.SPpop(), x = this.SPpop()) { // https://forth-standard.org/standard/core/LSHIFT
     this.SPpush(x << u);
   }
+  //TODO-83 SCANNED ABOVE HERE
   TwoDiv(x = this.SPpop()) {
     this.SPpush((x & (1 << (this.CELLbits - 1))) | (x >> 1));
   }
@@ -3466,8 +3469,7 @@ class Forth {
   // : : TOKEN $,n [ ' doLIST ] LITERAL ] ; see Zen pg96
   _colon(tok) {
     this.TOKEN();  // a; (counted string in named space)
-    this.cpAlign(); // Before dollarCommaN so code field in Name dictionary correct
-    this.dollarCommaN();
+    this.dollarCommaN(); // setup name dictionary headers, with aligned CP)
     this.DW(tok); // Must be after creating the name and links etc
   }
   colon() { this._colon(tokenDoList); this.closeBracket(); }

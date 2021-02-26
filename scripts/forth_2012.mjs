@@ -50,7 +50,7 @@ CREATE testResults 20 CELLS ALLOT
    ELSE               \\ DEPTH MISMATCH
       S" WRONG NUMBER OF RESULTS: " testError
    THEN ;
-' ?T DEFER!
+' }T DEFER!
 `;
 
 const forth = new Forth_with_fs({ CELLL, MEM, ROMSIZE, RAMSIZE, extensions, testFlags, memClass });
