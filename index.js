@@ -1925,6 +1925,9 @@ userAreaSave ( Save current User variables for COLD boot )
 
 let stdinBuffer = null; // Local to ?RX do not access directly - but there can be only one so global
 
+function logAndTrap(...args) {
+  console.log(...args);
+}
 /*
   This group of classes encapsulate memory management to hide it from the Forth code that is common
   to all of them.
@@ -1945,27 +1948,27 @@ class FlashXX_XX {
   }
   cellRomFetch(cellAddr) {
     if (cellAddr >= this.romCells) {
-      console.log('Attempt to read above top of Rom at', cellAddr);
+      logAndTrap('Attempt to read above top of Rom at', cellAddr);
     } // TODO-OPTIMIZE comment out
     return this.rom[cellAddr];
   }
   cellRamFetch(cellAddr) {
     if (cellAddr >= this.ramCells) {
-      console.log('Attempt to read above top of Ram at', cellAddr);
+      logAndTrap('Attempt to read above top of Ram at', cellAddr);
     } // TODO-OPTIMIZE comment out
     return this.ram[cellAddr];
   }
 
   cellRamStore(cellAddr, v) {
     if (cellAddr >= this.ramCells) {
-      console.log('Attempt to write above top of Ram at');
+      logAndTrap('Attempt to write above top of Ram at');
     } // TODO-OPTIMIZE comment out
     this.ram[cellAddr] = v;
   }
 
   cellRomStore(cellAddr, v) {
     if (!this.romWritable) {
-      console.log('Attempt to write to Rom after closed at', cellAddr);
+      logAndTrap('Attempt to write to Rom after closed at', cellAddr);
     } // TODO-OPTIMIZE comment out
     this.rom[cellAddr] = v;
   }
@@ -2061,26 +2064,26 @@ class Flash8_16 extends Flash8_XX {
   }
   cellRomFetch(cellAddr) { // cell addresses are 16 bits on 8 bit base
     if (cellAddr >= this.romCells) {
-      console.log('Attempt to read above top of Rom at', cellAddr);
+      logAndTrap('Attempt to read above top of Rom at', cellAddr);
     } // TODO-OPTIMIZE comment out
     return this._fetch16(this.rom, cellAddr << 1);
   }
   cellRamFetch(cellAddr) {
     if (cellAddr >= this.ramCells) {
-      console.log('Attempt to read above top of Ram at', cellAddr);
+      logAndTrap('Attempt to read above top of Ram at', cellAddr);
     } // TODO-OPTIMIZE comment out
     return this._fetch16(this.ram, cellAddr << 1);
   }
 
   cellRamStore(cellAddr, v) {
     if (cellAddr >= this.ramCells) {
-      console.log('Attempt to write above top of Ram at');
+      logAndTrap('Attempt to write above top of Ram at');
     } // TODO-OPTIMIZE comment out
     this._store16(this.ram, cellAddr << 1, v);
   }
   cellRomStore(cellAddr, v) {
     if (!this.romWritable) {
-      console.log('Attempt to write to Rom after closed at', cellAddr);
+      logAndTrap('Attempt to write to Rom after closed at', cellAddr);
     } // TODO-OPTIMIZE comment out
     this._store16(this.rom, cellAddr << 1, v);
   }
@@ -2117,13 +2120,13 @@ class Flash8_24 extends Flash8_XX {
 
   cellRomFetch(cellAddr) { // cell addresses are 16 bits on 8 bit base
     if (cellAddr >= this.romCells) {
-      console.log('Attempt to read above top of Rom at', cellAddr);
+      logAndTrap('Attempt to read above top of Rom at', cellAddr);
     } // TODO-OPTIMIZE comment out
     return this._fetch24(this.rom, cellAddr * 3);
   }
   cellRamFetch(cellAddr) {
     if (cellAddr >= this.ramCells) {
-      console.log('Attempt to read above top of Ram at', cellAddr);
+      logAndTrap('Attempt to read above top of Ram at', cellAddr);
     } // TODO-OPTIMIZE comment out
     return this._fetch24(this.ram, cellAddr * 3);
   }
@@ -2141,13 +2144,13 @@ class Flash8_24 extends Flash8_XX {
   }
   cellRamStore(cellAddr, v) {
     if (cellAddr >= this.ramCells) {
-      console.log('Attempt to write above top of Ram at');
+      logAndTrap('Attempt to write above top of Ram at');
     } // TODO-OPTIMIZE comment out
     this._store24(this.ram, cellAddr * 3, v);
   }
   cellRomStore(cellAddr, v) {
     if (!this.romWritable) {
-      console.log('Attempt to write to Rom after closed at', cellAddr);
+      logAndTrap('Attempt to write to Rom after closed at', cellAddr);
     } // TODO-OPTIMIZE comment out
     this._store24(this.rom, cellAddr * 3, v);
   }
@@ -2185,13 +2188,13 @@ class Flash8_32 extends Flash8_XX {
 
   cellRomFetch(cellAddr) { // cell addresses are 16 bits on 8 bit base
     if (cellAddr >= this.romCells) {
-      console.log('Attempt to read above top of Rom at', cellAddr);
+      logAndTrap('Attempt to read above top of Rom at', cellAddr);
     } // TODO-OPTIMIZE comment out
     return this._fetch32(this.rom, cellAddr << 2);
   }
   cellRamFetch(cellAddr) {
     if (cellAddr >= this.ramCells) {
-      console.log('Attempt to read above top of Ram at', cellAddr);
+      logAndTrap('Attempt to read above top of Ram at', cellAddr);
     } // TODO-OPTIMIZE comment out
     return this._fetch32(this.ram, cellAddr << 2);
   }
@@ -2207,13 +2210,13 @@ class Flash8_32 extends Flash8_XX {
   }
   cellRamStore(cellAddr, v) {
     if (cellAddr >= this.ramCells) {
-      console.log('Attempt to write above top of Ram at');
+      logAndTrap('Attempt to write above top of Ram at');
     } // TODO-OPTIMIZE comment out
     this._store32(this.ram, cellAddr << 2, v);
   }
   cellRomStore(cellAddr, v) {
     if (!this.romWritable) {
-      console.log('Attempt to write to Rom after closed at', cellAddr);
+      logAndTrap('Attempt to write to Rom after closed at', cellAddr);
     } // TODO-OPTIMIZE comment out
     this._store32(this.rom, cellAddr << 2, v);
   }
@@ -2625,7 +2628,7 @@ class Forth {
   // Put Fbreak in a definition.
   Fbreak() {
     console.log('S:', this.debugStack());
-    console.log('\nbreak in a FORTH word'); } // Put a breakpoint in your IDE at this line
+    logAndTrap('\nbreak in a FORTH word'); } // Put a breakpoint in your IDE at this line
   // debugPrintTIB will print the current TIB.
   debugPrintTIB() {
     console.log('TIB: ', this.m.decodeString(this.Ufetch(TIBoffset) + this.Ufetch(INoffset),
@@ -2670,11 +2673,11 @@ class Forth {
   Tunbrace() {
     // DEPTH testActualDepth @ = IF DEPTH ?DUP IF 0 DO testResults I CELLS + @ = 0= IF S" INCORRECT RESULT: " testError LEAVE THEN LOOP THEN ELSE S" WRONG NUMBER OF RESULTS: " testError THEN ;
     if (this._DEPTH() != this.testActualDepth) {
-      console.log("WRONG NUMBER OF RESULTS: "); //TODO replace this and all console.log and console.assert with a string output
+      logAndTrap("WRONG NUMBER OF RESULTS: "); //TODO replace this and all console.log and console.assert with a string output
       testError();
     } else if (this.testActualDepth) {
       for (let i = 0; i < this.testActualDepth; i++) {
-        console.assert(this.SPpop() === this.testResults.pop());
+        if (this.SPpop() !== this.testResults.pop()) { logAndTrap("results dont match"); }
       }
     }
   }
@@ -2913,7 +2916,7 @@ class Forth {
       this.Ustore(NPoffset, a); // ca=CP ;
     } else {                    // THEN $" name" THROW ;
       this.ramSP++;// DROP
-      console.log('name error'); // This is an error - in FORTH equivalent its a THROW
+      logAndTrap('name error'); // This is an error - in FORTH equivalent its a THROW
     }
   }
   // Make the most recent definition available in the directory. This is part of closing every 'defining word'
@@ -3048,10 +3051,10 @@ class Forth {
         }
         return;
       } catch (err) {
-        console.log('Error caught in runXT');
+        logAndTrap('Error caught in runXT');
         console.error(err);
         xt = this.JStoXT('THROW', true);
-        console.log('Looping back for a good throw');
+        logAndTrap('Looping back for a good throw');
       }
     }
   }
@@ -3378,7 +3381,7 @@ class Forth {
         this.DW(this.js2xt.doLIT, this.SPpop());
       } else {
         // TODO-32-ERRORS handle error in Forth-ish way (via Throw) - this is harder than it looks !
-        console.log('Number conversion of', this.countedToJS(this.SPpop()), 'failed');
+        logAndTrap('Number conversion of', this.countedToJS(this.SPpop()), 'failed');
       }
     }
   }
@@ -3393,7 +3396,7 @@ class Forth {
       this.NUMBERQ(); // n T | a F
       if (!this.SPpop()) {
         // TODO-32-ERRORS handle error in Forth-ish way (via Throw) - this is harder than it looks !
-        console.log('Number conversion of', this.countedToJS(this.SPpop()), 'failed');
+        logAndTrap('Number conversion of', this.countedToJS(this.SPpop()), 'failed');
       }
     }
   }
@@ -3412,7 +3415,9 @@ class Forth {
         await this.dINTERPRET();
       }
       // TODO-28-MULTITASK RP0 will move
-      console.assert(this.ramSP <= this.ramSPP && (this.m.fromRamAddr(this.ramRP) <= this.Ufetch(RP0offset))); // Side effect of making SP and SPP available to debugger.
+      if (this.ramSP > this.ramSPP || (this.m.fromRamAddr(this.ramRP) > this.Ufetch(RP0offset))) {
+        logAndTrap('stack problems');
+      }
     }
     const prompt = this.Ufetch(PROMPToffset);
     if (prompt) {
@@ -3423,7 +3428,9 @@ class Forth {
   // ==== FORTH Interpreter - words that have no Forth equivalent ====
   JStoTIB(s) {
     const TIBoff = this.Ufetch(TIBoffset);
-    console.assert((TIBoff + s.length) < (this.Ufetch(RP0offset) - 10)); // Check for overlong lines
+    if ((TIBoff + s.length) >= (this.Ufetch(RP0offset) - 10)) {
+      logAndTrap('long lines in TIB');
+    }
     this.Ustore(INoffset, 0); // Start at beginning of TIB
     this.Ustore(nTIBoffset,  this.m.encodeString(TIBoff, s)); // copy string to TIB, and store length in #TIB
   }
