@@ -211,6 +211,9 @@ which leaves 4 on the stack.
 The intention is to make this available for different situations, 
 to date there is a Javascript and a C (for Arduino) version.
 
+### Strings
+Please see [docs/strings.md](../docs/strings.md)
+
 ## Write More about
 
 ### Orthogonality and likely changes
