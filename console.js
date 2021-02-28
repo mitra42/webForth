@@ -8,7 +8,7 @@ let Forth; // Will hold class when loaded
 let forth; // Will hold instance
 
 async function ForthLoad({ extensions = [] } = {}) {
-  const fLog = extensions.map((x) => x.f).find((f) => f.name === 'bound TXbangS') || console.log;
+  const fLog = extensions.map((x) => x.f).find((f) => f.name === 'bound TXstoreS') || console.log;
   const CELLL = 2;
   const MEM = 8;
   const RAMSIZE = 0x2000 * CELLL; // default is 0x2000 * CELLL
@@ -112,8 +112,8 @@ class ForthConsole extends HTMLElement {
     // Create an input area, but only attach once Forth is loaded.
     this.input = EL('forth-input', { stack: this.stack });
     // Define hooks for IO to these areas
-    const extensions = [{ f: (function TXbangS(s) {
-      this.output.TXbangS_web(s); }).bind(this) }]; // Note this is instance of ForthConsole not Forth
+    const extensions = [{ f: (function TXstoreS(s) {
+      this.output.TXstoreS_web(s); }).bind(this) }]; // Note this is instance of ForthConsole not Forth
     // Load Forth can also define CELL, EM, memClass
     const CELLL = 2;
     const MEM = 8;
@@ -133,7 +133,7 @@ class ForthOutput extends HTMLElement {
     this.shadowRoot.append(this.pre);
   }
   // Append string to area, this function is passed to the Forth instance on construction.
-  TXbangS_web(s) {
+  TXstoreS_web(s) {
     this.pre.textContent += s;
   }
 }
@@ -158,7 +158,7 @@ class ForthInput extends HTMLElement {
       console.log('Premature input TODO', inp);
     } else {
       this.inputbox.value = '';       // Clear result
-      forth.TXbangS(inp);             // But echo - via forth, should go to Console
+      forth.TXstoreS(inp);             // But echo - via forth, should go to Console
       // noinspection JSIgnoredPromiseFromCall
       forth.interpret1(inp)            // Async interpretation of text
         // Attempt to debug a race condition - commented out as condition disappeared

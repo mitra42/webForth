@@ -208,8 +208,6 @@ const filesExtension = `
    
 vCREATE buf 1024 vALLOT
 
-: EVALUATE ( xxx caddr u -- yyy;  https://forth-standard.org/standard/core/EVALUATE )
-  sourcePush -1 -ROT 0 4 RESTORE-INPUT THROW quit1  ; \\ TODO may not want the prompt at the end - which quit1 does
 : INCLUDE-FILE ( i * x fileid -- j * x ; https://forth-standard.org/standard/file/INCLUDE-FILE )
   sourcePush buf 0 0 4 RESTORE-INPUT THROW ;
 : INCLUDED ( caddr u -- ; https://forth-standard.org/standard/file/INCLUDED e.g. $" filename" INCLUDED )
@@ -220,8 +218,6 @@ vCREATE buf 1024 vALLOT
 
 : ALLOCATE ( u -- a ior; Shortcut to https://forth-standard.org/standard/memory/ALLOCATE rewrite if want to use FREE) 
     HERE SWAP ALLOT 0 ;
-: MOVE ( a a' u -- ; https://forth-standard.org/standard/core/MOVE ; TODO redefine in terms of CMOVE or CMOVE> depending on overlaps)
-  >R 2DUP > R> SWAP IF CMOVE ELSE CMOVE> THEN ;
 : n2sign DUP IF 0< IF -1 ELSE 1 THEN THEN ; ( u -- -1 | 0 | 1)
 : COMPARE ( c-addr1 u1 c-addr2 u2 -- n ; https://forth-standard.org/standard/string/COMPARE )
   ROT SWAP 2DUP 2>R \\ c1 c2 u1 u2 ^ u1,u2 ; save lengths
@@ -323,7 +319,7 @@ VARIABLE included-names 0 included-names !
   CLOSE-FILE THROW ( )
   S" TEST2.FTH" DELETE-FILE THROW
   ;
-: TESTER ." starting test" doLIT TESTFILES CATCH ?DUP .$ ."  After " ;
+: TESTER ." starting test" doLit TESTFILES CATCH ?DUP .$ ."  After " ;
 `;
 
 class Forth_with_fs extends Forth {

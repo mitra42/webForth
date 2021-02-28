@@ -43,30 +43,28 @@ const jsFunctionAttributes = [
   { n: 'tokenDefer', token: true }, // Execute payload (like DoList but just one)
   { n: 'tokenValue', token: true }, // Returns value from a user variable.
   'ALIGNED',
-  { n: 'find-name-in', f: 'findNameIn' }, // Fast version of find
-  { n: 'overt', defer: true },
+  { n: 'FIND-NAME-IN', f: 'findNameIn' }, // Fast version of find
+  { n: 'OVERT', defer: true },
   { n: '$,n', f: 'dollarCommaN', defer: true },
-// TODO-83 =X=X=X=X=X=X=X=X=X=X=X=X=X=X=X=X=X=X=X=X SCAN COMPLETED TO HERE =X=X=X=X=X=X=X=X=X=X=X=X=X=X=X=X
-  'MS', 'BYE', { n: 'EXIT', jsNeeds: true }, 'EXECUTE',
-  { n: '?RX', f: 'QRX' }, {  n: 'TX!', f: 'TXbang' }, { n: '!IO', f: 'bangIO' },
-  { n: 'doLIT', jsNeeds: true }, { n: 'DOES>', f: 'DOES' }, 'next', { n: '?branch', f: 'qBranch' }, 'branch',
-  { n: '!', f: 'store' }, { n: '@', f: 'fetch' }, { n: 'C@', f: 'cFetch' }, { n: 'C!', f: 'cStore' },
-  { n: 'RP@', f: 'RPat' }, { n: 'RP!', f: 'RPbang' }, { n: 'R>', f: 'Rfrom'  }, { n: 'R@', f: 'Rat'  }, { n: '>R', f: 'toR'  },
-  { n: '2R>', f: 'TwoRfrom'  }, { n: '2R@', f: 'TwoRat'  }, { n: '2>R', f: 'TwoToR'  },
+  'ms', 'BYE', { n: 'EXIT', jsNeeds: true }, 'EXECUTE',
+  { n: '?RX', f: 'QRX' }, {  n: 'TX!', f: 'TXstore' }, { n: '!IO', f: 'storeIO' },
+  { n: 'doLit', jsNeeds: true }, { n: 'DOES>', f: 'DOES' }, 'next', { n: '?branch', f: 'qBranch' }, 'branch',
+  { n: '!', f: 'store' }, { n: '@', f: 'fetch' }, { n: 'C@', f: 'CFetch' }, { n: 'C!', f: 'CStore' },
+  { n: 'RP@', f: 'RPat' }, { n: 'RP!', f: 'RPStore' }, { n: 'R>', f: 'Rfrom'  }, { n: 'R@', f: 'Rat'  }, { n: '>R', f: 'toR'  },
+  { n: '2R>', f: 'TwoRfrom'  }, { n: '2R@', f: 'TwoRFetch'  }, { n: '2>R', f: 'TwotoR'  },
   { n: 'SP@', f: 'SPat' }, { n: 'SP!', f: 'SPbang' },
-  'DROP', 'DUP', 'SWAP', 'OVER',
-  { n: '0<', f: 'less0' }, 'AND', 'OR', 'XOR', { n: 'UM+', f: 'UMplus' },
-  /* TODO-ARDUINO needs this line */ 'RSHIFT', 'LSHIFT', { n: '2/', f: 'TwoDiv' },
+  'DROP', 'DUP', 'SWAP', 'OVER', 'ROLL', 'ROT',
+  { n: '0<', f: 'zeroLess' }, 'AND', 'OR', 'XOR', { n: 'UM+', f: 'UMplus' },
+  'RSHIFT', 'LSHIFT', { n: '2/', f: 'TwoDiv' },
   'userAreaInit', 'userAreaSave',
-  { n: 'PARSE', defer: true }, { n: 'TOKEN', defer: true }, { n: 'NUMBER?', f: 'NUMBERQ', defer: true },
+  { n: 'PARSE', defer: true }, { n: '(', f: 'parenthesis', defer: true, immediate: true}, { n: 'TOKEN', defer: true }, { n: 'NUMBER?', f: 'NUMBERQ', defer: true },
   { n: '$COMPILE', f: 'dCOMPILE', defer: true }, { n: '$INTERPRET', f: 'dINTERPRET', jsNeeds: true, defer: true },
   { n: '[', f: 'openBracket', immediate: true, defer: true }, { n: ']', f: 'closeBracket', defer: true },
   { n: ':', f: 'colon', defer: true }, { n: ';', f: 'semicolon', immediate: true, defer: true }, { n: "'", f: 'tick', defer: true },
-  'debugNA', 'testing3', 'Fbreak', 'debugPrintTIB', 'TEST', 'stringBuffer', 'TYPE',
-  // TODO-ARDUINO needs from here down - some could be in Forth instead
-  'loop', 'I', 'leave', 'RDROP', { n: '2RDROP', f: 'TwoRDROP' }, { n: 'immediate?', f: 'immediateQ' },
-  { n: 'ALIGN', f: 'vpAlign' }, { n: '>BODY', f: 'toBODY' }, 'DEFER', 'ROLL', 'ROT', 'of',
-  { n: 'T{', f: 'Tbrace', defer: true }, { n: 'DEPTH', defer: true }, { n: '}T', f: 'Tunbrace', defer: true }, { n: '->', f: 'Tarrow', defer: true }
+  'debugNA', 'Fbreak', 'stringBuffer', 'TYPE',
+  'loop', 'I', 'leave', 'RDrop', { n: '2RDrop', f: 'TwoRDrop' }, { n: 'immediate?', f: 'immediateQ' },
+  { n: 'ALIGN', f: 'vpAlign' }, { n: '>BODY', f: 'toBODY' }, { n: 'DEFER', defer: true}, 'of',
+  { n: 'T{', f: 'Tbrace', defer: true }, { n: 'DEPTH', defer: true }, { n: '}T', f: 'Tunbrace', defer: true }, { n: '->', f: 'Tarrow', defer: true },
 ];
 
 // Define the tokens used in the first cell of each word.
@@ -81,10 +79,11 @@ const tokenCreate = 6;
 const tokenDefer = 7;
 const tokenValue = 8;
 
+
 // ported to Arduino below to L.115
 // === Memory Map - Zen pg26
 const l = {}; // Constants that will get compiled into the dictionary
-l.COMP = 0x40; // bit in first char of name field to indicate 'compile-only'  ERRATA Zen uses this but its not defined
+l.COMP = 0x40; // bit in first char of name field to indicate 'COMPILE-ONLY'  ERRATA Zen uses this but its not defined
 l.IMED = 0x80; // bit in first char of name field to indicate 'immediate' ERRATA Zen uses this but its not defined
 const bitsSPARE = 0x20; // Unused spare bit in names
 l.BYTEMASK = 0xFF - l.COMP - l.IMED - bitsSPARE; // bits to mask out of a call with count and first char. ERRATA Zen uses this but its not defined
@@ -124,7 +123,6 @@ const TIBoffset = USER(undefined, 'TIB0');  // Hold current address of Terminal 
 USER('CSP', 0);        // Hold the stack pointer for error checking.
 // eFORTH diff - eFORTH uses EVAL as vector to either $INTERPRET or $COMPILE, ANS uses a variable called STATE
 const STATEoffset = USER('STATE', l.FALSE); // True if compiling - only changed by [ ] : ; ABORT QUIT https://forth-standard.org/standard/core/STATE
-//const EVALoffset = USER("'EVAL", 0);      // Initialized when have JS $INTERPRET, this switches between $INTERPRET and $COMPILE
 USER('SPARE2', 0);
 USER('HLD', 0);        // Hold a pointer in building a numeric output string.
 USER('HANDLER', 0);    // Hold the return stack pointer for error handling.
@@ -153,6 +151,7 @@ const testDepthOffset = USER('testDepth', 0);  // Needs to autoadjust //TODO-2AR
 
 const forthInForth = `
 T{ -> }T
+T{ FORTH -> }T
 : 2DROP DROP DROP ;
 T{ 1 2 2DROP -> }T
 
@@ -160,13 +159,15 @@ T{ 1 2 2DROP -> }T
 : COMPILE-ONLY COMP setHeaderBits ;
 : IMMEDIATE IMED setHeaderBits ;
 
-: ( 41 PARSE 2DROP ; IMMEDIATE ( from Zen pg74, note dont have LITERAL so cant do [ CHAR ( ] LITERAL instead of 41 )
+( Note - above is both definition and the first use of the comment )
+( Below may also be the first execution of a word - IMMEDIATE - defined with a colon )
+( Note this is the first execution of an immediate word '(' inside a compilation )
 : \\ ( -- ; Ignore following text till the end of line.)
    #TIB @ >IN ! ( store the length of TIB in >IN )
    ; IMMEDIATE ( in effect ignore the rest of a line )
 ( Now these are defined we can use both kinds of comments below here )
 
-1 2 ( 3 ) 1 2 2 TEST
+T{ 1 2 ( 3 ) 4 -> 1 2 4 }T
 
 ( Uncomment first for production, 2nd for testing )
 
@@ -174,70 +175,64 @@ T{ 1 2 2DROP -> }T
 
 ( === Test as many of the words defined in code as possible)
 ( EXIT & EXECUTE tested with ' )
-( doLIT implicitly tested by all literals )
+( doLit implicitly tested by all literals )
 ( next, ?branch, branch implicitly tested by control structures )
-123 HLD ! HLD @ 123 1 TEST ( Also tests user variables )
-222 HLD C! HLD C@ 222 1 TEST
+T{ 123 HLD ! HLD @ -> 123 }T ( Also tests user variables )
+T{ 222 HLD C! HLD C@ -> 222 }T
 ( R> >R R@ SP@ SP! tested after arithmetic operators )
-30 20 DROP 30 1 TEST
-30 20 DUP 30 20 20 3 TEST
-10 20 SWAP 20 10 2 TEST
-10 20 OVER 10 20 10 3 TEST
-123 0< -123 0< 0 -1 2 TEST
-16 BASE !
-5050 6060 AND 5050 6060 OR 5050 6060 XOR 4040 7070 3030 3 TEST
-0A BASE !
+T{ 30 20 DROP -> 30 }T
+T{ 30 20 DUP -> 30 20 20 }T
+T{ 10 20 SWAP -> 20 10 }T
+T{ 10 20 OVER -> 10 20 10 }T
+T{ 123 0< -123 0< -> 0 -1 }T
+T{ 16 BASE ! 5050 6060 AND 5050 6060 OR 5050 6060 XOR -> 4040 7070 3030 0A BASE ! }T
 
-12 34 UM+ 46 0 2 TEST
+T{ 12 34 UM+ -> 46 0 }T
 ( Next test is contrived to work with any CELLL size )
--1 -1 UM+ -2 1 2 TEST
+T{ -1 -1 UM+ -> -2 1 }T
 ( IMMEDIATE implicitly tested )
-BL PARSE ABC SWAP DROP 3 1 TEST
-!IO 62 TX! 0 TEST ( Should output > )
-: FOO 10 EXIT 20 ; FOO 10 1 TEST
-' FOO EXECUTE 30 10 30 2 TEST
-
+T{ BL PARSE ABC SWAP DROP -> 3 }T
+T{ !IO 62 TX! -> }T ( Should output > )
+T{ : FOO 10 EXIT 20 ; FOO -> 10 }T
+T{ ' FOO EXECUTE 30 -> 10 30 }T
 
 ( === First section is words moved earlier than they appear in eForth as they are needed for other words )
 ( they are mostly still in the same order as in eForth )
 
-BL 32 1 TEST
+T{ BL -> 32 }T
 : NIP SWAP DROP ;
 : TUCK SWAP OVER ; ( w1 w2 -- w2 w1 w2 ; tuck top of stack under 2nd )
-1 2 NIP 2 1 TEST
-1 2 TUCK 2 1 2 3 TEST
+T{ 1 2 NIP -> 2 }T
+T{ 1 2 TUCK -> 2 1 2 }T
 
-( Note failure on this line, can be for three reasons )
-( a: its the first execution of an immediate word inside a compilation )
-( b: its the first execution of a word defined with a colon )
-( c: its the first use of the comment
 : HERE ( -- a; return top of code dictionary; Zen pg60) CP @ ;
 ( test is non-obvious )
 
-( Note eForth has +, but that isn't defined till Zen pg50 )
-: CELL+ CELLL UM+ DROP ;
+: + UM+ DROP ;
+: CELL+ CELLL + ;
+T{ 1 2 SP@ CELL+ SP! -> 1 }T
 
 ( ERRATA - Zen pg57 presumes CELLL==2 and need to align, not case with JS and byte Buffer, moved to code )
-
 ( ERRATA v5 skips ALIGNED form this definition)
 : , ( w --; Compile an integer into the code dictionary. Zen pg 89)
   HERE ALIGNED DUP CELL+ CP ! ! ;
-: COMPILE, , ; ( Forth2012 version)
+: COMPILE, , ; ( Forth2012 version of ',')
 
 : [COMPILE] ( -- ; <string> ) ' , ; IMMEDIATE
+T{ : foo [COMPILE] ( ; foo 2 ) -> }T
 
 : COMPILE ( --; Compile the next address in colon list to code dictionary. Zen pg 90)
   R> DUP @ , CELL+ >R ; COMPILE-ONLY
 
 : LITERAL ( w -- ) ( Compile tos to code dictionary as an integer literal.)
-  COMPILE doLIT ( compile doLIT to head lit )
+  COMPILE doLit ( compile doLit to head lit )
   , ; IMMEDIATE ( compile literal itself )
 
-: create TOKEN $,n overt , 0 , ; 
+: create TOKEN $,n OVERT , 0 , ; 
 ( Create a new word that doesnt allocate any space, but will push address of that space. )
 ( redefines definitions moved up so that they will use new TOKEN etc)
 : CREATE tokenCreate create ; ( Note the extra field for DOES> to patch - redefines definition moved up so that it will use new TOKEN etc)
-( TODO-TEST test of above group non-obvious as writing to dictionary. )
+T{ : foo CREATE 123 , DOES> @ ; foo BAR BAR -> 123 }T
 
 ( === Control structures - were on Zen pg91 but needed earlier Zen pg 91-92 but moved early )
 ( this version comes from EFORTH-V5 which introduced MARK> >MARK )
@@ -282,7 +277,7 @@ BL 32 1 TEST
   0= IF [COMPILE] \\ THEN ; IMMEDIATE 
 : ?safe\\ ( compilation/interpretation line if checking for safety - overflows etc )
   testFlags @ 4 AND [COMPILE] ?\\ ; IMMEDIATE
-: ?test\\  ( compilation/interpretation line if running compile time tests )
+: ?test\\  ( compilation/interpretation line if running compile time tests ) \\ TODO-OBSOLETE maybe 
   testFlags @ 8 AND [COMPILE] ?\\ ; IMMEDIATE
 
 ( === Multitasking Zen pg48 - not implemented in eForth TODO )
@@ -294,59 +289,60 @@ BL 32 1 TEST
 : 2SWAP >R -ROT R> -ROT ; ( w1 w2 w3 w4 -- w3 w4 w1 w2 )
 ( 2DROP & NIP moved earlier )
 
-?test\\ 1 ?DUP 0 ?DUP 1 1 0 3 TEST
-?test\\ 1 2 3 ROT 2 3 1 3 TEST
-?test\\ 1 2 2DUP 1 2 1 2 4 TEST
+T{ 1 ?DUP 0 ?DUP -> 1 1 0 }T
+T{ 1 2 3 ROT -> 2 3 1 }T
+T{ 1 2 2DUP -> 1 2 1 2 }T
 
 ( === More Arithmetic operators Zen pg50 and a few not in eForth but widely used )
-: + UM+ DROP ; ( w1 w2 -- w1+w2)
+T{ 1 2 + -> 3 }T
 : D+ >R SWAP >R UM+ R> R> + + ; ( d1 d2 -- d1+d2)
+T{ -1 1 -1 3 D+ -> -2 5 }T ( Test contrived to be CELLL independent )
 : INVERT -1 XOR ; ( w -- w; 1's compliment)
+T{ 257 INVERT -> -258 }T ( 257 is 0x101 65278 is 0xFEFE )
 ( NOT's meaning is deprecated use 0= logical or INVERT bitwise see http://lars.nocrew.org/forth2012/core/INVERT.html)
 : 1+ 1 + ; 
 : NEGATE INVERT  1+ ; ( w -- w; 2's complement)
+T{ 53 NEGATE 53 + -> 0 }T
 : DNEGATE INVERT >R INVERT  1 UM+ R> + ;
 : - NEGATE + ; ( n1 n2 -- n1-n2)
+T{ 456 123 - 456 -123 - -> 333 579 }T
+: 1- 1 - ; 
 : ?negate ( n1 n2 -- n1|-n1 ; negate n1 if n2 negative)
   0< IF NEGATE THEN ; 
-: 1- 1 - ; 
 
 : ABS DUP ?negate ; ( n -- n; Absolute value of w)
+T{ -456 ABS 456 ABS - -> 0 }T
 
 : CHAR+ 1+ ; 
 : C, ( c --; Compile a single character into code dictionary and advance pointer 1 character )
   HERE DUP CHAR+ CP ! C! ; 
 
-
-?test\\ 1 2 + 3 1 TEST
-?test\\ -1 1 -1 3 D+ -2 5 2 TEST ( Test contrived to be CELLL independent )
-?test\\ 257 INVERT -258 1 TEST ( 257 is 0x101 65278 is 0xFEFE )
-?test\\ 53 NEGATE 53 + 0 1 TEST
-?test\\ 456 123 - 456 -123 - 333 579 2 TEST
-?test\\ -456 ABS 456 ABS - 0 1 TEST
-?test\\ 111 >R R@ RP@ R> SWAP RP@ SWAP - 111 111 CELLL 3 TEST
-?test\\ 1 2 SP@ CELL+ SP! 1 1 TEST
+T{ -> }T
+T{ : foo 111 >R R> ; foo -> 111 }T \\ Tests >R R@ RP@ R> but needs '-'
+T{ : foo 111 >R R@ R> ; foo -> 111 111 }T \\ Tests >R R@ RP@ R> but needs '-'
+T{ : foo 111 >R R@ RP@ R> SWAP RP@ SWAP - ; foo -> 111 111 CELLL }T \\ Tests >R R@ RP@ R> but needs '-'
+T{ 111 >R R@ RP@ R> SWAP RP@ SWAP - -> 111 111 CELLL }T \\ Tests >R R@ RP@ R> but needs '-'
 
 ( === More comparison Zen pg51-52 - ud< is added)
 : = XOR IF FALSE EXIT THEN TRUE ; ( w w -- t)
+T{ 123 123 = 123 124 = -> -1 0 }T
 : <> XOR IF TRUE EXIT THEN FALSE ; ( w w -- t; from ANS not eForth)
 : U< 2DUP XOR 0< IF NIP 0< EXIT THEN - 0< ;
+T{ 123 100 U< 100 123 U< 123 -100 U< -100 123 U< -> 0 -1 -1 0 }T
 : U> SWAP U< ;
 : ud< ( ud ud -- f ) ROT SWAP U< IF 2DROP TRUE ELSE U< THEN ;
 : < 2DUP XOR 0< IF DROP 0< EXIT THEN - 0< ;
+T{ 123 100 < 100 123 < 123 -100 < -100 123 < -> 0 -1 0 -1 }T
 : > SWAP < ;
 : MAX 2DUP < IF SWAP THEN DROP ;
+T{ 100 200 MAX 300 100 MAX -> 200 300 }T
 : MIN 2DUP SWAP < IF SWAP THEN DROP ;
+T{ 100 200 MIN 300 100 MIN -> 100 100 }T
 : WITHIN OVER - >R - R> U< ;
-
-?test\\ 123 123 = 123 124 = -1 0 2 TEST
-?test\\ 123 100 U< 100 123 U< 123 -100 U< -100 123 U< 0 -1 -1 0 4 TEST
-?test\\ 123 100 < 100 123 < 123 -100 < -100 123 < 0 -1 0 -1 4 TEST
-?test\\ 100 200 MAX 300 100 MAX 200 300 2 TEST
-?test\\ 100 200 MIN 300 100 MIN 100 100 2 TEST
-?test\\ 200 100 300 WITHIN 300 100 200 WITHIN 100 -100 200 WITHIN -1 0 -1 3 TEST
+T{ 200 100 300 WITHIN 300 100 200 WITHIN 100 -100 200 WITHIN -> -1 0 -1 }T
 
 : S>D DUP 0< ; ( n -- d)
+T{ 111 S>D -111 S>D -> 111 0 -111 -1 }T
 
 ( === More Math Words Zen pg53-55 UM/MOD M/MOD /MOD MOD / UM+ * M* )
 : UM/MOD ( udl udh u -- ur uq ) ( needs FOR-NEXT from 91)
@@ -372,6 +368,9 @@ BL 32 1 TEST
   THEN DROP 2DROP   ( overflow, return -1's)
   -1 DUP
 ;
+T{ -1 1 2 UM/MOD -> 1 -1 }T
+T{ 9 0 4 UM/MOD -> 1 2 }T
+
 : M/MOD ( d n -- r q)
   ( Signed floored divide of double by single. Return mod and quotient.)
   DUP 0<          ( n negative)
@@ -385,6 +384,7 @@ BL 32 1 TEST
   R>              ( if n is negative)
   IF SWAP NEGATE SWAP THEN  ( negative remainder also )
 ;
+T{ -1 1 2 M/MOD -> 1 -1 }T
 : FM/MOD ( d n -- r q) M/MOD ; \\ Forth2012 https://github.com/NieDzejkob/2klinux.git
 
 : /MOD ( n1 n2 -- r q)
@@ -392,9 +392,12 @@ BL 32 1 TEST
   >R S>D R> ( d1 n2 ; sign extend n1)
   M/MOD     ( floored divide)
 ;
+T{ 9 4 /MOD -> 1 2 }T
+
 : MOD ( n n -- r)
   ( Signed divide. Return mod only)
   /MOD DROP ; ( discard quotient)
+T{ 9 4 MOD -> 1 }T
 
 : / ( n n -- q)
   ( Signed divide. Return quotient only)
@@ -426,15 +429,10 @@ BL 32 1 TEST
   ABS SWAP ABS UM*  ( multiply absolutes)
   R> IF DNEGATE THEN ;  ( negate if signs are different)
 
-?test\\ -1 1 2 UM/MOD 1 -1 2 TEST
-?test\\ -1 1 2 M/MOD 1 -1 2 TEST
-?test\\ 9 0 4 UM/MOD 1 2 2 TEST
-?test\\ 9 4 /MOD 1 2 2 TEST
-?test\\ 9 4 MOD 1 1 TEST
-?test\\ 9 4 / 2 1 TEST
-?test\\ 2 -1 UM* -2 1 2 TEST
-?test\\ 3 4 * 12 1 TEST
-?test\\ -2 -3 M* 6 0 2 TEST
+T{ 9 4 / -> 2 }T
+T{ 2 -1 UM* -> -2 1 }T
+T{ 3 4 * -> 12 }T
+T{ -2 -3 M* -> 6 0 }T
 
 ( === Scaling Words Zen pg56 */MOD */ )
 
@@ -442,13 +440,13 @@ BL 32 1 TEST
   ( Multiply n1 and n2, then divide by n3. Return mod and quotient)
   >R M*       ( n1*n2)
   R> M/MOD ;  ( n1*n2/n3 with remainder)
+T{ 5 7 2 */MOD -> 1 17 }T
 
 : */ ( n1 n2 n3 -- q )
   ( Multiple by n1 by n2, then divide by n3. Return quotient only)
   */MOD NIP ; ( n1*n2/n3 and discard remainder)
+T{ 5 7 2 */ -> 17 }T
 
-?test\\ 5 7 2 */MOD 1 17 2 TEST
-?test\\ 5 7 2 */ 17 1 TEST
 
 ( === More arithmetic needed for ANS compliance ==== )
 \\ TODO-DOUBLE word set https://forth-standard.org/standard/double
@@ -466,24 +464,24 @@ BL 32 1 TEST
 ;
 
 ( === Memory Alignment words Zen pg57 CELL+ CELL- CELLS ALIGNED )
-( CELL+ & ALIGNED moved earlier ERRATA Zen & v5 use 2 which is wrong unless CELL is '2' )
+( ERRATA Zen & v5 use 2 which is wrong unless CELL is '2' )
 
 : CELL- ( a -- a)
   ( Subtract cell size in byte from address)
   CELLL - ;
+T{ 123 CELL- CELLL + -> 123 }T
 
 : CELLS ( n - n )
   ( Multiply n by cell size in bytes)
   CELLL * ;
+T{ 123 CELLS CELLL / -> 123 }T
 
 : CHARS ; \\ A noop since 1 address unit per char - note this is ANS CHARS, eFORTH CHARS is now emits
 : 2* 2 * ; \\ TODO-83 This should be optimized to a left shift and then find where used
 
-?test\\ 123 CELL- CELLL + 123 1 TEST
-?test\\ 123 CELLS CELLL / 123 1 TEST
 
 : ($,n)  ( na -- )
-    ( na) DUP LAST !          ( save na for vocabulary link for overt)
+    ( na) DUP LAST !          ( save na for vocabulary link for OVERT)
     ( na) HERE ALIGNED 
     ( na cp') DUP CP ! SWAP    ( align code address )
     ( cp' na) CELL-            ( link address )
@@ -504,22 +502,11 @@ BL 32 1 TEST
 : >BODY! >BODY ! ;
 : DEFER! ( xt1 xt2 --; ) >BODY! ; 
 
-
-
-\\ Math routines from Forth2012
-( see also in functions e.g. RSHIFT )
-
-
-( === Special Characters Zen pg58 BL >CHAR )
-
-( BL moved earlier)
-
 : >CHAR ( c -- c; filter non printing characters, replace by _)
   127 AND DUP   ( mask off the MSB bit)
   127 BL WITHIN ( if its a control character)
   IF DROP 95 THEN ; ( replace with an underscore)
-
-?test\\ 41 >CHAR 23 >CHAR BL >CHAR 41 95 BL 3 TEST
+T{ 41 >CHAR 23 >CHAR BL >CHAR -> 41 95 BL }T
 
 ( === Managing Data Stack Zen pg59 DEPTH PICK )
 
@@ -530,27 +517,28 @@ BL 32 1 TEST
   SP0 @ SWAP -  ( distance from stack origin)
   CELLL / ;     ( divide by bytes/cell)
 ' DEPTH DEFER!
+T{ 1 2 3 DEPTH -> 1 2 3 3 }T
 
 : PICK ( ... +n -- ... w)
   ( Copy the nth stack item to tos)
   1+ CELLS     ( bytes below tos)
   SP@ + @ ;     ( fetch directly from stack)
-
-?test\\ 1 2 3 DEPTH 1 2 3 3 4 TEST
-?test\\ 11 22 33 1 PICK 11 22 33 22 4 TEST
+T{ 11 22 33 1 PICK -> 11 22 33 22 }T
 
 ( === Memory Access Zen pg60 +! 2! 2@ HERE PAD TIB @EXECUTE )
 ( Note 2! 2@ presume big-endian which is a Forth assumption (high word at low address)
 
 : +! ( n a -- ; Add n to the contents at address a)
   SWAP OVER @ + SWAP ! ;
+T{ HLD @ 2 HLD +! HLD @ SWAP - -> 2 }T
 : ++ 1 SWAP +! ;
 : -- -1 SWAP +! ;
 : 2! ( d a -- ; Store double integer to address a, high part at low address)
   SWAP OVER ! CELL+ ! ;
+T{ 1 2 3 SP@ 4 5 ROT 2! -> 1 4 5 }T
 : 2@ ( a -- d; Fetch double integer from address a, high part from low address)
   DUP CELL+ @ SWAP @ ;
-( HERE is defined in moved forward words)
+T{ 1 2 3 SP@ 2@ -> 1 2 3 2 3 }T
 
 ( Support Data separation from Code TODO rethink this as always having some code)
 : vHERE ( -- a; top of data space - code space if none or after back in Ram) VP @ ?DUP IF EXIT THEN HERE ;
@@ -565,20 +553,17 @@ BL 32 1 TEST
 
 : TIB ( -- a; Return address of terminal input buffer)
   #TIB CELL+ @ ; ( 1 cell after #TIB)
+T{ >IN @ BL PARSE XXX SWAP TIB - ROT - -> 3 9 }T
 : @EXECUTE ( a -- ; execute vector -if any- stored in address a)
   @ ?DUP IF EXECUTE THEN ;
-
-?test\\ HLD @ 2 HLD +! HLD @ SWAP - 2 1 TEST
-?test\\ 1 2 3 SP@ 4 5 ROT 2! 1 4 5 3 TEST
-?test\\ 1 2 3 SP@ 2@ 1 2 3 2 3 5 TEST
-?test\\ >IN @ BL PARSE XXX SWAP TIB - ROT - 3 9 2 TEST
 
 ( === Memory Array and String Zen pg61-62: COUNT CMOVE FILL -TRAILING PACK$ )
 
 : COUNT ( b -- b+1 +n; return count byte of string and add 1 to byte address)
   DUP 1+ SWAP C@ ;
+T{ NP @ CELL+ CELL+ COUNT NIP -> 5 }T \\ Note works because COUNT is last word defined 
 
-: CMOVE ( b1 b2 u -- ; Copy u bytes from b1 to b2)
+: CMOVE ( b1 b2 u -- ; Copy u bytes from b1 to b2) 
   FOR             ( repeat u+1 times)
     AFT           ( skip to THEN first time)
       >R DUP C@   ( fetch from source )
@@ -598,6 +583,9 @@ BL 32 1 TEST
       R> 1-      ( increment destination address)
     THEN
   NEXT 2DROP ;    ( done discard addresses)
+
+: MOVE ( a a' u -- ; https://forth-standard.org/standard/core/MOVE ; TODO redefine in terms of CMOVE or CMOVE> depending on overlaps)
+  >R 2DUP > R> SWAP IF CMOVE ELSE CMOVE> THEN ;
 
 : FILL ( b u c --; Fill u bytes of character c to area beginning at b.)
   SWAP            ( b c u)
@@ -623,6 +611,11 @@ BL 32 1 TEST
     THEN              ( else continue scanning)
   NEXT 0 ;            ( reach the beginning of b)
 
+T{ NP @ CELL+ CELL+ COUNT OVER PAD ROT CMOVE C@ -> PAD C@ }T ( Check first character copied - expect pad="PACK$")
+T{ PAD 3 + 5 BL FILL PAD 7 + C@ -> BL }T
+T{ PAD 8 -TRAILING -> PAD 3 }T
+
+
 ( Note there is code in this.TOKEN which does this )
 ( DIFF: V5 version used; Zen&Staapl: DUP >R 2DUP C! 1 + 2DUP + 0 SWAP ! SWAP CMOVE R> )
 : PACK$ ( b u a -- a; Build a counted string with u characters from b. Null fill.)
@@ -634,11 +627,6 @@ BL 32 1 TEST
   1+ SWAP CMOVE      ( ; store characters in cells - 0 padded to end of cell)
   R> ;        ( leave only word buffer address )
 
-?test\\ NP @ CELL+ CELL+ COUNT NIP 5 1 TEST
-?test\\ NP @ CELL+ CELL+ COUNT OVER PAD ROT CMOVE C@ PAD C@ 1 TEST ( Check first character copied - expect pad="PACK$"
-?test\\ PAD 3 + 5 BL FILL PAD 7 + C@ BL 1 TEST
-?test\\ PAD 8 -TRAILING PAD 3 2 TEST
-
 ( === TEXT INTERPRETER ===  Zen pg63 )
 
 ( === Numeric Output Zen pg64 DIGIT EXTRACT )
@@ -647,10 +635,7 @@ BL 32 1 TEST
   7 AND +     ( add 7 to make it A-F)
   48 + ;      ( add ASCII 0 for offset)
   
-\\ : EXTRACT ( d base -- n/base c ; Extract the least significant digit from n.)
-\\   UM/MOD   ( divide n by base)
-\\  SWAP DIGIT ;    ( convert remainder to a digit)
-: extract ( d base -- d c ; Extract least significant digit from d)
+: EXTRACT ( d base -- d c ; Extract least significant digit from d)
   >R
   0 R@ FM/MOD  ( S: l rh qh R: b )
   R> SWAP >R   ( S: l rh b R: qh )
@@ -658,9 +643,7 @@ BL 32 1 TEST
   R> ROT       ( S: ql qh r ) 
   DIGIT
   ;
-
-\\ ?test\\ 123 10 EXTRACT 12 51 2 TEST
-?test\\ 123 0 10 extract 12 0 51 3 TEST
+T{ 123 0 10 EXTRACT -> 12 0 51 }T
 
 ( === Number formatting Zen pg65 <# HOLD #S SIGN #> )
 
@@ -678,7 +661,7 @@ BL 32 1 TEST
 : # ( u -- u; Extract one digit from u and append the digit to output string.- ANS/eForth conflict eForth used single, ANS double )
   \\ eFORTH: BASE @ EXTRACT HOLD
      BASE @         ( get current base)
-     extract        ( extract one digit from u)
+     EXTRACT        ( EXTRACT one digit from u)
      HOLD ;         ( save digit to number buffer)
 
 : #S ( u -- 0 0 ; Convert u until all digits are added to the output string. - ANS/eForth conflict eForth used single, ANS double )
@@ -697,10 +680,8 @@ BL 32 1 TEST
   HLD @         ( address of last digit)
   PAD OVER - ;  ( return address of 1st digit and length)
 
-?test\\ 123 0 <# OVER SIGN #S #> SWAP COUNT SWAP COUNT SWAP COUNT NIP 3 49 50 51 4 TEST ( hold="123" )
-?test\\ -123 DUP ABS 0 <# #S ROT SIGN #> SWAP COUNT SWAP COUNT SWAP COUNT SWAP COUNT NIP 4 45 49 50 51 5 TEST ( hold="-123" )
-
-( === More definitions moved up )
+T{ 123 0 <# OVER SIGN #S #> SWAP COUNT SWAP COUNT SWAP COUNT NIP -> 3 49 50 51 }T ( hold="123" )
+T{ -123 DUP ABS 0 <# #S ROT SIGN #> SWAP COUNT SWAP COUNT SWAP COUNT SWAP COUNT NIP -> 4 45 49 50 51 }T ( hold="-123" )
 
 : EMIT ( c--;  Send a character to the output device. Zen pg69)
   'EMIT @EXECUTE ;
@@ -710,12 +691,12 @@ BL 32 1 TEST
   SWAP 0 MAX FOR AFT DUP EMIT THEN NEXT DROP ; ( From Staapl and V5, not in Zen) ( TODO-ANS flagged as possible conflict)
 : SPACES ( n -- ; Send n spaces to the output device. Zen pg70) ( ERRATA Zen has bad initial SWAP)
   BL emits ;
+T{ 60 EMIT SPACE 2 SPACES 61 EMIT -> }T
+
 \\ use JS definition (hand coded on Arduino etc)
 \\ : TYPE ( b u -- ; Output u characters from b)
 \\  FOR AFT DUP C@ EMIT 1+ THEN NEXT DROP ;
 : .$ ( a -- ) COUNT TYPE ; ( from Staapl, not in eForth)
-
-?test\\ 60 EMIT SPACE 2 SPACES 61 EMIT 0 TEST
 ( .$ is tested by ."| and others )
 
 ( === Number output Zen pg66 str HEX DECIMAL .R U.R U. . ? )
@@ -735,7 +716,7 @@ BL 32 1 TEST
   >R str            ( convert n to a number string)
   R> OVER - SPACES  ( print leading spaces)
   TYPE ;            ( print number in +n column format)
-
+  
 : U.R ( u+ n -- ; Display an unsigned integer in n column, right justified.)
   >R            ( save column number)
   0 <# #S #> R>   ( convert unsigned number)
@@ -754,12 +735,10 @@ BL 32 1 TEST
 
 : ? ( a -- ; Display the contents in a memory cell.)
   @ . ; ( very simple but useful command)
-
-?test\\ -123 5 .R 123 5 U.R 123 U. 123 . BASE ? 0 TEST
+T{ -123 5 .R 123 5 U.R 123 U. 123 . BASE ? -> }T
 
 ( === Numeric input Zen pg67-68 DIGIT? NUMBER? )
 ( ERRATA Zen NIP is used but not defined )
-
 : DIGIT? ( c base -- u t ; Convert a character to its numeric value. A flag indicates success.)
   >R                    ( save radix )
   48 -          ( character offset from digit 0 - would be better as '[ CHAR 0 ] LITERAL' but dont have '[')
@@ -775,9 +754,9 @@ BL 32 1 TEST
   THEN                  ( if n>10, the flag will be 0 and )
   DUP                   ( OR result will still be n )
   R> U< ;               ( if n=/>radix, the digit is not valid )
+T{ 50 10 DIGIT? -> 2 -1 }T
 
 ( TODO Note the EFORTH-ZEN-ERRATA in the docs v. code for NUMBER? means we drop testing the flag will reconsider when see how used )
-( === Serial I/O Zen pg69 ?KEY KEY EMIT NUF? )
 
 ( === Derived I/O Zen pg70 PACE SPACE SPACES TYPE CR )
 ( ERRATA Staapl calls it "KEY?" )
@@ -786,12 +765,12 @@ BL 32 1 TEST
 : KEY ( -- c ) ( Wait for and return an input character.)
   0           ( Initial delay )
   BEGIN
-    MS        ( Introduce a delay, drops CPU from 100% to insignificant)
+    ms        ( Introduce a delay, drops CPU from 100% to insignificant)
     200       ( wait 0.5S if no keys w )
     ?KEY      ( delay c T | delay F; Check for key )
   UNTIL
   NIP ;       ( Drop delay )
-( EMIT moved up )
+
 ( ERRATA Staapl has different flow, probably wrong)
 : NUF? ( -- t) ( Return false if no input, else pause and if CR return true)
   ?KEY DUP ( -- c T T | F F;  wait for a key-stroke)
@@ -813,7 +792,7 @@ BL 32 1 TEST
 : SOURCE TIB #TIB @ ; ( Repurposing TIB and #TIB for the pointer to buffer and length whatever input source )
 
 ( === Word Parser Zen pg72-73 PARSE parse )
-( ERRATA Zen this doesnt set >IN past the string, but the callers clearly assume it does.)
+( ERRATA Zen PARSE doesnt set >IN past the string, but the callers clearly assume it does.)
 ( ERRATA Zen pg72 is obviously broken as it doesn't even increment the pointer in the FOR loop)
 ( This version is based on v5, Staapl is significantly different )
 ( Also adapting to use code in https://forth-standard.org/standard/core/PARSE-NAME )
@@ -835,8 +814,8 @@ BL 32 1 TEST
   WHILE OVER C@ R@ = 0=
   WHILE 1 /STRING 
   REPEAT THEN R> DROP ;
-  
-:NONAME ( delim <string> -- c-addr u )
+
+:NONAME ( delim <string> -- c-addr u : PARSE )
   >R
   SOURCE >IN @ /STRING ( a u ret: delim )
   R@ BL = IF ['] isspace? xt-skip THEN ( a' u' ret: delim )
@@ -844,23 +823,24 @@ BL 32 1 TEST
   R@ BL = IF ['] isnotspace? xt-skip ELSE R@ skip-till THEN R> DROP ( a' a" u")
   2DUP 1 MIN + SOURCE DROP - >IN !  
   DROP OVER - ;
-  
 ' PARSE DEFER! \\ IS PARSE
-: PARSE-NAME BL PARSE ;
 
+: PARSE-NAME BL PARSE ;
+  
 ( === Parsing Words Zen pg74 .( ( \\ CHAR TOKEN WORD )
 
 : CHAR PARSE-NAME DROP C@ ; ( Parse a word and return its first character )
+T{ CHAR ) -> 41 }T
 : [CHAR] ( "name" <spaces> -- ) CHAR [COMPILE] LITERAL ; IMMEDIATE
 : CTRL CHAR 31 AND ; ( Parse a word, return first character as a control )
-?test\\ CHAR ) 41 1 TEST
-?test\\ CTRL H 8 1 TEST
+T{ CTRL H -> 8 }T
 
 : .(  ( -- ) ( Output following string up to next )
   [ CHAR ) ] LITERAL PARSE
    ( parse the string until next )
   TYPE ; IMMEDIATE         ( type the string to terminal )
-?test\\ .( on consecutive ) CR .( lines )
+T{ .( on consecutive ) CR .( lines )
+T{ : foo .( output at compile time) ; -> }T
 
 :NONAME ( -- a ; <string> ; Parse a word from input stream and copy it to name dictionary. : TOKEN )
   PARSE-NAME              ( parse out next space delimited string )
@@ -868,20 +848,16 @@ BL 32 1 TEST
   NP @                    ( word buffer below name dictionary )
   OVER - CELLL - PACK$ ;  ( copy parsed string to word buffer )
 ' TOKEN DEFER!
+T{ : foo TOKEN C@ ; foo xxx -> 3 }T
 
 : WORD ( c -- a ; <string> ) ( Parse a word from input stream and copy it to code dictionary. Not if not in definition it will be overwritten by next)
   PARSE         ( parse out a string delimited by c )
   HERE PACK$ ;  ( copy the string into the word buffer )
+T{ BL WORD yyyy DUP C@ SWAP CP @ - -> 4 0 }T
 
-?test\\ 1 2 ( 3 ) 4 \\ commenting
-?test\\ 1 2 4 3 TEST
-?test\\ : foo TOKEN C@ ; foo xxx 3 1 TEST
-?test\\ BL WORD yyyy DUP C@ SWAP CP @ - 4 0 2 TEST
-?test\\ : foo .( output at compile time) ; 0 TEST
+( === Dictionary Search Zen pg75-77 NAME>INTERPRET SAME? NAME? )
 
-( === Dictionary Search Zen pg75-77 NAME> SAME? NAME? )
-
-: NAME> ( na -- xt )
+: NAME>INTERPRET ( na -- xt )
   ( Return a code address given a name address.)
   2 CELLS - ( move to code pointer field )
   @ ; ( get code field address )
@@ -906,6 +882,8 @@ BL 32 1 TEST
   NEXT              ( loop u times if strings are the same ) ( a1 a2;  R: u-n-1)
   FALSE ;               ( then push the 0 flag on the stack ) ( a1 a2 0)
 ( This can replace the code definition of find, however it is approx 8x slower )
+T{ BL WORD xxx DUP C@ 1+ PAD SWAP CMOVE PAD BL WORD xxx 4 SAME? >R 2DROP R> -> 0 }T
+T{ BL WORD xxx DUP C@ 1+ PAD SWAP CMOVE PAD BL WORD xzx 4 SAME? >R 2DROP R> 0= -> 0 }T
 
 : FIND-NAME ( caddr u -- na | F; see https://forth-standard.org/proposals/find-name#contribution-58)
   ( Note this ONLY currently works if caddr-- is a counted string )
@@ -921,7 +899,7 @@ BL 32 1 TEST
     R@ @        ( is this a valid vocabulary? )
   WHILE         ( caddr u R: va' ; yes)
     2DUP R@ @    ( caddr u caddr u va' R: va' )
-    find-name-in ( caddr u na R: va' | caddr u F R: va')
+    FIND-NAME-IN ( caddr u na R: va' | caddr u F R: va')
     ?DUP        ( word found here? )
   UNTIL         ( if not, go searching next vocabulary )
                 ( caddr u na R: va)
@@ -930,39 +908,34 @@ BL 32 1 TEST
   R> DROP 2DROP ( ; word is not found in all vocabularies )
   FALSE ;       ( F ; exit with a false flag )
 
-
 : NAME? ( a -- ca na, a F )
   ( Search all context vocabularies for a string.)
   DUP COUNT         ( a caddr u ) 
   FIND-NAME     ( a na | a F) 
   ?DUP
   IF            ( a na; word found)
-    NIP DUP NAME> SWAP ( ca na )
+    NIP DUP NAME>INTERPRET SWAP ( ca na )
   ELSE          ( a ) 
     FALSE       ( a F )
   THEN ; 
 
-( NAME> implicitly tested by find )
-?test\\ BL WORD xxx DUP C@ 1+ PAD SWAP CMOVE PAD BL WORD xxx 4 SAME? >R 2DROP R> 0 1 TEST
-?test\\ BL WORD xxx DUP C@ 1+ PAD SWAP CMOVE PAD BL WORD xzx 4 SAME? >R 2DROP R> 0= 0 1 TEST
-?test\\ FORTH 0 TEST
+( NAME>INTERPRET implicitly tested by find )
 
-\\ TODO replace: ?test\\ BL WORD TOKEN CONTEXT @ find BL WORD TOKEN CONTEXT @ FORTHfind 2 TEST
-\\ TODO replace: ?test\\ BL WORD TOKEN CONTEXT @ find NIP BL WORD TOKEN COUNT CONTEXT @ find-name-in 1 TEST
-\\ TODO replace: ?test\\ BL WORD TOKEN CONTEXT @ find NIP BL WORD TOKEN COUNT FIND-NAME 1 TEST ( FIND-NAME searches all vocabs)
-\\ TODO replace: ?test\\ BL WORD TOKEN CONTEXT @ find BL WORD TOKEN NAME? 2 TEST ( Name searches all vocabs )
+\\ TODO replace: T{ BL WORD TOKEN CONTEXT @ find -> BL WORD TOKEN CONTEXT @ FORTHfind }T
+\\ TODO replace: T{ BL WORD TOKEN CONTEXT @ find NIP -> BL WORD TOKEN COUNT CONTEXT @ FIND-NAME-IN }T
+\\ TODO replace: T{ BL WORD TOKEN CONTEXT @ find NIP -> BL WORD TOKEN COUNT FIND-NAME }T ( FIND-NAME searches all vocabs)
+\\ TODO replace: T{ BL WORD TOKEN CONTEXT @ find -> BL WORD TOKEN NAME? }T ( Name searches all vocabs )
 
 : FIND ( caddr -- c-addr 0 | xt 1 | xt -1 ; https://forth-standard.org/standard/core/FIND )
     DUP COUNT ( caddr caddr' u )
     FIND-NAME ( caddr na | caddr F )
     ?DUP IF
-      NIP DUP NAME> ( na xt )
+      NIP DUP NAME>INTERPRET ( na xt )
       SWAP immediate? ( xt b )
       IF 1 ELSE -1 THEN
     ELSE ( caddr )
       0
     THEN ;
-
 
 \\ TODO-35-VOCAB this will definitely need attention
 : MARKER NP @ CP @ CONTEXT @ DUP @ SWAP CURRENT @ DUP @ SWAP CREATE , , , , , ,
@@ -970,10 +943,9 @@ BL 32 1 TEST
    CELL+ DUP @ CONTEXT ! CELL+ DUP @ CONTEXT @ ! 
    CELL+ DUP @ CP ! CELL+ @ NP ! ;  
 
-\\ TODO replace: ?test\\ BL WORD TOKEN CONTEXT @ find DROP ( xt ) -1 BL WORD TOKEN FIND ( xt -1 ) 2 TEST ( not immediate )
-\\ TODO replace: ?test\\ BL WORD XYZZY 0 OVER FIND 2 TEST ( failure case)
-\\ TODO replace: ?test\\ BL WORD THEN CONTEXT @ find DROP ( xt ) 1 BL WORD THEN FIND 2 TEST ( immediate)
-
+\\ TODO replace: T{ BL WORD TOKEN CONTEXT @ find DROP ( xt ) -1 -> BL WORD TOKEN FIND ( xt -1 ) }T ( not immediate )
+\\ TODO replace: T{ BL WORD XYZZY 0 OVER FIND }T ( failure case)
+\\ TODO replace: T{ BL WORD THEN CONTEXT @ find DROP ( xt ) 1 -> BL WORD THEN FIND }T ( immediate)
 
 ( === Error Handling Zen pg80-82 CATCH THROW = moved in front of Text input )
 
@@ -988,8 +960,8 @@ BL 32 1 TEST
   R> DROP         ( discard the saved data stack pointer )
   0 ;             ( push a no-error flag on data stack )
 
-( EFORTH DIFFERENCE - eForth always THROWs, but ANS doesnt throw if non-zero, since eForth use cases always have a err# )
-( the ANS definition servers both and is used)
+( EFORTH DIFFERENCE - eForth always THROWs, but Forth2012 doesnt throw if non-zero, since eForth use cases always have a err# )
+( the Forth2012 definition servers both and is used)
 : THROW ( err# -- err# )
   ( Reset system to current local error frame and update error flag.)
   ?DUP IF 
@@ -1001,6 +973,9 @@ BL 32 1 TEST
     R> 
   THEN ;          ( retrieved err# )
 
+( Test is tricky - the "3" in bar is thrown away during hte "THROW" while 5 is argument to THROW )
+T{ : bar 3 5 THROW 4 ; : foo 1 [ ' bar ] LITERAL CATCH 2 ; foo -> 1 5 2 }T
+T{ : bar 3 ; : foo 1 [ ' bar ] LITERAL CATCH 2 ; foo -> 1 3 0 2 }T
 
 ( === Text input from terminal Zen pg 78: ^H TAP kTAP )
 ( EFORTH-ZEN-ERRATA CTRL used here but not defined. )
@@ -1057,6 +1032,8 @@ BL 32 1 TEST
   NIP DUP ;         ( bot cur cur;  duplicate cur to force ACCEPT to exit, Key not stored )
 
 \\ ==== STRING HANDLING ===== 
+\\ See docs/strings.md for documentation.
+\\
 \\ In order to handle Forth2012 strings which are typically addr+count, and traditional Forth (addr pointing to length)
 \\ We define:
 \\   $," that compiles a string into a dictionary
@@ -1088,17 +1065,19 @@ BL 32 1 TEST
 : S"| ( -- caddr u) do$ COUNT ; ( Forth2012 version )
 
 : $" ( -- addr) COMPILE $"| $," ; IMMEDIATE ( counted string)
+T{ : foo $" hello" COUNT NIP ; foo -> 5 }T
 : C" [COMPILE] $" ; IMMEDIATE ( Forth2012 name for $")
-( Moved earlier from Zen pg93 )
 : ." ( -- ) COMPILE ."| $," ; IMMEDIATE ( compile string that will be printed )
-( S" is more complex as it can comile, or just return a string )
+T{ : foo ." hello" ; foo -> }T
 
+( S" is more complex as it can compile, or just return a string )
 : S" ( compile time: <string> ; interpret time: -- caddr u ; ANS version puts address and length ) 
   STATE @ 
   IF COMPILE S"| $,"
   ELSE 34 PARSE stringBuffer PACK$ COUNT \\ Buffer is above used memory but always in Ram
   THEN
   ; IMMEDIATE
+T{ S" foo" TUCK + 1- C@ -> 3 CHAR o }T
 
 : bu+@ ( b1 u -- b' u' c ) 1- >R COUNT R> SWAP ;
 : c+! ( c a -- a+1 ) TUCK C! 1+ ;
@@ -1171,10 +1150,6 @@ BL 32 1 TEST
   ; IMMEDIATE
 
 
-?test\\ : foo $" hello" COUNT NIP ; foo 5 1 TEST
-?test\\ S" foo" TUCK + 1- C@ 3 CHAR o 2 TEST
-?test\\ : foo ." hello" ; foo 0 TEST
-
 ( === Error Handling Zen pg80-82 NULL$ ABORT abort" ?STACK )
 
 CREATE NULL$ 0 , ( EFORTH-ZEN-ERRATA inserts a string "coyote" after this, no idea why! )
@@ -1199,13 +1174,8 @@ CREATE NULL$ 0 , ( EFORTH-ZEN-ERRATA inserts a string "coyote" after this, no id
   COMPILE abort"  ( compile runtime abort code )
   $," ; IMMEDIATE ( compile abort message )
 
-
-( Test is tricky - the "3" in bar is thrown away during hte "THROW" while 5 is argument to THROW )
-?test\\ : bar 3 5 THROW 4 ; : foo 1 [ ' bar ] LITERAL CATCH 2 ; foo 1 5 2 3 TEST
-?test\\ : bar 3 ; : foo 1 [ ' bar ] LITERAL CATCH 2 ; foo 1 3 0 2 4 TEST
 ( Note that abort restores the stack, so shouldn't have consumed something else will have random noise on stack )
-?test\\ : bar ?DUP ABORT" test" 3 ; : foo [ ' bar ] LITERAL CATCH ; 1 foo C@ 0 foo 1 4 3 0 4 TEST
-( $," and abort" are implicitly tested by ABORT")
+T{ : bar ?DUP ABORT" test" 3 ; : foo [ ' bar ] LITERAL CATCH ; 1 foo C@ 0 foo -> 1 4 3 0 }T
 
 ( === Text Interpreter loop Zen pg83-84 $INTERPRET [ .OK ?STACK EVAL )
 
@@ -1218,7 +1188,7 @@ CREATE NULL$ 0 , ( EFORTH-ZEN-ERRATA inserts a string "coyote" after this, no id
   DUP immediate? 0= IF 
     COMPILE COMPILE
   THEN ( na ) 
-  NAME> ,
+  NAME>INTERPRET ,
 ; IMMEDIATE
 
 
@@ -1228,14 +1198,16 @@ CREATE NULL$ 0 , ( EFORTH-ZEN-ERRATA inserts a string "coyote" after this, no id
   NAME?                   ( search dictionary for word just parsed )
     ?DUP                    ( is it a defined word? )
   IF C@                    ( yes. examine the lexicon ) ( ERRATA Zen, V5 and Staapl use @, it should be C@)
-  [ COMP ] LITERAL AND ( is it a compile-only word? )
+  [ COMP ] LITERAL AND ( is it a COMPILE-ONLY word? )
   ABORT" compile ONLY"  ( if so, abort with the proper message )
-  EXECUTE EXIT          ( not compile-only, execute it and exit )
+  EXECUTE EXIT          ( not COMPILE-ONLY, execute it and exit )
   THEN                    ( not defined in the dictionary )
   NUMBER?                 ( convert it to a number ) ( TODO-NUMBER-5 merge with number in js)
   IF EXIT THEN            ( exit if conversion is successful )
   THROW ;                 ( else generated the error condition )
 ' $INTERPRET DEFER!
+T{ PARSE-NAME 123 PAD PACK$ $INTERPRET -> 123 }T
+T{ 123 PARSE-NAME DUP PAD PACK$ $INTERPRET  -> 123 123 }T
 
 : .OK ( -- )
   ( Display 'ok' only while interpreting.)
@@ -1244,32 +1216,27 @@ CREATE NULL$ 0 , ( EFORTH-ZEN-ERRATA inserts a string "coyote" after this, no id
 : ?STACK ( -- )
   ( Abort if the data stack underflows.)
   DEPTH 0< ABORT" underflow" ; ( Note Staapl uses $" THROW, v5 uses ABORT)
-
-?test\\ PARSE-NAME 123 PAD PACK$ $INTERPRET 123 1 TEST
-?test\\ 123 PARSE-NAME DUP PAD PACK$ $INTERPRET  123 123 2 TEST
-?test\\ : foo 1 2DROP ?STACK ; : bar [ ' foo ] LITERAL CATCH ; bar C@ 9 1 TEST
+T{ : foo 1 2DROP ?STACK ; : bar [ ' foo ] LITERAL CATCH ; bar C@ -> 9 }T
 
 ( This switches to use new interpreter, its still using old js $COMPILE )
-
 :NONAME ( -- ; Start the text interpreter : [ )
   FALSE STATE !                 ( ANS version)
   ; IMMEDIATE               ( must be done even while compiling )
 ' [ DEFER!
-
-?test\\ [ 1 2 3 ROT 2 3 1 3 TEST
+T{ [ 1 2 3 ROT -> 2 3 1 }T
 
 ( === Operating System Zen pg85-86 PRESET XIO FILE HAND I/O CONSOLE )
 
 ( EFORTH-V5-ERRATA uses TIB #TIB CELL+ ! which since ' TIB #TIB CELL+ @' is a NOOP )
 ( EFORTH-ZEN-ERRATA uses =TIB but doesnt define =TIB which is TIB0)
 
-: XIO ( prompt echo tap -- )
+: XIO ( prompt echo tap -- ) \\ TODO maybe obsolete
   ( Reset the I/O vectors, 'TAP, 'ECHO and 'PROMPT.)
   'TAP !                          ( init kTAP )
   'ECHO !                         ( init ECHO )
   'PROMPT ! ;                     ( init system prompt )
 
-: FILE ( -- )
+: FILE ( -- )  \\ TODO maybe obsolete
   ( Select I/O vectors for file download.)
   \\ [ ' PACE ] LITERAL  ( send 11 for acknowledge - eForth difference - this is only meaningful if feeding through serial )
   0 ( No prompt while on File )
@@ -1278,7 +1245,7 @@ CREATE NULL$ 0 , ( EFORTH-ZEN-ERRATA inserts a string "coyote" after this, no id
   XIO ;
 
 
-: HAND ( -- )
+: HAND ( -- )  \\ TODO maybe obsolete
   ( Select I/O vectors for terminal interface.)
   [ ' .OK  ] LITERAL  ( say 'ok' if all is well)
   ( ERRATA zen, Staapl uses 'EMIT @, current version of emit, V5's use of EMIT is better because respects changes to 'EMIT)
@@ -1289,7 +1256,7 @@ CREATE NULL$ 0 , ( EFORTH-ZEN-ERRATA inserts a string "coyote" after this, no id
 
 ( EFORTH-ZEN-ERRATA has 'RX?' should be '?RX'
 ( EPROM note, this is in Rom, not Ram as otherwise need to be initialized - and from what ?
-CREATE I/O  ' ?RX , ' TX! , ( Array to store default I/O vectors. )
+CREATE I/O  ' ?RX , ' TX! , ( Constant array to store default I/O vectors. )
 
 : CONSOLE ( -- )
   ( Initiate terminal interface.)
@@ -1305,7 +1272,9 @@ CREATE I/O  ' ?RX , ' TX! , ( Array to store default I/O vectors. )
 
 ( "," COMPILE LITERAL $," are moved earlier, redefinition of ] is moved later as needs $COMPILE )
 :NONAME ( -- ca ) TOKEN NAME? IF EXIT THEN THROW ; ' ' DEFER!
+T{ 1 ' DUP EXECUTE -> 1 1 }T
 : ALLOT ( n -- ) CP +! ; ( ERRATA Zen has +1 instead of +! fixed in V5 and Staapl)
+T{ HERE 2 ALLOT HERE SWAP - -> 2 }T
 : vALLOT ( n -- ) VP @ IF VP +! ELSE ALLOT THEN ; ( EPROM ALLOT - not part of eForth)
 : BUFFER: CREATE vALLOT ;
 
@@ -1319,19 +1288,12 @@ CREATE I/O  ' ?RX , ' TX! , ( Array to store default I/O vectors. )
   IF [COMPILE] ['] COMPILE DEFER@
   ELSE ' DEFER@
   THEN ; IMMEDIATE
-( ERRATA Staapl & Zen do 'CURRENT @ !', v5 does 'NAME> ,' this is fundamentally different usage, ANS matches latter )
-: RECURSE ( -- ) LAST @ NAME> , ; IMMEDIATE
 
-?test\\ 1 ' DUP EXECUTE 1 1 2 TEST
-?test\\ HERE 2 ALLOT HERE SWAP - 2 1 TEST
-?test\\ : foo [COMPILE] ( ; foo 2 ) 0 TEST
-?test\\ : foo ?DUP IF DUP 1- RECURSE THEN ; 3 foo 3 2 1 3 TEST
+( ERRATA Recurse: Staapl & Zen do 'CURRENT @ !', v5 does 'NAME>INTERPRET ,' this is fundamentally different usage, ANS matches latter )
+: RECURSE ( -- ) LAST @ NAME>INTERPRET , ; IMMEDIATE
+T{ : foo ?DUP IF DUP 1- RECURSE THEN ; 3 foo -> 3 2 1 }T
 
-( === Control Structures Zen pg91-92: FOR BEGIN NEXT UNTIL AGAIN IF AHEAD REPEAT THEN AFT ELSE WHILE )
-( All moved earlier )
-
-
-( === Name Dictionary Compiler Zen pg94-96: ?UNIQUE $,n $COMPILE overt ; ] call, : IMMEDIATE  (see this.dollarCommaN)
+( === Name Dictionary Compiler Zen pg94-96: ?UNIQUE $,n $COMPILE OVERT ; ] call, : IMMEDIATE  (see this.dollarCommaN)
 
 : ?UNIQUE ( a -- a ) ( Redefining code word qUNIQUE in Forth)
   ( Display a warning message if the word already exists.)
@@ -1339,8 +1301,7 @@ CREATE I/O  ' ?RX , ' TX! , ( Array to store default I/O vectors. )
   IF ."  reDef "  ( if so, print warning )
   OVER .$       ( with the offending name )
   THEN DROP ;     ( discard token address )
-
-?test\\ TOKEN foo DUP ?UNIQUE - 0 1 TEST
+T{ TOKEN foo DUP ?UNIQUE - -> 0 }T
 
 :NONAME ( na -- ; : $,n )
   ( Build a new dictionary name using the string at na.)
@@ -1385,7 +1346,7 @@ CREATE I/O  ' ?RX , ' TX! , ( Array to store default I/O vectors. )
 
 ( === TODO-TEST TODO-IO test EVAL, not that .OK wont work here since not yet using $INTERPRET )
 
-:NONAME  ( -- : overt)
+:NONAME  ( -- : OVERT)
   ( Link a successfully defined word into the current vocabulary. )
   LAST @        ( name field address of last word )
   DUP @ IF        ( Dont store if LAST is 0 as in :NONAME)
@@ -1393,28 +1354,30 @@ CREATE I/O  ' ?RX , ' TX! , ( Array to store default I/O vectors. )
   ELSE
     DROP NP @ 3 CELLS + NP !
   THEN ;
-' overt DEFER!
+' OVERT DEFER!
 
 :NONAME ( -- : ; )
   ( Terminate a colon definition. )
   COMPILE EXIT  ( compile exit code )
   [COMPILE] [   ( return to interpreter state )
-  overt ;       ( restore current vocabulary )
+  OVERT ;       ( restore current vocabulary )
 ' ; DEFER! COMPILE-ONLY IMMEDIATE
 
 :NONAME ( -- ; Start compiling the words in the input stream : ] )
   TRUE STATE ! ;
 ' ] DEFER!
 
-:NONAME ( -- ; <string> ) ( redefining javascript word ':' = colon )
+:NONAME ( -- ; <string> ) ( redefining javascript word ':' = colon; : : )
   ( Start a new colon definition using next word as its name.)
   TOKEN $,n   ( compile new word with next name )
   tokenDoList ,
   ] ;         ( Set state to compiling )
 ' : DEFER!
+T{ : foo 1 ; foo -> 1 }T
 
-?test\\ : foo 1 ; foo 1 1 TEST
-
+:NONAME ( -- ; Define a DEFERING word : DEFER )
+  TOKEN $,n tokenDefer , 0 , OVERT ;
+' DEFER DEFER!
 
 ( TODO may need JS equivalent - see if used;  : CALL, ( ca -- ; ( DTC 8086 relative call ; [ =CALL ] LITERAL , HERE CELL+ - , ; )
 
@@ -1422,19 +1385,17 @@ CREATE I/O  ' ?RX , ' TX! , ( Array to store default I/O vectors. )
 
 ( EFORTH-DIFF each of V5, Zen and Staapl do this differently - this is different again because of token threaded architecture)
 
-\\ Deprecated \\ : USER ( u -- ; <string> ) TOKEN $,n overt tokenUser , ;
-: VALUE TOKEN $,n overt HERE tokenValue , _USER @ , _USER ++ >BODY! ; \\ TODO needs to initialize variable
+\\ Deprecated \\ : USER ( u -- ; <string> ) TOKEN $,n OVERT tokenUser , ;
+: VALUE TOKEN $,n OVERT HERE tokenValue , _USER @ , _USER ++ >BODY! ; \\ TODO needs to initialize variable
 : TO '>BODY! ; IMMEDIATE
 
-?test\\ : foo CREATE 123 , DOES> @ ; foo BAR BAR 123 1 TEST
-
 : VARIABLE ( -- ; <string> ) vCREATE 0 v, ;
+T{ VARIABLE foo -> }T
+T{ 12 foo ! -> }T
+T{ foo @ -> 12 }T
 
-: CONSTANT ( u -- ; <string> ) TOKEN $,n overt tokenNextVal , , ;
+: CONSTANT ( u -- ; <string> ) TOKEN $,n OVERT tokenNextVal , , ;
 
-?test\\ VARIABLE foo 0 TEST
-?test\\ 12 foo ! 0 TEST
-\\ TEST-15-EPROM test failing: foo @ 12 1 TEST
 
 \\ Advanced Loops   DO | ?DO ... LEAVE ... LOOP | +LOOP; I,J,I-MAX,J-MAX,UNLOOP
 \\ lifted from https://github.com/NieDzejkob/2klinux/blob/2665d2491d82f0f8ced8d89163199a42bcd8c5f0/image-files/stage1.frt#L538-L649
@@ -1475,8 +1436,8 @@ VARIABLE leave-ptr
 \\   it handle ?DO correctly, and because the execution token of 2>R is not the same as the execution
 \\   token of leave, this will not break DO.
 
-\\    LOOP ->  (loop) ?branch loop-beginning 2RDROP
-\\   +LOOP -> (+loop) ?branch loop-beginning 2RDROP
+\\    LOOP ->  (loop) ?branch loop-beginning 2RDrop
+\\   +LOOP -> (+loop) ?branch loop-beginning 2RDrop
 \\                                           ^ LEAVE jumps here
 \\ )
 
@@ -1511,7 +1472,7 @@ VARIABLE leave-ptr
 : LEAVE COMPILE branch leave, ; IMMEDIATE
 
 : UNLOOP ( https://forth-standard.org/standard/core/UNLOOP )
-  COMPILE 2RDROP
+  COMPILE 2RDrop
 ; IMMEDIATE
 
 : DO
@@ -1596,10 +1557,10 @@ VARIABLE leave-ptr
     COUNT           ( a a' c ; Get single character )
     SWAP COUNT 39 <> ( a c a' f ; Get ending quote and check )
     IF ( a c a' f R: base0 a+1 n )
-      2DROP 2RDROP FALSE ( a a F R: base0 )
+      2DROP 2RDrop FALSE ( a a F R: base0 )
     ELSE
       DROP NIP TRUE     ( c T )
-      2RDROP
+      2RDrop
     THEN            ( a a F | c T R: base0 )
     R> BASE !
     EXIT 
@@ -1617,12 +1578,8 @@ VARIABLE leave-ptr
   R> BASE !         ( n T | a F )
 ;
 ' NUMBER? DEFER!
-
-?test\\ 50 10 DIGIT? 2 -1 2 TEST
-?test\\ PARSE-NAME 1234 PAD PACK$ NUMBER? DROP 1234 1 TEST
-?test\\ 123 123 1 TEST
-
-
+T{ PARSE-NAME 1234 PAD PACK$ NUMBER? DROP -> 1234 }T
+T{ 123 -> 123 }T
 
 ( === Text input from terminal Zen pg 78: ^H TAP kTAP ACCEPT EXPECT QUERY )
 
@@ -1668,7 +1625,8 @@ DEFER unreadFile
 : sourcePop sourceStack spops ( source-id buff len in 4 ) RESTORE-INPUT THROW ; 
 
 DEFER READ-LINE
-: REFILL ( https://forth-standard.org/standard/core/REFILL )
+
+: REFILL ( https://forth-standard.org/standard/core/REFILL)
   SOURCE-ID ( source )
   ?DUP IF ( not a terminal )  
 [ rqFiles ] ?\\ DUP -1 = IF 
@@ -1687,7 +1645,14 @@ DEFER READ-LINE
     TRUE    ( return true, never unwind from terminal )
   THEN
 ;
+
 : QUERY REFILL 0= IF sourcePop THEN ; ( Read from current source, on fail go back to previous reseting >IN )
+
+\\ Can redefine '(' now that we have REFILL
+:NONAME  ( -- ; : ( )
+ 41 PARSE + C@ 41 <> IF REFILL 0= ABORT" unterminated comment" RECURSE THEN ; IMMEDIATE
+' ( DEFER!
+( Old Single line version: ( 41 PARSE 2DROP ; IMMEDIATE is now in JS) 
 
 ( === Operating System Zen pg85-86 PRESET XIO FILE HAND I/O CONSOLE QUIT)
 
@@ -1698,7 +1663,7 @@ DEFER READ-LINE
 : PRESET ( -- )
   ( Reset data stack pointer and the terminal input buffer. )
   SP0 @ SP!   ( initialize data stack )
-  sourceStack sempty ( empty any nested files
+  sourceStack sempty ( empty any nested files )
   0 TIB0 0 0 4 RESTORE-INPUT THROW ( and read from terminal - resets PROMPT and vectored I/O )
   ;
 : quitError ( f -- )
@@ -1740,22 +1705,11 @@ DEFER READ-LINE
     [COMPILE] [       ( Exit compiling e.g. if error in a definition )
   THEN ;
 
-
-( === Utilities Zen pg98  - looks like all moved )
+: EVALUATE ( xxx caddr u -- yyy;  https://forth-standard.org/standard/core/EVALUATE )
+  sourcePush -1 -ROT 0 4 RESTORE-INPUT THROW quit1  ; \\ TODO may not want the prompt at the end - which quit1 does
 
 ( === Memory Dump Zen pg99 _TYPE do+ DUMP )
-
 ( ERRATA Staapl - uses COUNT which is technically correct but poor typing )
-
-: _TYPE ( b u -- )
-  ( Send a counted string to output )
-  FOR           ( repeat u+1 times )
-    AFT         (  skip to THEN the first time )
-    DUP C@      ( get one character from b )
-    >CHAR EMIT  ( display only printable char )
-    1+
-  THEN NEXT     ( repeat u times )
-  DROP ;        ( discard b address )
 
 : dm+ ( b u -- b )
   ( Dump u bytes from , leaving a+u on the stack.)
@@ -1772,7 +1726,7 @@ DEFER READ-LINE
   16 /                  ( dump 16 bytes at a time)
   FOR CR                ( new line for each 16 bytes )
     16 2DUP dm+         ( dump 16 bytes with address )
-    -ROT 2 SPACES _TYPE ( display the ASCII characters )
+    -ROT 2 SPACES TYPE ( display the ASCII characters )
     NUF? 0=             ( exit the loop if a key is hit )
   WHILE
   NEXT                  ( repeat until all bytes are dumped)
@@ -1781,7 +1735,7 @@ DEFER READ-LINE
   DROP R> BASE ! ;      ( restore radix )
 
 ( DUMP needs NUF? which needs ?RX, so will fail test if those are not defined yet )
-?test\\ LAST @ 48 DUMP 0 TEST
+T{ LAST @ 48 DUMP -> }T
 
 ( === Stack Dump Zen pg100 .S )
 
@@ -1794,10 +1748,9 @@ DEFER READ-LINE
     THEN
   NEXT          ( repeat until done )
   ."  <sp " ;    ( print stack pointer )
+T{ 1 2 .S -> 1 2 }T
 
-?test\\ 1 2 .S 1 2 2 TEST
-
-( === More Forth2012 words === 
+( === More Forth2012 words === )
 : UNUSED ( -- u ; https://forth-standard.org/standard/core/UNUSED )
   NP @ CP @ - ;
 
@@ -1811,18 +1764,17 @@ DEFER READ-LINE
   SP@ CSP ! ;
 : ?CSP ( -- ; Check stack pointer matches saved stack pointer )
   SP@ CSP @ XOR ABORT" stack depth" ;
-
-?test\\ .BASE .FREE 1 !CSP ?CSP 1 1 TEST
+T{ .BASE .FREE 1 !CSP ?CSP -> 1 }T
 
 ( === Dictionary Dump Zen pg102 .ID WORDS )
 
-: .ID ( na -- )
+: .ID ( na -- ) \\ TODO find JS equivalent and merge, or at least rename
   ( Display the name at address.)
   ?DUP                ( not valid name if na=0 )
   IF COUNT            ( get length by mask lexicon bits )
     BYTEMASK AND         ( limit length to 31 characters )
     ( ERRATA? Zen uses TYPE which presumes name is all printable chars (V5 correct )
-    _TYPE ( print the name string )
+    TYPE ( print the name string )
     EXIT
   THEN ." {noName}" ; ( error if na is not valid)
 
@@ -1837,27 +1789,24 @@ DEFER READ-LINE
   UNTIL           ( repeat next name )
     DROP
   THEN ;          ( end of vocab exit )
-
-?test\\ WORDS 0 TEST ( Commented out as expensive )
+T{ WORDS -> }T
 
 ( === Search Token Name Zen pg103 >NAME )
 \\ Note can also define fast version: toName() { this.SPpush(this.xt2na(this.SPpop())); }
 
-: >NAME ( ca -- na, F ) (
+: >NAME ( ca -- na, F )
   ( Convert code address to a name address. )
   CURRENT             ( search only the current vocab )
   BEGIN CELL+ @ ?DUP  ( end of vocabulary? )
   WHILE 2DUP
     BEGIN @ DUP
-    WHILE 2DUP NAME> XOR ( code pointer=ca? )
+    WHILE 2DUP NAME>INTERPRET XOR ( code pointer=ca? )
     WHILE CELL-
     REPEAT            ( ca not found, repeat next word)
     THEN NIP ?DUP
   UNTIL NIP NIP EXIT  ( found.  return name address )
   THEN DROP FALSE ;       ( end of vocabulary, failure )
-
-  
-?test\\ BL WORD DUP NAME? SWAP >NAME = -1 1 TEST
+T{ BL WORD DUP NAME? SWAP >NAME = -> -1 }T
 
 ( === The simplest Decompiler Zen pg104 SEE )
 : SEE ( -- ; <string> )
@@ -1867,13 +1816,13 @@ DEFER READ-LINE
   IF
     ." : " 
     DUP >NAME .ID ( xt )
-    BEGIN CELL+        ( xt+2
+    BEGIN CELL+         ( xt+2 )
       DUP @ DUP         ( xt+2 xt' xt' )
       IF >NAME          ( xt+2 na|F )
       THEN
       ?DUP IF           ( xt+2 na | xt+2)
         SPACE .ID       ( xt+2)
-        DUP @ doLIT EXIT = OVER CELL+ @ 20 < AND IF DROP EXIT THEN ( Guess when have end )
+        DUP @ doLit EXIT = OVER CELL+ @ 20 < AND IF DROP EXIT THEN ( Guess when have end )
       ELSE DUP @ U.     ( xt+2)
       THEN
       NUF?
@@ -1882,7 +1831,7 @@ DEFER READ-LINE
   THEN
   DROP ;
 
-?test\\ SEE >NAME 0 TEST
+T{ SEE >NAME -> }T
 
 ( ERRATA Zen uses CONSTANT but doesnt define it )
 ( === Signon Message Zen pg105 VER hi )
@@ -1898,13 +1847,13 @@ DEFER READ-LINE
   version ; COMPILE-ONLY
 
 ( === Hardware Reset Zen pg106 COLD )
-( ERRATA v5 adds "6 CP 3 MOVE overt" without defining MOVE, and unclear what it does, Zen & Staapl dont have EMPTY)
+( ERRATA v5 adds "6 CP 3 MOVE OVERT" without defining MOVE, and unclear what it does, Zen & Staapl dont have EMPTY)
 : EMPTY ( -- )
   ( Empty out any definitions)
   FORTH CONTEXT @ DUP CURRENT 2! ;
 
 ( Note this is in ROM, as default BOOT it has to be) 
-CREATE 'BOOT  ' hi , ( application vector )
+CREATE 'BOOT  ' hi , ( application vector ) \\ TODO use DEFER for this
 
 ( ERRATA ZEN uses but doesnt define U0 and assumes US=37 )
 : COLD ( -- )
@@ -1914,9 +1863,9 @@ CREATE 'BOOT  ' hi , ( application vector )
     PRESET        ( Initialize TIB and SP )
     CONSOLE
     'BOOT @EXECUTE ( Vectored Boot routine, defaults to hi)
-    ( EPROM: EMPTY overt will initialize LAST (from usersave -> FORTH -> CONTEXT & CURRENT )
+    ( EPROM: EMPTY OVERT will initialize LAST (from usersave -> FORTH -> CONTEXT & CURRENT )
     EMPTY          ( Make FORTH context vocabulary -and empty out definitions )
-    overt         ( And Reset FORTH definition to last definition from the userAreaInit  )
+    OVERT         ( And Reset FORTH definition to last definition from the userAreaInit  )
     QUIT          ( Invoke Forth "operating system" )
   AGAIN ;         ( Safeguard the Forth interpreter )
 
@@ -1950,7 +1899,7 @@ class FlashXX_XX {
   cellRomFetch(cellAddr) {
     if (cellAddr >= this.romCells) {
       logAndTrap('Attempt to read above top of Rom at', cellAddr);
-    } // TODO-OPTIMIZE comment out
+    } // TODO-OP TIMIZE comment out
     return this.rom[cellAddr];
   }
   cellRamFetch(cellAddr) {
@@ -2420,7 +2369,7 @@ class Forth {
     this.Ustore(CURRENToffset, vocabPtr); // Initialize Current. Context & Current+CELLL initialized in USER process Zen pg46
     this.Ustore(CURRENToffset + 1, vocabPtr); // Initialize Current. Context & Current+CELLL initialized in USER process Zen pg46
     this.Ustore(CONTEXToffset, vocabPtr); // Initialize Current. Context & Current+CELLL initialized in USER process Zen pg46
-    this.overt(); // Uses the initialization done by this.Ustore(CURRENToffset) above.
+    this.OVERT(); // Uses the initialization done by this.Ustore(CURRENToffset) above.
 
     // copy constants over
     ['CELLL', 'CELLbits', 'CELLMASK', 'TIB0', 'rqFiles'].forEach((k) => this.buildConstant(k, this[k]));
@@ -2451,7 +2400,7 @@ class Forth {
     this.CODE(name);
     // Note assumption that token for constants is 1, i.e. its the 2nd tokenFunction defined
     this.DW(tokenNextVal, val);
-    this.overt();
+    this.OVERT();
   }
   buildCode(name, tok, attribs) {
     let xt;
@@ -2467,7 +2416,7 @@ class Forth {
       xt = this.cpFetch();
       this.DW(tok);  // The entire definition is the token for the JS function
     }
-    this.overt();
+    this.OVERT();
     if (attribs.immediate) {
       this.setHeaderBits(l.IMED);
     }
@@ -2488,7 +2437,7 @@ class Forth {
     if (name) {                       // Put into dictionary
       this.CODE(name);
       this.DW(tokenUser, offsetInCells);
-      this.overt();
+      this.OVERT();
     }
     this.Ustore(0, _USER + 1); // Need to skip to next _USER
   }
@@ -2618,46 +2567,21 @@ class Forth {
     }
   }
 
-  // ported to Arduino below L.2023
-
   // === Code words to support debugging on the console
   // Put debugNA in a definition to print a counted string on the console
   debugNA() { console.log('NAME=', this.countedToJS(this.SPfetch())); } // Print the NA on console
-  // Put testing3 in a definition to start outputing stack trace on console.
-  testing3(n = this.SPpop()) { this.Ustore(testFlagsOffset, n); } // TODO unclear if need this now
+
   isTestFlags(bb) { return (this.Ufetch(testFlagsOffset) & bb); }
   // Put Fbreak in a definition.
   Fbreak() {
     console.log('S:', this.debugStack());
     logAndTrap('\nbreak in a FORTH word'); } // Put a breakpoint in your IDE at this line
-  // debugPrintTIB will print the current TIB.
-  debugPrintTIB() {
-    console.log('TIB: ', this.m.decodeString(this.Ufetch(TIBoffset) + this.Ufetch(INoffset),
-      this.Ufetch(TIBoffset) + this.Ufetch(nTIBoffset)));
-  }
-  // TEST will (destructively) check the stack matches expected result, used for testing the compiler.
-  // e.g. this.interpret(`10 DUP 10 10 2 TEST`); // Confirm stack finishes with 2 items (10 10)
-  // TODO TEST() is obsolete
-  TEST() { //  a1 a2 a3 b1 b2 b3 n -- ; Check n parameters on stack
-    // eslint-disable-next-line no-unused-vars
-    const stackDepth = this.SPpop();
-    // Copy stack matching against
-    const b = []; // Store matching stack here
-    for (let i = 0; i < stackDepth; i++) {
-      b.unshift(this.SPpop());
-    }
-    // Check stack depth matches
-    console.assert((this.ramSPP - this.ramSP) === stackDepth);
-    // Compare stacks
-    for (let i = 0; i < stackDepth; i++) {
-      console.assert(this.SPpop() === b.pop());
-    }
-    this.debugClear(); // Reset Debug Stack as can be mucked up by THROW and CATCH
-  }
+
   _DEPTH() {
-    this.m.ramAddr(this.Ufetch(SP0offset)) - this.ramSP;
+    return this.m.ramAddr(this.Ufetch(SP0offset)) - this.ramSP;
   }
   DEPTH() { this.SPpush(this._DEPTH()); }
+
   Tbrace() { // : T{ testFlags @ 8 AND IF [COMPILE] ?\ THEN ;
     // Skip rest of line if not testing
     if (! this.isTestFlags(8)) {
@@ -2678,7 +2602,7 @@ class Forth {
       testError();
     } else if (this.testActualDepth) {
       for (let i = 0; i < this.testActualDepth; i++) {
-        if (this.SPpop() !== this.testResults.pop()) { logAndTrap("results dont match"); }
+        if (this.SPpop() !== this.testResults.shift()) { logAndTrap("results dont match"); }
       }
     }
   }
@@ -2690,9 +2614,7 @@ class Forth {
   // 8 bit equivalents
   Mfetch8(a) { return this.m.fetch8(a); } // Returns byte at a
   Mstore8(a, v) { this.m.store8(a, v); }
-  // TODO-83-SCANNED BELOW
   ALIGNED() { this.SPpush(this.m.cellAlign(this.SPpop())); } // https://forth-standard.org/standard/core/ALIGNED
-  // TODO-83-SCANNED ABOVE
   SPfetch() { return this.m.cellRamFetch(this.ramSP); }
   SPpop() {
     return this.m.cellRamFetch(this.ramSP++); }
@@ -2714,15 +2636,12 @@ class Forth {
   SPpopD() {
     return (this.SPpop() << (this.CELLL * 4) << (this.CELLL * 4)) + this.SPpop();
   }
-
   // === Access to the USER variables before they are defined
   currentFetch() { return this.Ufetch(CURRENToffset); }
   cpFetch() { return this.Ufetch(CPoffset); }
   // Return pointer to writable address space (aka data space), if code is going to RAM this will be CP, if code is going to ROM it will be VP
   vpFetch() { return this.Ufetch(VPoffset) || this.Ufetch(CPoffset); }
   cpAlign() { this.Ustore(CPoffset, this.m.cellAlign(this.cpFetch())); }
-  // TODO-ARDUINO vpAlign needs updating
-  // OLD vpAlign() { this.Ustore(VPoffset, this.m.cellAlign(this.vpFetch())); }
   // Align whichever pointer using for data space.
   vpAlign() {
     let h = this.Ufetch(VPoffset);
@@ -2735,7 +2654,7 @@ class Forth {
   padPtr() { return this.vpFetch() + 80; } // Sometimes JS needs the pad pointer
 
   stringBuffer() {
-    this.SPpush(this.vpFetch() + 160); } // A string buffer used for input - not same as PAD see S" //TODO-24-FILES add to Arduino
+    this.SPpush(this.vpFetch() + 160); } // A string buffer used for input - not same as PAD see S"
 
   // === Functions related to building 'find'  and its wrappers ====
 
@@ -2747,14 +2666,13 @@ class Forth {
   countedToJS(a) { // Convert string specified by address which holds a count - possibly with a bytemask to JS
     return this.stringToJS(a + 1, this.Mfetch8(a) & l.BYTEMASK); }
   // Convert a name address to the code dictionary definition.
-  na2xt(na) { return this.Mfetch(na - (2 * this.CELLL)); } // Forth version is NAME>
+  na2xt(na) { return this.Mfetch(na - (2 * this.CELLL)); } // Forth version is NAME>INTERPRET
   // a u --; return JS string given an ANS style string on stack.
   SPpopString() {
     const u = this.SPpop();
     const a = this.SPpop();
     return this.stringToJS(a, u);
   }
-
   // Inner function of find, traverses a linked list Name dictionary.
   // name   javascript string looking for
   // va     pointer holding address of first element in the list.
@@ -2772,7 +2690,6 @@ class Forth {
     return true;
   }
 
-  // TODO-83-SCANNED BELOW
   _findNameIn(va, u, caddr) { // c-addr u va -- nt | 0 ; https://forth-standard.org/proposals/find-name#contribution-58
     const cellCount = (u / this.CELLL) >> 0; // Count of cells after first one
     const na = --caddr; // Point at count
@@ -2816,9 +2733,6 @@ class Forth {
       this.SPpush(l.FALSE);
     }
   }
-
-
-  // TODO-83-SCANNED ABOVE
 
   // Traverse dictionary to convert xt back to a na (for decompiler or debugging)
   // Could also define fast version of >NAME but not used: ToNAME() { this.SPpush(this.xt2na(this.SPpop())); }
@@ -2865,7 +2779,6 @@ class Forth {
     }
   }
 
-  // ported to Arduino below to L.2214-
   // === JS Functions to be able to define words ==== in Zen pg30 these are Macros.
 
   // Compile one or more words into the next consecutive code cells.
@@ -2895,7 +2808,6 @@ class Forth {
     }
   }
 
-  // TODO-83-SCANNED BELOW
   // na -- ; Builds bytes around a newly entered name. Same function as $,n on Zen pg94 used by all defining words (this.CODE ':')
   // expects in Name dictionary: <count><string><opt padding>
   // prepends:   <aligned address of next cell of code><address of na of last definition in vocabulary>...
@@ -2922,10 +2834,9 @@ class Forth {
     }
   }
   // Make the most recent definition available in the directory. This is part of closing every 'defining word'
-  overt() {
+  OVERT() {
     this.Mstore(this.currentFetch(), this.lastFetch()); // LAST @ CURRENT @ !
   }
-  // TODO-83-SCANNED ABOVE
 
   //  Build a new definition - part of all defining words.
   CODE(name) {
@@ -2969,7 +2880,7 @@ class Forth {
     this.IP = this.PAYLOAD; // Point at first word in the definition
   }
 
-  tokenDefer() { // TODO-ARDUINO needed
+  tokenDefer() {
     // Payload contains XT of word to be executed, nothing goes on return stack as not unwound
     const xt = this.Mfetch(this.PAYLOAD);
     if (xt) this.threadtoken(xt);
@@ -2977,7 +2888,7 @@ class Forth {
   // Leaves an address in the user area, note it doesnt compile the actual address since UP will change when multi-tasking
   tokenUser() { this.SPpush(this.m.fromRamAddr(this.Mfetch(this.PAYLOAD) + this.ramUP)); }
 
-  tokenValue() { //TODO-83-ARDUINO needs this
+  tokenValue() {
     // Get content of Payload which is offset in cells past ramUP, read that value and push it
     this.SPpush(this.Ufetch(this.Mfetch(this.PAYLOAD))); }
   // Put the address of the payload onto Stack - used for CREATE which is used by VARIABLE
@@ -3017,8 +2928,8 @@ class Forth {
   // This is quite different from eForth as its token-threaded rather than direct threaded
 
   threadtoken(xt) {
-    // This next section is only done while testing, and outputs a trace, so set it on (with testing3) immediately before a likely error.
-    this.debugThread(xt); //TODO comment out this expensive call
+    // This next section is only done while testing, and outputs a trace, so set it on immediately before a likely error.
+    // this.debugThread(xt); //comment out this expensive call in the inner loop
     const tok = this.Mfetch(xt);
     this.PAYLOAD = xt + this.CELLL;
     return this.jsFunctions[tok].call(this); // Run the token function - like tokenDoList or tokenVar - will return null or a Promise
@@ -3059,7 +2970,7 @@ class Forth {
     }
   }
 
-  MS() { // ms --; delay for a period of time  (async but just returns a promise)
+  ms() { // ms --; delay for a period of time  (async but just returns a promise)
     return new Promise((resolve) => setTimeout(resolve, this.SPpop()));
   }
 
@@ -3075,11 +2986,12 @@ class Forth {
   }
 
   // EXECUTE runs the word on the stack,
-  // TODO-ASYNC it works because it itself is a code word, included in colon words
-  // and because there is nothing after the return from threadtoken which would get executed out of order
+  // Async works because it itself is a code word, included in colon words and because there is nothing
+  // after the return from threadtoken which would get executed out of order
   // Note that it has a return which could be a promise, which the 'run' will await on.
   // This pattern may or may not work in other situations.
-  EXECUTE() { return this.threadtoken(this.SPpop()); }
+  EXECUTE() { // xt -- ; https://forth-standard.org/standard/core/EXECUTE
+    return this.threadtoken(this.SPpop()); }
 
   // === Basic low level key I/O and links to OS - Zen pg 35
   // This section will need editing for other systems.
@@ -3108,21 +3020,21 @@ class Forth {
   }
 
   // Low level TX!, output one character to stdout, inefficient, but not likely to be bottleneck.
-  TXbangC(c) { // noinspection JSUnresolvedFunction
-    this.TXbangS(String.fromCharCode(c)); } // TXbangS is passed in by node and console.js
-  TXbang() { this.TXbangC(this.SPpop()); }
-  qrx() { return [false]; } // Overridden by node
+  // Use TXstoreS if know its a string
+  TXstoreC(c) { // noinspection JSUnresolvedFunction
+    this.TXstoreS(String.fromCharCode(c)); } // TXstoreS is passed in by node and console.js
+  TXstore() { this.TXstoreC(this.SPpop()); }
+  qrx() { return [false]; } // Overridden by caller as way to vectoring input
   TYPE() { // a u -- ; same signature as Forth this.TYPE
-    this.TXbangS(this.SPpopString());
+    this.TXstoreS(this.SPpopString());
   }
-
-  bangIO() { } // Default to nothing to do, but Node extends
+  storeIO() { } // Default to nothing to do, but Node extends
 
   // === Literals and Branches - using next value in dictionary === eForthAndZen#37
 
   // push the value in the next code word
-  // The XT of this is stored in this.doLIT
-  doLIT() { this.SPpush(this.IPnext()); }
+  // The XT of this is stored in this.doLit
+  doLit() { this.SPpush(this.IPnext()); }
 
   // See DOES> and CREATE, this patches the field after the token compiled by the create to point to the code following the DOES>
   // : DOES> R> LAST @ 2 CELLS - @ CELLL + ! ; // Untested Forth version, note side effect of the R> of doing an exit.
@@ -3137,6 +3049,7 @@ class Forth {
   // Address Literals (aka branches and jumps) eForthAndZen#38
 
   // decrement count on Return stack, and branch if not decremented past zero (FOR..NEXT)
+  // eForth but not Forth2012
   // noinspection JSUnusedGlobalSymbols
   next() {
     let x = this.RPpop();
@@ -3146,7 +3059,8 @@ class Forth {
       this.IP = destn; // Jump back
     }
   }
-  // ASN, not eForth
+
+  // Forth2012, not eForth
   loop() { // R: I limit -- I+1 limit | ; loop if I < limit
     let i = this.RPpop();
     const destn = this.IPnext(); // Increment over loop
@@ -3157,6 +3071,7 @@ class Forth {
       this.RPpop();
     }
   }
+
   I() { this.SPpush(this.RPfetch()); }
 
   // Jump if flag on stack is zero to destn in dictionary
@@ -3171,7 +3086,7 @@ class Forth {
   branch() { this.IP = this.IPnext(); }
   leave() { this.RPpop(); this.RPpop(); this.branch(); }
 
-  of() { // TODO-ARDUINO needs this
+  of() {
     const destn = this.IPnext();
     if (this.SPpop() !== this.SPfetch()) {
       this.IP = destn;
@@ -3185,21 +3100,24 @@ class Forth {
   // Memory access eForthAndZen#39
   store() { this.Mstore(this.SPpop(), this.SPpop()); } //!  w a -- , Store
   fetch() { this.SPpush(this.Mfetch(this.SPpop())); } //@ a -- w, fetch
-  cStore() { this.Mstore8(this.SPpop(), this.SPpop()); } //C! c a -- , Store character
-  cFetch() { this.SPpush(this.Mfetch8(this.SPpop())); } //C@ a -- c, Fetch character
+  CStore() { this.Mstore8(this.SPpop(), this.SPpop()); } //C! c a -- , Store character
+  CFetch() { this.SPpush(this.Mfetch8(this.SPpop())); } //C@ a -- c, Fetch character
 
   // Return stack words eForthAndZen#40
   RPat() { this.SPpush(this.m.fromRamAddr(this.ramRP)); } //RP@
-  RPbang() { this.ramRP = this.m.ramAddr(this.SPpop()); } // RP! must be aligned
-  Rfrom() { this.SPpush(this.RPpop()); } // R>
-  Rat() { this.SPpush(this.RPfetch()); } // R@
-  toR() { this.RPpush(this.SPpop()); } // >R
+  RPStore() { this.ramRP = this.m.ramAddr(this.SPpop()); } // RP! must be aligned
+  Rfrom() {
+    this.SPpush(this.RPpop()); } // R>
+  Rat() {
+    this.SPpush(this.RPfetch()); } // R@
+  toR() {
+    this.RPpush(this.SPpop()); } // >R
   // 2>R 2R> 2R@ are odd - they swap the order so 2>R !=== >R >R
-  TwoToR() { const x2 = this.SPpop(); this.RPpush(this.SPpop()); this.RPpush(x2); }
+  TwotoR() { const x2 = this.SPpop(); this.RPpush(this.SPpop()); this.RPpush(x2); }
   TwoRfrom() { const x2 = this.RPpop(); this.SPpush(this.RPpop()); this.SPpush(x2); }
-  TwoRat() { const x2 = this.RPpop(); this.SPpush(this.RPfetch()); this.SPpush(x2); this.RPpush(x2); }
-  RDROP() { this.ramRP++; } // TODO-ARDUINO needs
-  TwoRDROP() { this.ramRP += 2; } // TODO-ARDUINO needs
+  TwoRFetch() { const x2 = this.RPpop(); this.SPpush(this.RPfetch()); this.SPpush(x2); this.RPpush(x2); }
+  RDrop() { this.ramRP++; }
+  TwoRDrop() { this.ramRP += 2; }
 
   // Data stack initialization eForthAndZen#41
   SPat() { this.SPpush(this.m.fromRamAddr(this.ramSP)); } //SP@
@@ -3215,21 +3133,16 @@ class Forth {
     }
     this.m.cellRamStore(bottom, val);
   }
-  ROLL() { this._roll(this.SPpop()); } // TODO-ARDUINO needed
+  ROLL() { this._roll(this.SPpop()); }
   DROP() { this.ramSP++; }
   DUP() { this.SPpush(this.SPfetch()); }
-  SWAP() { this._roll(1); } // TODO-ARDUINO rewrote
-  ROT() { this._roll(2); } // TODO-ARDUINO rewrote
-  OVER() {
-    const x = this.SPpop();
-    const y = this.SPfetch();
-    this.SPpush(x);
-    this.SPpush(y);
-  } // TODO optimize
+  SWAP() { this._roll(1); }
+  ROT() { this._roll(2); }
+  OVER() { this.SPpush(this.m.cellRamFetch(this.ramSP + 1)); }
 
   // Logical Words eForthAndZen43
   // noinspection JSBitwiseOperatorUsage
-  less0() { this.SPpush((this.SPpop() & (1 << (this.CELLbits - 1))) ? l.TRUE : l.FALSE); } //0<  e.g. 0x8000 for CELLL=2
+  zeroLess() { this.SPpush((this.SPpop() & (1 << (this.CELLbits - 1))) ? l.TRUE : l.FALSE); } //0<  e.g. 0x8000 for CELLL=2
   AND() { this.SPpush(this.SPpop() & this.SPpop()); }
   OR() { this.SPpush(this.SPpop() | this.SPpop()); }
   XOR() { this.SPpush(this.SPpop() ^ this.SPpop()); }
@@ -3244,22 +3157,19 @@ class Forth {
       this.SPpush(x >>> 0);
       this.SPpush(x >= 0x100000000 ? 1 : 0);
     } else {
-      // Note there is what I believe is a JS bug where x >> 32 is a noop so do th double shift
       const x = a + b;
       this.SPpushD(x); // Push double word
     }
   }
 
-  //TODO-83 SCANNED BELOW HERE
   // Math from Forth2012 - could probably define in Forth but efficiency important
-  RSHIFT(u = this.SPpop(), x = this.SPpop()) { // https://forth-standard.org/standard/core/RSHIFT
+  RSHIFT( u = this.SPpop(), x = this.SPpop()) { // https://forth-standard.org/standard/core/RSHIFT
     // Note this needs to 0 fill
     this.SPpush(x >>> u);
   }
   LSHIFT(u = this.SPpop(), x = this.SPpop()) { // https://forth-standard.org/standard/core/LSHIFT
     this.SPpush(x << u);
   }
-  //TODO-83 SCANNED ABOVE HERE
   TwoDiv(x = this.SPpop()) {
     this.SPpush((x & (1 << (this.CELLbits - 1))) | (x >> 1));
   }
@@ -3271,12 +3181,11 @@ class Forth {
   userAreaInit() {
     const _USER = this.m.cellRomFetch(this.UZERO / this.CELLL); // 0th item in user space is its size
     for (let a = 0; a < _USER; a++) {
-      //console.log(a, this.Ufetch(a), this.Mfetch(this.UZERO + a * this.CELLL));
       this.Ustore(a, this.m.cellRomFetch(this.UZERO / this.CELLL + a));
     }
   }
   // The opposite of userAreaInit - save values for restoration at COLD
-  // Note it saves the value of LAST which is also in "FORTH", the "overt" in COLD restores that
+  // Note it saves the value of LAST which is also in "FORTH", the "OVERT" in COLD restores that
   userAreaSave() {
     this.useRam(); // If were using ROM then switch
     const _USER = this.Ufetch(0);
@@ -3304,7 +3213,11 @@ class Forth {
     } // Exit with inoffset at #TIB or after delimiter
     this.SPpush(b);
     this.SPpush(tib + inoffset - b); // Store length not including trailing delimiter
-    this.Ustore(INoffset, inoffset < ntib ? ++inoffset : inoffset); // Skip over delimiter - TODO its not clear this is what FORTH wants. eForth doc is almost certainly wrong
+    this.Ustore(INoffset, inoffset < ntib ? ++inoffset : inoffset); // Skip over delimiter
+  }
+
+  parenthesis() {
+    this.SPpush(41); this.PARSE(); this.DROP(); this.DROP();
   }
 
   // JS version of TOKEN - same signature
@@ -3323,6 +3236,7 @@ class Forth {
 
   NUMBERQ() { // Same footprint as NUMBER?,but less functionality (Decimal only)
     // TODO-backport simple number conversion from Arduino
+    // TODO add handle of 123. (maybe double, maybe floating?)
     const a = this.SPpop();
     const w = this.countedToJS(a);
     const base = this.Ufetch(BASEoffset);
@@ -3367,6 +3281,7 @@ class Forth {
   immediateQ() {
     this.SPpush(this.Mfetch8(this.SPpop()) & l.IMED);
   }
+
   async dCOMPILE() { // a -- ...; same signature as to $COMPILE at Zen pg96
     this.findName(); // xt na | a F
     const na = this.SPpop();
@@ -3381,7 +3296,7 @@ class Forth {
     } else { // a
       this.NUMBERQ();
       if (this.SPpop()) {
-        this.DW(this.js2xt.doLIT, this.SPpop());
+        this.DW(this.js2xt.doLit, this.SPpop());
       } else {
         // TODO-32-ERRORS handle error in Forth-ish way (via Throw) - this is harder than it looks !
         logAndTrap('Number conversion of', this.countedToJS(this.SPpop()), 'failed');
@@ -3424,7 +3339,7 @@ class Forth {
     }
     const prompt = this.Ufetch(PROMPToffset);
     if (prompt) {
-      await this.runXT(prompt); //TODO-BACKPORT changed line
+      await this.runXT(prompt);
     }
   }
 
@@ -3472,13 +3387,16 @@ class Forth {
     this.dollarCommaN(); // setup name dictionary headers, with aligned CP)
     this.DW(tok); // Must be after creating the name and links etc
   }
-  colon() { this._colon(tokenDoList); this.closeBracket(); }
-  DEFER() {  this._colon(tokenDefer); this.DW(0); this.overt(); } //TODO-ARDUINO needs this
 
-  // : ; doLIT EXIT , overt [ ; IMMEDIATE
+  colon() { this._colon(tokenDoList); this.closeBracket(); }
+
+  DEFER() {  // <string>
+    this._colon(tokenDefer); this.DW(0); this.OVERT(); }
+
+  // : ; doLit EXIT , OVERT [ ; IMMEDIATE
   semicolon() { // Zen pg95
     this.DW(this.js2xt.EXIT);
-    this.overt();
+    this.OVERT();
     this.openBracket();
   }
 
@@ -3523,9 +3441,9 @@ class Forth {
   jsNeeds: true The execution address of this word is needed by the JS o will be stored in js2xt[n]
 */
 const ForthNodeExtensions = [
-  { f: function TXbangS(s) { process.stdout.write(s); } }, // Named function so will override in Forth instance
+  { f: function TXstoreS(s) { process.stdout.write(s); } }, // Named function so will override in Forth instance
   { n: '!IO',
-    f: function bangIO() {
+    f: function storeIO() {
       if (process.stdin.isTTY) {
         // process.stdout.write('RAW');
         process.stdin.setRawMode(true);

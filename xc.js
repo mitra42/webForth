@@ -20,7 +20,7 @@ class ForthXC extends Forth {
     if (fd) {
       return fd.write(s); // Current position, utf8, return a promise { bytesWritten, buffer }
     } else {
-      this.TXbangS(s);
+      this.TXstoreS(s);
     }
   }
   xcNameEncode(s) { return escape(s) // C identifiers are alphanumeric and _
