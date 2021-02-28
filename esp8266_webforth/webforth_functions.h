@@ -13,15 +13,15 @@
 #define CELLSHIFT 2
 #define CELLOFFSETMASK 3
 #define LITTLEENDIAN true
-#define ROMCELLS 0x1000
+#define ROMCELLS 0x3000
 #define RAMCELLS 0x2800
 #define SPP 0x9cc0
 #define RP0 0x9ee0
 #define RAMNAMEE 0x9ac0
 #define RAMCODEE 0
 #define ROM(cellAddr) pgm_read_dword_near(&rom[cellAddr])
-#define FUNCTIONSLENGTH 62
-#define XT_COLD 0x400023e8 /* COLD*/
+#define FUNCTIONSLENGTH 85
+#define XT_COLD 0x40003658 /* COLD*/
 // Data defined currently in arduino_webforth.ino but used in webforth_functions.cpp
 extern const CELLTYPE rom[ROMCELLS] PROGMEM;
 extern void (* const f[FUNCTIONSLENGTH])() PROGMEM;
