@@ -48,7 +48,7 @@ const jsFunctionAttributes = [
   { n: '$,n', f: 'dollarCommaN', defer: true },
   'ms', 'BYE', { n: 'EXIT', jsNeeds: true }, 'EXECUTE',
   { n: '?RX', f: 'QRX' }, {  n: 'TX!', f: 'TXstore' }, { n: '!IO', f: 'storeIO' },
-  { n: '(literal)', f: literal, jsNeeds: true }, { n: 'DOES>', f: 'DOES' }, { n: '(next)', f: 'next' }, { n: '?branch', f: 'qBranch' }, 'branch',
+  { n: '(literal)', f: 'literal', jsNeeds: true }, { n: 'DOES>', f: 'DOES' }, { n: '(next)', f: 'next' }, { n: '?branch', f: 'qBranch' }, 'branch',
   { n: '!', f: 'store' }, { n: '@', f: 'fetch' }, { n: 'C@', f: 'CFetch' }, { n: 'C!', f: 'CStore' },
   { n: 'RP@', f: 'RPat' }, { n: 'RP!', f: 'RPStore' }, { n: 'R>', f: 'Rfrom'  }, { n: 'R@', f: 'Rat'  }, { n: '>R', f: 'toR'  },
   { n: '2R>', f: 'TwoRfrom'  }, { n: '2R@', f: 'TwoRFetch'  }, { n: '2>R', f: 'TwotoR'  },
@@ -63,7 +63,7 @@ const jsFunctionAttributes = [
   { n: ':', f: 'colon', defer: true }, { n: ';', f: 'semicolon', immediate: true, defer: true }, { n: "'", f: 'tick', defer: true },
   'debugNA', 'Fbreak', 'stringBuffer', 'TYPE',
   'I', 'RDrop', { n: '2RDrop', f: 'TwoRDrop' }, { n: 'immediate?', f: 'immediateQ' },
-  { n: 'ALIGN', f: 'vpAlign' }, { n: '>BODY', f: 'toBODY' }, { n: 'DEFER', defer: true}, { n: '(of)', f: 'of' }
+  { n: 'ALIGN', f: 'vpAlign' }, { n: '>BODY', f: 'toBODY' }, { n: 'DEFER', defer: true}, { n: '(of)', f: 'of' },
   { n: 'T{', f: 'Tbrace', defer: true }, { n: 'DEPTH', defer: true }, { n: '}T', f: 'Tunbrace', defer: true }, { n: '->', f: 'Tarrow', defer: true },
 ];
 
@@ -225,7 +225,7 @@ T{ : foo [COMPILE] ( ; foo 2 ) -> }T
   R> DUP @ , CELL+ >R ; COMPILE-ONLY
 
 : LITERAL ( w -- ) ( Compile tos to code dictionary as an integer literal.)
-  COMPILE (literal) ( compile (literal) to head lit )
+  COMPILE (literal) ( compile (literal to head lit )
   , ; IMMEDIATE ( compile literal itself )
 
 : create TOKEN $,n OVERT , 0 , ; 
@@ -3284,7 +3284,7 @@ class Forth {
     } else { // a
       this.NUMBERQ();
       if (this.SPpop()) {
-        this.DW(this.js2xt.literal, this.SPpop());
+        this.DW(this.js2xt['(literal)'], this.SPpop());
       } else {
         // TODO-32-ERRORS handle error in Forth-ish way (via Throw) - this is harder than it looks !
         logAndTrap('Number conversion of', this.countedToJS(this.SPpop()), 'failed');

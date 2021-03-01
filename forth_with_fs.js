@@ -319,7 +319,7 @@ VARIABLE included-names 0 included-names !
   CLOSE-FILE THROW ( )
   S" TEST2.FTH" DELETE-FILE THROW
   ;
-: TESTER ." starting test" doLit TESTFILES CATCH ?DUP .$ ."  After " ;
+: TESTER ." starting test" ['] TESTFILES CATCH ?DUP .$ ."  After " ;
 `;
 
 class Forth_with_fs extends Forth {
