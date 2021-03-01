@@ -14,14 +14,8 @@ const memClass = undefined; // Define to override default based on CELLL and MEM
 const testFlags = 0; // bit field: 1 trace interpreter 2 trace threading 4 safety checks 8 tests TODO-67-TESTING - see unreadFile above //TODO-2ARDUINO
 
 const preTest = `
-\\ TODO multi line comments, once put this in a file
-\\ : ( 41 PARSE ." XXX(" 2DUP + C@ 41 = IF ... ; IMMEDIATE
-\\ ( testing one line comment )
-\\ ( testing multi line comment
-\\   second line )
-
-
 \\ Copied from forth2012 test suite tester.fs
+\\ Note there are JS versions in index.js 
 VARIABLE testActualDepth        \\ STACK RECORD
 CREATE testResults 20 CELLS ALLOT
 

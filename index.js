@@ -48,7 +48,7 @@ const jsFunctionAttributes = [
   { n: '$,n', f: 'dollarCommaN', defer: true },
   'ms', 'BYE', { n: 'EXIT', jsNeeds: true }, 'EXECUTE',
   { n: '?RX', f: 'QRX' }, {  n: 'TX!', f: 'TXstore' }, { n: '!IO', f: 'storeIO' },
-  { n: 'doLit', jsNeeds: true }, { n: 'DOES>', f: 'DOES' }, 'next', { n: '?branch', f: 'qBranch' }, 'branch',
+  { n: '(literal)', f: literal, jsNeeds: true }, { n: 'DOES>', f: 'DOES' }, { n: '(next)', f: 'next' }, { n: '?branch', f: 'qBranch' }, 'branch',
   { n: '!', f: 'store' }, { n: '@', f: 'fetch' }, { n: 'C@', f: 'CFetch' }, { n: 'C!', f: 'CStore' },
   { n: 'RP@', f: 'RPat' }, { n: 'RP!', f: 'RPStore' }, { n: 'R>', f: 'Rfrom'  }, { n: 'R@', f: 'Rat'  }, { n: '>R', f: 'toR'  },
   { n: '2R>', f: 'TwoRfrom'  }, { n: '2R@', f: 'TwoRFetch'  }, { n: '2>R', f: 'TwotoR'  },
@@ -62,8 +62,8 @@ const jsFunctionAttributes = [
   { n: '[', f: 'openBracket', immediate: true, defer: true }, { n: ']', f: 'closeBracket', defer: true },
   { n: ':', f: 'colon', defer: true }, { n: ';', f: 'semicolon', immediate: true, defer: true }, { n: "'", f: 'tick', defer: true },
   'debugNA', 'Fbreak', 'stringBuffer', 'TYPE',
-  'loop', 'I', 'leave', 'RDrop', { n: '2RDrop', f: 'TwoRDrop' }, { n: 'immediate?', f: 'immediateQ' },
-  { n: 'ALIGN', f: 'vpAlign' }, { n: '>BODY', f: 'toBODY' }, { n: 'DEFER', defer: true}, 'of',
+  'I', 'RDrop', { n: '2RDrop', f: 'TwoRDrop' }, { n: 'immediate?', f: 'immediateQ' },
+  { n: 'ALIGN', f: 'vpAlign' }, { n: '>BODY', f: 'toBODY' }, { n: 'DEFER', defer: true}, { n: '(of)', f: 'of' }
   { n: 'T{', f: 'Tbrace', defer: true }, { n: 'DEPTH', defer: true }, { n: '}T', f: 'Tunbrace', defer: true }, { n: '->', f: 'Tarrow', defer: true },
 ];
 
@@ -175,7 +175,7 @@ T{ 1 2 ( 3 ) 4 -> 1 2 4 }T
 
 ( === Test as many of the words defined in code as possible)
 ( EXIT & EXECUTE tested with ' )
-( doLit implicitly tested by all literals )
+( (literal implicitly tested by all literals )
 ( next, ?branch, branch implicitly tested by control structures )
 T{ 123 HLD ! HLD @ -> 123 }T ( Also tests user variables )
 T{ 222 HLD C! HLD C@ -> 222 }T
@@ -225,7 +225,7 @@ T{ : foo [COMPILE] ( ; foo 2 ) -> }T
   R> DUP @ , CELL+ >R ; COMPILE-ONLY
 
 : LITERAL ( w -- ) ( Compile tos to code dictionary as an integer literal.)
-  COMPILE doLit ( compile doLit to head lit )
+  COMPILE (literal) ( compile (literal) to head lit )
   , ; IMMEDIATE ( compile literal itself )
 
 : create TOKEN $,n OVERT , 0 , ; 
@@ -244,7 +244,7 @@ T{ : foo CREATE 123 , DOES> @ ; foo BAR BAR -> 123 }T
 : >RESOLVE ( A -- ) <MARK SWAP ! ; \\ Resolve a forward jump destination
 : FOR ( -- a ) COMPILE >R <MARK ; IMMEDIATE
 : BEGIN ( -- a ) <MARK ; IMMEDIATE
-: NEXT ( a -- ) COMPILE next <RESOLVE ; IMMEDIATE
+: NEXT ( a -- ) COMPILE (next) <RESOLVE ; IMMEDIATE
 : UNTIL ( a -- ) COMPILE ?branch <RESOLVE ; IMMEDIATE
 : AGAIN ( a -- ) COMPILE branch <RESOLVE ; IMMEDIATE
 : IF ( -- A )   COMPILE ?branch >MARK ; IMMEDIATE
@@ -263,7 +263,7 @@ T{ : foo CREATE 123 , DOES> @ ; foo BAR BAR -> 123 }T
 : >RESOLVETHREAD ( A -- ) \\ Resolve a set of forward jumps
   BEGIN ?DUP WHILE DUP @ SWAP >RESOLVE REPEAT ; 
 : CASE >MARKSTART ; IMMEDIATE \\ Leave head of >MARKTHREAD chain
-: OF COMPILE of >MARK ; IMMEDIATE
+: OF COMPILE (of) >MARK ; IMMEDIATE
 : ENDOF COMPILE branch SWAP >MARKTHREAD SWAP >RESOLVE ; IMMEDIATE
 : ENDCASE COMPILE DROP >RESOLVETHREAD ; IMMEDIATE
 
@@ -1159,7 +1159,7 @@ CREATE NULL$ 0 , ( EFORTH-ZEN-ERRATA inserts a string "coyote" after this, no id
   NULL$   ( take address of NULL$ )
   THROW ; ( and give it to current CATCH )
 
-: abort" ( f -- )
+: (abort") ( f -- )
   ( Run time routine of ABORT" . Abort with a message.)
   IF        ( if flag is true, abort )
     do$     ( take address of next string )
@@ -1171,7 +1171,7 @@ CREATE NULL$ 0 , ( EFORTH-ZEN-ERRATA inserts a string "coyote" after this, no id
 ( Moved earlier from Zen pg93 )
 : ABORT" ( C: -- ; I: f --; <string> )
   ( Conditional abort with an error message.)
-  COMPILE abort"  ( compile runtime abort code )
+  COMPILE (abort")  ( compile runtime abort code )
   $," ; IMMEDIATE ( compile abort message )
 
 ( Note that abort restores the stack, so shouldn't have consumed something else will have random noise on stack )
@@ -1822,7 +1822,7 @@ T{ BL WORD DUP NAME? SWAP >NAME = -> -1 }T
       THEN
       ?DUP IF           ( xt+2 na | xt+2)
         SPACE .ID       ( xt+2)
-        DUP @ doLit EXIT = OVER CELL+ @ 20 < AND IF DROP EXIT THEN ( Guess when have end )
+        DUP @ (literal) EXIT = OVER CELL+ @ 20 < AND IF DROP EXIT THEN ( Guess when have end )
       ELSE DUP @ U.     ( xt+2)
       THEN
       NUF?
@@ -3034,7 +3034,7 @@ class Forth {
 
   // push the value in the next code word
   // The XT of this is stored in this.doLit
-  doLit() { this.SPpush(this.IPnext()); }
+  literal() { this.SPpush(this.IPnext()); }
 
   // See DOES> and CREATE, this patches the field after the token compiled by the create to point to the code following the DOES>
   // : DOES> R> LAST @ 2 CELLS - @ CELLL + ! ; // Untested Forth version, note side effect of the R> of doing an exit.
@@ -3060,18 +3060,6 @@ class Forth {
     }
   }
 
-  // Forth2012, not eForth
-  loop() { // R: I limit -- I+1 limit | ; loop if I < limit
-    let i = this.RPpop();
-    const destn = this.IPnext(); // Increment over loop
-    if (++i < this.RPfetch()) {
-      this.RPpush(i);
-      this.IP = destn; // jump back
-    } else {
-      this.RPpop();
-    }
-  }
-
   I() { this.SPpush(this.RPfetch()); }
 
   // Jump if flag on stack is zero to destn in dictionary
@@ -3084,7 +3072,7 @@ class Forth {
 
   // Unconditional jump to destn in dictionary
   branch() { this.IP = this.IPnext(); }
-  leave() { this.RPpop(); this.RPpop(); this.branch(); }
+  //OBS: leave() { this.RPpop(); this.RPpop(); this.branch(); }
 
   of() {
     const destn = this.IPnext();
@@ -3296,7 +3284,7 @@ class Forth {
     } else { // a
       this.NUMBERQ();
       if (this.SPpop()) {
-        this.DW(this.js2xt.doLit, this.SPpop());
+        this.DW(this.js2xt.literal, this.SPpop());
       } else {
         // TODO-32-ERRORS handle error in Forth-ish way (via Throw) - this is harder than it looks !
         logAndTrap('Number conversion of', this.countedToJS(this.SPpop()), 'failed');
@@ -3393,7 +3381,7 @@ class Forth {
   DEFER() {  // <string>
     this._colon(tokenDefer); this.DW(0); this.OVERT(); }
 
-  // : ; doLit EXIT , OVERT [ ; IMMEDIATE
+  // : ; ' EXIT , OVERT [ ; IMMEDIATE
   semicolon() { // Zen pg95
     this.DW(this.js2xt.EXIT);
     this.OVERT();

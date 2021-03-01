@@ -481,8 +481,8 @@ void TYPE() { const char c = SPpop(); const CELLTYPE a = SPpop(); TXstoreS(a, c)
 // === Literals and Branches - using next value in dictionary === eForthAndZen#37
 
 // push the value in the next code word
-// The XT of this is stored in doLit
-void doLit() { SPpush(IPnext()); }
+// The XT of this is stored in literal
+void literal() { SPpush(IPnext()); }
 
 // See DOES> and CREATE, this patches the field after the token compiled by the create to point to the code following the DOES>
 // : DOES> R> LAST @ 2 CELLS - @ CELLL + ! ; // Untested Forth version, note side effect of the R> of doing an exit.
@@ -507,17 +507,6 @@ void next() {
   }
 }
 
-  // ASN, not eForth
-void loop() { // R: I limit -- I+1 limit | ; loop if I < limit
-    CELLTYPE i = RPpop();
-    const CELLTYPE destn = IPnext(); // Increment over loop
-    if (++i < RPfetch()) {
-      RPpush(i);
-      IP = destn; // jump back
-    } else {
-      RPpop();
-    }
-  }
 void I() { SPpush(RPfetch()); }
 
 
@@ -532,8 +521,6 @@ void qBranch() {
 
 // Unconditional jump to destn in dictionary
 void branch() { IP = IPnext(); }
-
-void leave() { RPpop(); RPpop(); branch(); }
 
 void of() {
     const CELLTYPE destn = IPnext();
