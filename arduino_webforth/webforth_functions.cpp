@@ -78,9 +78,7 @@ static uint8_t testing = 0;
 #define ramRP0 RAMADDR(RP0)
 #define ramUP0 RAMADDR(UPP)
 
-//L.1852
 static CELLTYPE ram[RAMCELLS]; // Equivalent of Flash16_16 in webForth
-//L.1853 - jsFunctions[] is now fp[] and has to be after definition of functions in it.
 
 // Key pointers used - would ideally be registers in a register based system
 CELLTYPE IP = 0;    // Interpreter Pointer (this is a byte pointer - cannot use CellPointer as could be into Rom or Ram)
@@ -172,8 +170,8 @@ void SPpushD(DOUBLECELLTYPE x) {
     SPpush(x); // This should only push the bottom cell.
     SPpush(x >> (8 << CELLSHIFT));
 }
-SPpopD() {
-    return (SPpop() << (8 << CELLSHIFT)) + this.SPpop();
+DOUBLECELLTYPE SPpopD() {
+    return (SPpop() << (8 << CELLSHIFT)) + SPpop();
 }
 
 // === Access to the USER variables before they are defined
@@ -183,9 +181,9 @@ CELLTYPE vpFetch() { return Ufetch(VPoffset) || Ufetch(CPoffset); }
 void cpAlign() { Ustore(CPoffset, align(cpFetch())); }
 
 void vpAlign() {
-    CELLTYPE h = this.Ufetch(VPoffset);
+    CELLTYPE h = Ufetch(VPoffset);
     const uint8_t o = h ? VPoffset : CPoffset;
-    h = cellAlign(h || Ufetch(CPoffset));
+    h = align(h || Ufetch(CPoffset));
     Ustore(o, h);
 }
 
@@ -198,8 +196,6 @@ void ALIGNED() { SPpush(align(SPpop())); }
 
 // === Functions related to building 'find'  and its wrappers ====
 
-
-//L.2096-
 // Convert a name address to the code dictionary definition.
 CELLTYPE na2xt(const CELLTYPE na) {
     return Mfetch(na - uint8_t(2 << CELLSHIFT));
@@ -220,16 +216,16 @@ bool _sameq(const CELLTYPE na1, const CELLTYPE na2, const uint8_t cells) {
     }
     return true;
 }
-CELLTYPE _findNameIn(const CELLTYPE va, const uint8_t u, const CELLTYPE caddr) { // c-addr u va -- nt | 0 ; https://forth-standard.org/proposals/find-name#contribution-58
+CELLTYPE _findNameIn(const CELLTYPE va, const uint8_t u, CELLTYPE caddr) { // c-addr u va -- nt | 0 ; https://forth-standard.org/proposals/find-name#contribution-58
     // Serial.print(F("XXX _find looking for:")); TXstoreS(caddr, u);
     const uint8_t cellCount = u >> CELLSHIFT; // Count of cells after first one
-    const CELLTYPE na = caddr--; // Point at count
+    const CELLTYPE na = caddr - 1; // Point at count
     const CELLTYPE cell1 = Mfetch(na);  // Could be little or big-endian
     CELLTYPE p = va;
     while (p = Mfetch(p)) {
       //Serial.print(F(" - ")); printCounted(p);
       const CELLTYPE c1 = Mfetch(p) & CELLMASK; // count
-      if (cell1 === c1) { // first cell matches (if cell1 not passed then does slow compare
+      if (cell1 == c1) { // first cell matches (if cell1 not passed then does slow compare
         if (_sameq(p + CELLL, na + CELLL, cellCount)) {
           return p;
         }
@@ -240,7 +236,7 @@ CELLTYPE _findNameIn(const CELLTYPE va, const uint8_t u, const CELLTYPE caddr) {
     return FALSE;
 }
 
-findNameIn() { // caddr u va -- na|0; Note this ONLY currently works if caddr-- is a counted string
+void findNameIn() { // caddr u va -- na|0; Note this ONLY currently works if caddr-- is a counted string
     SPpush(_findNameIn(SPpop(), SPpop(), SPpop()));
 }
 
@@ -269,10 +265,10 @@ void toNAME() { SPpush(_toName(SPpop())); }  // Fast version of >NAME see Forth 
 void findName() { // a -- xt na | a F
   const CELLTYPE va = Ufetch(CONTEXToffset);
   const CELLTYPE a = SPpop();
-  //this.m.assertAlign(a);
+  //m.assertAlign(a);
   //console.log('find: Looking for', name) // comment out except when debugging find
-  //const na = this._find(va, a);  // return matching na or 0
-  const uint8_t charCount = Mfetch8(a) & l.BYTEMASK;
+  //const na = _find(va, a);  // return matching na or 0
+  const uint8_t charCount = Mfetch8(a) & BYTEMASK;
   const CELLTYPE na = _findNameIn(va, charCount, a + 1);
   if (na) {
     SPpush(na2xt(na));
@@ -293,7 +289,6 @@ void DW(const CELLTYPE word) {
   Ustore(CPoffset, cp);
 }
 
-//L.2278-
 void tokenVocabulary() {
   Ustore(CONTEXToffset, Mfetch(PAYLOAD));
 };
@@ -323,7 +318,7 @@ void tokenUser() {
   SPpush(FROMRAMADDR((Mfetch(PAYLOAD) + ramUP)));
   //Serial.print(" result="); Serial.print(SPfetch()); Serial.print(" @="); Serial.println(Mfetch(SPfetch()));
 }
-tokenValue() {
+void tokenValue() {
     // Get content of Payload which is offset in cells past ramUP, read that value and push it
     SPpush(Ufetch(Mfetch(PAYLOAD)));
 }
@@ -345,7 +340,7 @@ void tokenCreate() {
 }
 
 void toBODY() { // xt -- a; push address of data space for something built with VARIABLE or CREATE or DEFER
-    const CELLTYPE xt = SPpop()
+    const CELLTYPE xt = SPpop();
     // defined for tokenVar, tokenCreate, tokenDefer, tokenValue
     const CELLTYPE token = Mfetch(xt); // token - ideally tokenCreate or tokenVar
     // TokenVar and tokenCreate have an extra cell with a possible pointer to DOES>
@@ -356,7 +351,7 @@ void toBODY() { // xt -- a; push address of data space for something built with 
         dataSpace = Mfetch(dataSpace);
     }
     if (token == F_tokenValue) {
-      dataSpace = fromRamAddr(dataSpace + ramUP);
+      dataSpace = FROMRAMADDR(dataSpace + ramUP);
     }
     SPpush(dataSpace);
 }
@@ -404,15 +399,15 @@ void threadtoken(const CELLTYPE xt) {
 /* ARDUINO REPLACED BY LOOP
 void runXT(CELLTYPE xt) {
   //let waitFrequency = 0;
-  //console.assert(this.IP === 0); // Cant nest run()
+  //console.assert(IP == 0); // Cant nest run()
   threadtoken(xt);
   // If this returns without changing program Counter, it will exit
   while (IP) {
-    // console.assert(this.IP >= CODEE && this.IP <= NAMEE); // uncomment if tracking down jumping into odd places
+    // console.assert(IP >= CODEE && IP <= NAMEE); // uncomment if tracking down jumping into odd places
     xt = IPnext();
     // Comment this out except when needed for debugging, they are slow
-    // debugTIB =  this.m.decodeString(Ufetch(TIBoffset) + Ufetch(INoffset), Ufetch(TIBoffset) + Ufetch(nTIBoffset));
-    // 'await this.threadtoken(xt)' would be legit, but creates a stack frame in critical inner loop, when usually not reqd.
+    // debugTIB =  decodeString(Ufetch(TIBoffset) + Ufetch(INoffset), Ufetch(TIBoffset) + Ufetch(nTIBoffset));
+    // 'await threadtoken(xt)' would be legit, but creates a stack frame in critical inner loop, when usually not reqd.
     threadtoken(xt);
   }
 }
@@ -481,8 +476,8 @@ void TYPE() { const char c = SPpop(); const CELLTYPE a = SPpop(); TXstoreS(a, c)
 // === Literals and Branches - using next value in dictionary === eForthAndZen#37
 
 // push the value in the next code word
-// The XT of this is stored in doLit
-void doLit() { SPpush(IPnext()); }
+// The XT of this is stored in literal
+void literal() { SPpush(IPnext()); }
 
 // See DOES> and CREATE, this patches the field after the token compiled by the create to point to the code following the DOES>
 // : DOES> R> LAST @ 2 CELLS - @ CELLL + ! ; // Untested Forth version, note side effect of the R> of doing an exit.
@@ -507,17 +502,6 @@ void next() {
   }
 }
 
-  // ASN, not eForth
-void loop() { // R: I limit -- I+1 limit | ; loop if I < limit
-    CELLTYPE i = RPpop();
-    const CELLTYPE destn = IPnext(); // Increment over loop
-    if (++i < RPfetch()) {
-      RPpush(i);
-      IP = destn; // jump back
-    } else {
-      RPpop();
-    }
-  }
 void I() { SPpush(RPfetch()); }
 
 
@@ -532,8 +516,6 @@ void qBranch() {
 
 // Unconditional jump to destn in dictionary
 void branch() { IP = IPnext(); }
-
-void leave() { RPpop(); RPpop(); branch(); }
 
 void of() {
     const CELLTYPE destn = IPnext();
@@ -552,7 +534,7 @@ void CFetch() { SPpush(Mfetch8(SPpop())); } //C@ a -- c, Fetch character
 
 
 // Return stack words eForthAndZen#40
-void RPfetch() { SPpush(FROMRAMADDR(ramRP)); } //RP@
+void RPat() { SPpush(FROMRAMADDR(ramRP)); } //RP@
 void RPStore() { ramRP = RAMADDR(SPpop()); } // RP! must be aligned
 void Rfrom() { SPpush(RPpop()); } // R>
 void Rat() { SPpush(RPfetch()); } // R@
@@ -596,7 +578,7 @@ void UMplus() { /* UM+ */
   const CELLTYPE a = SPpop();
   const CELLTYPE b = SPpop();
   /*
-  if (CELLL === 4) {
+  if (CELLL == 4) {
     // JS truncates to 32 bits before shift, so use it here rather than getting bitten below
     const x = (a >>> 0) + (b >>> 0);
     SPpush(x >>> 0);
@@ -619,7 +601,7 @@ void LSHIFT() { // https://forth-standard.org/standard/core/LSHIFT
     SPpush(SPpop() << u);
 }
 void TwoDiv() {
-    const CELLTYPE x = SPpop()) {
+    const CELLTYPE x = SPpop();
     SPpush((x & (1 << (CELLbits - 1))) | (x >> 1));
 }
 
@@ -630,7 +612,7 @@ void TwoDiv() {
   // TODO-28-MULTITASK will need to think carefully about how to move all, or part of the USER space to task-specific space.
   // TODO-28-MULTITASK this is non-trivial since somethings are clearly across all tasks (e.g. CP and NP)
 void userAreaInit() {
-  const CHARTYPE UromStart = UZERO / CELLL; // Should be zero
+  const CELLTYPE UromStart = UZERO / CELLL; // Should be zero
   const uint8_t _USER = cellRomFetch(UromStart); // 0th item in user space is its size
   for (uint8_t a = 0; a < _USER; a++) {
     Ustore(a, cellRomFetch(UromStart + a));
@@ -653,10 +635,11 @@ void userAreaSave() {
 
 uint8_t _immediateQ(CELLTYPE na) {
     const uint8_t ch = Mfetch8(na);
-    return ch & l.IMED;
+    return ch & IMED;
 }
+
 void immediateQ() {
-    SPpush(Mfetch8(this.SPpop()) & l.IMED);
+    SPpush(Mfetch8(SPpop()) & IMED);
 }
 
 void debugStack() {  // TODO - can comment out and remove from Fbreak when .S working, useful for debugging early
@@ -679,4 +662,3 @@ void debugStack() {  // TODO - can comment out and remove from Fbreak when .S wo
 void debugNA() { Serial.print(F("NAME=")); printCounted(SPfetch()); } // Print the NA on console
 
 // ==== FORTH Interpreter - words that have no Forth equivalent ====
-

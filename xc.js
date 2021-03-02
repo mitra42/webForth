@@ -80,7 +80,7 @@ class ForthXC extends Forth {
       const name = this.countedToJS(p);
       const xt = this.na2xt(p);
       const funcNumber = this.Mfetch(xt); // Typically 3 for colon words
-      if (!jsFunctionAttributes[funcNumber].defer) { await this.xcXTdef(name, xt, fd); }
+      if (name && !jsFunctionAttributes[funcNumber].defer) { await this.xcXTdef(name, xt, fd); }
       p -= this.CELLL; // point at link address and loop for next word
     }
   }
@@ -145,7 +145,7 @@ class ForthXC extends Forth {
     while (CP < romTop) { // Only need to go to ROMNAMEE - above is in Ram
       const val = this.Mfetch(CP);
       const na = this._toName(val);
-      const value = na
+      const value = (na && (this.Mfetch8(na) & 31))
         ? this.xcXTIdentifier(this.countedToJS(na))
         : (definitionName && (definitionXT < val) && (val < (definitionXT + longestDef)))
           ? `${this.xcXTIdentifier(definitionName)} + ${this.xcNum(val - definitionXT)}`

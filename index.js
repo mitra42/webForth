@@ -2692,7 +2692,7 @@ class Forth {
 
   _findNameIn(va, u, caddr) { // c-addr u va -- nt | 0 ; https://forth-standard.org/proposals/find-name#contribution-58
     const cellCount = (u / this.CELLL) >> 0; // Count of cells after first one
-    const na = --caddr; // Point at count
+    const na = caddr - 1; // Point at count
     const cell1 = this.Mfetch(na);  // Could be little or big-endian
     let p = va;
     while (p = this.Mfetch(p)) {
@@ -3167,9 +3167,10 @@ class Forth {
   // TODO-28-MULTITASK will need to think carefully about how to move all, or part of the USER space to task-specific space.
   // TODO-28-MULTITASK this is non-trivial since somethings are clearly across all tasks (e.g. CP and NP)
   userAreaInit() {
-    const _USER = this.m.cellRomFetch(this.UZERO / this.CELLL); // 0th item in user space is its size
+    const UromStart = this.m.romAddr(UZERO); // Should be zero
+    const _USER = cellRomFetch(UromStart); // 0th item in user space is its size
     for (let a = 0; a < _USER; a++) {
-      this.Ustore(a, this.m.cellRomFetch(this.UZERO / this.CELLL + a));
+      this.Ustore(a, this.m.cellRomFetch(UromStart + a));
     }
   }
   // The opposite of userAreaInit - save values for restoration at COLD

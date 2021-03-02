@@ -20,8 +20,8 @@
 #define RAMNAMEE 0x9ac0
 #define RAMCODEE 0
 #define ROM(cellAddr) pgm_read_dword_near(&rom[cellAddr])
-#define FUNCTIONSLENGTH 85
-#define XT_COLD 0x40003658 /* COLD*/
+#define FUNCTIONSLENGTH 83
+#define XT_COLD 0x40003650 /* COLD*/
 // Data defined currently in arduino_webforth.ino but used in webforth_functions.cpp
 extern const CELLTYPE rom[ROMCELLS] PROGMEM;
 extern void (* const f[FUNCTIONSLENGTH])() PROGMEM;
@@ -29,4 +29,15 @@ extern void (* const f[FUNCTIONSLENGTH])() PROGMEM;
 extern CELLTYPE IP;
 extern CELLTYPE IPnext();
 extern void threadtoken(const CELLTYPE xt);
+
+// These are needed by webforth_functions.cpp which doesn't include webforth_dictionary.cpp
+#define F_tokenVocabulary 1
+#define F_tokenNextVal 2
+#define F_tokenDoList 3
+#define F_tokenUser 4
+#define F_tokenVar 5
+#define F_tokenCreate 6
+#define F_tokenDefer 7
+#define F_tokenValue 8
+
 #endif
