@@ -14,7 +14,7 @@ the same as the final version.
 Errata: There are quite a few bugs in eForthAndZen, 
 * some are fixed in [eForthOverviewv5.pdf](http://www.exemark.com/FORTH/eForthOverviewv5.pdf)
 * others in [staapl](http://planet.racket-lang.org/package-source/zwizwa/staapl.plt/1/9/mcf/eforth/eforth.f)
-* in the code in index.js these are flagged as EFORTH-ZEN-ERRATA
+* in the code in index.js, these are flagged as EFORTH-ZEN-ERRATA
 
 And some links I have still to research.
 

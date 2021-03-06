@@ -158,6 +158,7 @@ class ForthInput extends HTMLElement {
       console.log('Premature input TODO', inp);
     } else {
       this.inputbox.value = '';       // Clear result
+      // noinspection JSUnresolvedFunction
       forth.TXstoreS(inp);             // But echo - via forth, should go to Console
       // noinspection JSIgnoredPromiseFromCall
       forth.interpret1(inp)            // Async interpretation of text

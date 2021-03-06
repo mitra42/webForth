@@ -1,3 +1,4 @@
+// eslint-disable-next-line import/extensions
 import fs from 'fs';
 import { Forth, ForthNodeExtensions } from './index.js';
 // Normally this would be: import Forth from 'webforth';

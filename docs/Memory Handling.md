@@ -2,8 +2,8 @@
 
 The memory map follows the concepts of the traditional & eForth model as defined on page 27 of eForth Zen,
 Note that page 27 doesn't quite match the supplied code on page 26!
-The code that defines these is well commented inline.
-In Javascript, its in a pair of UintXXarray structures. In C, its a pair of arrays.
+The code that defines this is well commented inline.
+In Javascript, it is in a pair of UintXXarray structures. In C, it is a pair of arrays.
 
 ## Epromability
 One challenge with eForth is that it puts data and code in the same space,
@@ -20,7 +20,7 @@ anything built with vCREATE will use memory in the Ram area, as do anything buil
 A word "useRam" does the correct manipulation of pointers
 so that the Flashed dictionaries point to Ram for a continuation.
 
-#### Memory map to Javascript
+#### Memory Map to Javascript
 The primary memory, is a large area of (at least conceptually) contiguous memory.
 This area is conceptually split into a Rom portion, and a Ram portion.
 
@@ -40,10 +40,10 @@ If CELLL and MEM are different, then cells have to be packed into memory slots,
 for example if CELLL=2 and MEM = 32 then two 16 bit cells fit in each memory slot.
 Usually an alignment is done, so that if CELLL is 2 then it always starts on an even border,
 but this depends on memory efficiency and (may) not be done if MEM=8.
-The actual packing and unpacking are done by a class that, the defaults are in index.js
+The actual packing and unpacking are done by a class that, the defaults are in `index.js`
 but alternatives can be passed to the Forth constructor for special needs.
 
-For example Flash8_32 is a 8 bit wide memory array for holding 32 bit cells which uses a `Uint8array`.
+For example Flash8_32 is an 8 bit wide memory array for holding 32 bit cells which uses a `Uint8array`.
 
 There may be future experimentation to experiment with different ways of handling memory,
 or managing a large virtual memory space on a smaller device.

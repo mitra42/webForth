@@ -1,3 +1,4 @@
+// eslint-disable-next-line import/extensions
 import { Forth_with_fs, ForthNodeExtensions } from '../forth_with_fs.js';
 // Normally this would be: import Forth from 'webforth';
 
@@ -54,4 +55,3 @@ forth.initialize()
   // TODO-83 next line fails because it only switches SOURCE-ID, so it returns immediately.
   //.then(() => forth.interpret('REQUIRE prelimtest.fth'))
   .then(() => forth.console());
-  // .then(() => console.log('EXITING AFTER TEST'));

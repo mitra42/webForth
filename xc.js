@@ -1,5 +1,6 @@
 import { promises as fs, constants as fs_constants } from 'fs';
 
+// eslint-disable-next-line import/extensions
 import { Forth, ForthNodeExtensions, jsUsers, RP0offset, jsFunctionAttributes } from './index.js';
 
 const extensions = ForthNodeExtensions;
@@ -15,12 +16,13 @@ const xcRevDefines = {}; // Extra defines to check for values in
 const numTokens = 8; // Should match value of highest token - currently tokenValue
 
 //TODO-DUMP should refuse to dump any code fields to non existent routines
-// noinspection JSCheckFunctionSignatures
+// noinspection JSCheckFunctionSignatures,JSBitwiseOperatorUsage
 class ForthXC extends Forth {
   xcLine(s, fd) { // asynchronous if passed fd
     if (fd) {
       return fd.write(s); // Current position, utf8, return a promise { bytesWritten, buffer }
     } else {
+      // noinspection JSUnresolvedFunction
       this.TXstoreS(s);
     }
   }
@@ -103,7 +105,7 @@ class ForthXC extends Forth {
         await this.xcLine(`\nextern void ${arduinoFuncName}();`, fd);
       }
     }
-    // This is the actual array of functions - will have 0 for defered ones
+    // This is the actual array of functions - will have 0 for deferred ones
     // On Arduino uno `const void (*f[62])() = {` worked, but ESP8266 required `void (* const f[])() PROGMEM = {`
     await this.xcLine(`\nvoid (* const f[FUNCTIONSLENGTH])()${processor === 'esp8266' ? ' PROGMEM' : ''} = {`, fd);
     const itemsPerLine = 4;

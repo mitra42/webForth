@@ -1,3 +1,4 @@
+// eslint-disable-next-line import/extensions
 import { ForthXC, extensions } from '../xc.js';
 
 /*
@@ -23,6 +24,7 @@ import { ForthXC, extensions } from '../xc.js';
  */
 
 async function build({
+  // eslint-disable-next-line no-shadow
   processor, CELLL, extensions = {}, MEM = undefined,
   ROMCELLS = undefined, ROMSIZE = undefined,
   RAMCELLS = undefined, RAMSIZE = undefined,
@@ -39,4 +41,5 @@ async function build({
 
 build({
   processor: 'esp8266', CELLL: 4, ROMCELLS: 0x2000, RAMCELLS: 0x2800, extensions,
-});
+})
+  .then(() => console.log('XC Built'));

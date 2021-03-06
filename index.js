@@ -58,13 +58,13 @@ const jsFunctionAttributes = [
   { n: '0<', f: 'zeroLess' }, 'AND', 'OR', 'XOR', { n: 'UM+', f: 'UMplus' },
   'RSHIFT', 'LSHIFT', { n: '2/', f: 'TwoDiv' },
   'userAreaInit', 'userAreaSave',
-  { n: 'PARSE', defer: true }, { n: '(', f: 'parenthesis', defer: true, immediate: true}, { n: 'TOKEN', defer: true }, { n: 'NUMBER?', f: 'NUMBERQ', defer: true },
+  { n: 'PARSE', defer: true }, { n: '(', f: 'parenthesis', defer: true, immediate: true }, { n: 'TOKEN', defer: true }, { n: 'NUMBER?', f: 'NUMBERQ', defer: true },
   { n: '$COMPILE', f: 'dCOMPILE', defer: true }, { n: '$INTERPRET', f: 'dINTERPRET', jsNeeds: true, defer: true },
   { n: '[', f: 'openBracket', immediate: true, defer: true }, { n: ']', f: 'closeBracket', defer: true },
   { n: ':', f: 'colon', defer: true }, { n: ';', f: 'semicolon', immediate: true, defer: true }, { n: "'", f: 'tick', defer: true },
   'debugNA', 'Fbreak', 'stringBuffer', 'TYPE',
   'I', 'RDrop', { n: '2RDrop', f: 'TwoRDrop' }, { n: 'immediate?', f: 'immediateQ' },
-  { n: 'ALIGN', f: 'vpAlign' }, { n: '>BODY', f: 'toBODY' }, { n: 'DEFER', defer: true}, { n: '(of)', f: 'of' },
+  { n: 'ALIGN', f: 'vpAlign' }, { n: '>BODY', f: 'toBODY' }, { n: 'DEFER', defer: true }, { n: '(of)', f: 'of' },
   { n: 'T{', f: 'Tbrace', defer: true }, { n: 'DEPTH', defer: true }, { n: '}T', f: 'Tunbrace', defer: true }, { n: '->', f: 'Tarrow', defer: true },
 ];
 
@@ -79,7 +79,6 @@ const tokenVar = 5;
 const tokenCreate = 6;
 const tokenDefer = 7;
 const tokenValue = 8;
-
 
 // ported to Arduino below to L.115
 // === Memory Map - Zen pg26
@@ -2562,7 +2561,7 @@ class Forth {
       this.debugName = na ? this.countedToJS(na) : 'undefined';
       if (this.Ufetch(testDepthOffset) > this.debugExcecutionStack.length) {
         //TODO-28-MULTITASK RPP(RP0) and SPP will move
-        console.log('R:', this.debugReturnStack(), this.debugExcecutionStack, debugName, 'S:', this.ramSPP === this.ramSP ? '' : this.debugStack(),
+        console.log('R:', this.debugReturnStack(), this.debugExcecutionStack, this.debugName, 'S:', this.ramSPP === this.ramSP ? '' : this.debugStack(),
           this.padTestLength ? ('pad: ' + (this.padTestLength > 0 ? this.m.decodeString(this.padPtr(), this.padPtr() + this.padTestLength) : this.m.decodeString(this.padPtr() + this.padTestLength, this.padPtr()))) : '');
       }
     }
@@ -2585,25 +2584,24 @@ class Forth {
 
   Tbrace() { // : T{ testFlags @ 8 AND IF [COMPILE] ?\ THEN ;
     // Skip rest of line if not testing
-    if (! this.isTestFlags(8)) {
-      this.Ustore(INoffset,this.Ufetch(nTIBoffset));
+    if (!this.isTestFlags(8)) {
+      this.Ustore(INoffset, this.Ufetch(nTIBoffset));
     }
   }
   Tarrow() { // : -> DEPTH DUP testActualDepth ! ?DUP IF 0 DO testResults I CELLS + ! LOOP THEN ;
-    this.testActualDepth = this._DEPTH()
-    this.testResults = []
+    this.testActualDepth = this._DEPTH();
+    this.testResults = [];
     for (let i = 0; i < this.testActualDepth; i++) {
       this.testResults.push(this.SPpop());
     }
   }
   Tunbrace() {
     // DEPTH testActualDepth @ = IF DEPTH ?DUP IF 0 DO testResults I CELLS + @ = 0= IF S" INCORRECT RESULT: " testError LEAVE THEN LOOP THEN ELSE S" WRONG NUMBER OF RESULTS: " testError THEN ;
-    if (this._DEPTH() != this.testActualDepth) {
-      logAndTrap("WRONG NUMBER OF RESULTS: "); //TODO replace this and all console.log and console.assert with a string output
-      testError();
+    if (this._DEPTH() !== this.testActualDepth) {
+      logAndTrap('WRONG NUMBER OF RESULTS: '); //TODO replace this and all console.log and console.assert with a string output
     } else if (this.testActualDepth) {
       for (let i = 0; i < this.testActualDepth; i++) {
-        if (this.SPpop() !== this.testResults.shift()) { logAndTrap("results dont match"); }
+        if (this.SPpop() !== this.testResults.shift()) { logAndTrap('results dont match'); }
       }
     }
   }
@@ -3027,6 +3025,7 @@ class Forth {
   TXstore() { this.TXstoreC(this.SPpop()); }
   qrx() { return [false]; } // Overridden by caller as way to vectoring input
   TYPE() { // a u -- ; same signature as Forth this.TYPE
+    // noinspection JSUnresolvedFunction
     this.TXstoreS(this.SPpopString());
   }
   storeIO() { } // Default to nothing to do, but Node extends
@@ -3152,7 +3151,7 @@ class Forth {
   }
 
   // Math from Forth2012 - could probably define in Forth but efficiency important
-  RSHIFT( u = this.SPpop(), x = this.SPpop()) { // https://forth-standard.org/standard/core/RSHIFT
+  RSHIFT(u = this.SPpop(), x = this.SPpop()) { // https://forth-standard.org/standard/core/RSHIFT
     // Note this needs to 0 fill
     this.SPpush(x >>> u);
   }
@@ -3168,8 +3167,8 @@ class Forth {
   // TODO-28-MULTITASK will need to think carefully about how to move all, or part of the USER space to task-specific space.
   // TODO-28-MULTITASK this is non-trivial since somethings are clearly across all tasks (e.g. CP and NP)
   userAreaInit() {
-    const UromStart = this.m.romAddr(UZERO); // Should be zero
-    const _USER = cellRomFetch(UromStart); // 0th item in user space is its size
+    const UromStart = this.m.romAddr(this.UZERO); // Should be zero
+    const _USER = this.m.cellRomFetch(UromStart); // 0th item in user space is its size
     for (let a = 0; a < _USER; a++) {
       this.Ustore(a, this.m.cellRomFetch(UromStart + a));
     }

@@ -14,7 +14,7 @@ The only prerequisite is [`node`](https://nodejs.org) and `npm` (or `yarn`).
 npm install webforth
 ```
 Installs webforth, note there are intentionally no dependencies 
-in the browser versions and the only dependency in the node version is to
+in the browser versions, and the only dependency in the node version is to
 the builtin `fs`
 
 If you only want to host the web version, then cloning the git repo should be sufficient.
@@ -48,7 +48,7 @@ Try `1 2 3 ROT .S` A simple forth command and output the stack
 This is an experimental API - it might change, 
 - see any discussion in: [issue#23](https://github.com/mitra42/webForth/issues/23).
 
-In particular we'll be adding ability to load forth files into an instance.
+In particular, we will be adding ability to load forth files into an instance.
 
 Note, it should be possible to run multiple instances, but this isn't tested fully yet.
 e.g. 
@@ -72,7 +72,7 @@ http-server &
 ```
 Open `http://localhost:8080/console.html` in a browser. 
 
-The HTML uses Web Components and TextEncoders so they should work in any modern browsers such as:
+The HTML uses Web Components and TextEncoders, so they should work in any modern browsers such as:
 Firefox, Chrome, Opera, Edge, Android. 
 It will not work in IE or Safari on IOS or OSX, and there are no plans to support those browsers, 
 however I'll be happy to add PRs if someone else does.
@@ -91,8 +91,8 @@ Feel free to open a new issue on [the git repo](https://github.com/mitra42/webfo
 but the first thing I'm going to ask for is a copy of whatever appeared in the Console,
 or in Node.
 
-There are two useful Forth words you can insert in either a definition or the code to help debug.
-* `testing3`: sets an internal flag to increase (significantly) debugging output so we 
+There are two useful Forth words you can insert in either a definition, or the code to help debug.
+* `testing3`: sets an internal flag to increase (significantly) debugging output, so we 
     see stack condition before every forth word. 
     Changing debugDepth can be useful to get more or less of it. (look for the variable)
 * `break`: Just calls a short routine that generates a console log, when working in my IDE 
@@ -102,23 +102,23 @@ There are two useful Forth words you can insert in either a definition or the co
 Support for Arduino is still early stage, 
 but it runs to flash (standard Arduino process, this does NOT clobber your bootloader),
 there is an OK prompt with full forth support including defining words, 
-though any words you define interactively wont be saved to flash.
+though any words you define interactively will not be saved to flash.
 
 To rebuild the repo, in either arduino or esp8266 folders run
 ```
 node --experimental-modules ./build_xc.mjs
 ```
-* I'm working on the extension mechanism. [issue#72](https://github.com/mitra42/webForth/issues/72);
+* I am working on the extension mechanism. [issue#72](https://github.com/mitra42/webForth/issues/72);
 * a way to output via the Web UI [issue#61](https://github.com/mitra42/webForth/issues/61);
 * Support for pins and interrupts [issue#63](https://github.com/mitra42/webForth/issues/63)
-* Support for the WiFi & TCP/IP [issue#73](https://github.com/mitra42/webForth/issues/73)
+* Support for the Wi-Fi & TCP/IP [issue#73](https://github.com/mitra42/webForth/issues/73)
 
 ## File support
 File support is in its early days but works.
 How to test it will probably change as it evolves
 
 Because browsers don't have access to `fs` it uses a separate class
-that has a imports `fs`.
+that imports `fs`.
 ```
 cd scripts
 ./forth_console_with_fs_via_node.mjs
@@ -134,14 +134,15 @@ Yes please !
 Please introduce yourself on [issue#1](https://github.com/mitra42/webforth/issues/1)
 
 Pull requests are welcome, and even quite significant changes at this stage, 
-but lets discuss first (open a new issue in GIT). 
+but let us discuss first (open a new issue in GIT). 
 
 ## Cutting a release 
-* Run a code inspection - surprising how many bugs this ESLint or most IDE's catch ! 
-* Update CHANGELOG.md
-* Check README.md reflects any changes
-* Update VER in index.js and version in package.json to next even number
+* Run a code inspection - surprising how many bugs this ESLint, or most IDE's catch ! 
+* Update `CHANGELOG.md`
+* Check `README.md` reflects any changes
+* Update `VER` in index.js and version in package.json to next even number
 * `npm publish`
-* push to git on master branch
-* Update VER in index.js and version in package.json to next odd number
+* push to git on `master` branch
+* Update `VER` in index.js and version in package.json to next odd number
 * npm update; npm install
+* Check how to update on mitra.biz so Console runs new one ... 
