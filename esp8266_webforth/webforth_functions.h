@@ -30,7 +30,8 @@ extern CELLTYPE IP;
 extern CELLTYPE IPnext();
 extern void threadtoken(const CELLTYPE xt);
 
-// These are needed by webforth_functions.cpp which doesn't include webforth_dictionary.cpp
+// Tokens are needed by webforth_functions.cpp which does not include webforth_dictionary.cpp
+/* === Function tokens === */
 #define F_tokenVocabulary 1
 #define F_tokenNextVal 2
 #define F_tokenDoList 3
@@ -39,5 +40,4 @@ extern void threadtoken(const CELLTYPE xt);
 #define F_tokenCreate 6
 #define F_tokenDefer 7
 #define F_tokenValue 8
-
 #endif

@@ -12,6 +12,7 @@ const extensions = ForthNodeExtensions;
  */
 
 const xcRevDefines = {}; // Extra defines to check for values in
+const numTokens = 8; // Should match value of highest token - currently tokenValue
 
 //TODO-DUMP should refuse to dump any code fields to non existent routines
 // noinspection JSCheckFunctionSignatures
@@ -84,9 +85,9 @@ class ForthXC extends Forth {
       p -= this.CELLL; // point at link address and loop for next word
     }
   }
-  async xcTokens(fd) {
+  async xcTokens(top = this.jsFunctions.length, fd) {
     await this.xcLine('\n/* === Function tokens === */', fd);
-    for (let token = 0; token < this.jsFunctions.length; token++) {
+    for (let token = 0; token < top; token++) {
       const func = this.jsFunctions[token];
       if (func) {
         await this.xcLine(`\n#define ${this.xcFuncIdentifier(func, token)} ${token}`, fd);
@@ -109,7 +110,7 @@ class ForthXC extends Forth {
     let itemsToGoOnLine = 0;
     for (let token = 0; token < this.jsFunctions.length; token++) {
       const func = this.jsFunctions[token];
-      if (!itemsToGoOnLine--) { itemsToGoOnLine = itemsPerLine - 1; await this.xcLine('\n', fd); }
+      if (!itemsToGoOnLine--) { itemsToGoOnLine = itemsPerLine - 1; await this.xcLine(`\n /* ${token} */`, fd); }
       if (!func || jsFunctionAttributes[token].defer) {
         await this.xcLine('0, ', fd);
       } else {
@@ -200,7 +201,7 @@ class ForthXC extends Forth {
     await this.xcLine('#include "webforth_functions.h"', fd);
     await this.xcLine('\n// === Arduino source built directly from dictionary - edit at your own risk ! === ', fd);
     await this.xcNames(fd);
-    await this.xcTokens(fd);
+    await this.xcTokens(undefined, fd);
     await this.xcFunctions({ processor }, fd);
     await this.xcCode(fd);
     await this.xcLine('\n// === End of Arduino source from dictionary === \n', fd);
@@ -218,8 +219,10 @@ extern void (* const f[FUNCTIONSLENGTH])()${processor === 'esp8266' ? ' PROGMEM'
 extern CELLTYPE IP;
 extern CELLTYPE IPnext();
 extern void threadtoken(const CELLTYPE xt);
-#endif
 `, fd);
+    await this.xcLine('\n// Tokens are needed by webforth_functions.cpp which does not include webforth_dictionary.cpp', fd);
+    await this.xcTokens(numTokens + 1, fd);
+    await this.xcLine('\n#endif', fd);
     await fd.close();
   }
 }

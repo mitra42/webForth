@@ -42,6 +42,7 @@ const jsFunctionAttributes = [
   { n: 'tokenCreate', token: true },
   { n: 'tokenDefer', token: true }, // Execute payload (like DoList but just one)
   { n: 'tokenValue', token: true }, // Returns value from a user variable.
+  // Note the number of tokens goes in xc.js NumTokens //
   'ALIGNED',
   { n: 'FIND-NAME-IN', f: 'findNameIn' }, // Fast version of find
   { n: 'OVERT', defer: true },

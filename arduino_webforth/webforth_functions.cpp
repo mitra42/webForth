@@ -5,6 +5,7 @@ extern void debugStack();
 extern void debugNA();
 extern void debugPrintTIB();
 extern void printCounted(CELLTYPE a);
+extern void TXstoreS(CELLTYPE byteaddr, const uint8_t len);
 
 /*
  * NOTES
@@ -134,7 +135,7 @@ uint8_t Mfetch8(const CELLTYPE byteAddr) {
 }; // Returns byte at a
 
 void Mstore8(const CELLTYPE byteAddr, uint8_t v) {
-  //Serial.print("Mstore8 a="); Serial.print(byteAddr); Serial.print(" v="); Serial.println(v);
+  //Serial.print(F("Mstore8 a=")); Serial.print(byteAddr); Serial.print(F(" v=")); Serial.println(v);
     const uint8_t offset = byteAddr & CELLOFFSETMASK;
 #ifdef LITTLEENDIAN
     const uint8_t shiftbits = 8 * offset ;
@@ -217,7 +218,7 @@ bool _sameq(const CELLTYPE na1, const CELLTYPE na2, const uint8_t cells) {
     return true;
 }
 CELLTYPE _findNameIn(const CELLTYPE va, const uint8_t u, CELLTYPE caddr) { // c-addr u va -- nt | 0 ; https://forth-standard.org/proposals/find-name#contribution-58
-    // Serial.print(F("XXX _find looking for:")); TXstoreS(caddr, u);
+    //Serial.print(F("XXX _find looking for: caddr=")); Serial.print(caddr); Serial.print(F(" u=")); Serial.print(u); TXstoreS(caddr, u);
     const uint8_t cellCount = u >> CELLSHIFT; // Count of cells after first one
     const CELLTYPE na = caddr - 1; // Point at count
     const CELLTYPE cell1 = Mfetch(na);  // Could be little or big-endian
@@ -237,16 +238,19 @@ CELLTYPE _findNameIn(const CELLTYPE va, const uint8_t u, CELLTYPE caddr) { // c-
 }
 
 void findNameIn() { // caddr u va -- na|0; Note this ONLY currently works if caddr-- is a counted string
-    SPpush(_findNameIn(SPpop(), SPpop(), SPpop()));
+    const CELLTYPE va = SPpop();
+    const CELLTYPE u = SPpop();
+    const CELLTYPE caddr = SPpop();
+    SPpush(_findNameIn(va, u, caddr));
 }
 
 // Traverse dictionary to convert xt back to a na (for decompiler or debugging)
 CELLTYPE _toName(const CELLTYPE xt) {
   CELLTYPE p = currentFetch(); // vocabulary
   if (!Mfetch(p)) { p = lastFetch() - CELLL; } // Note this is not quite correct, it will miss the first definition (WARM)
-  //Serial.print("_toName: p="); Serial.println(p);
+  //Serial.print(F("_toName: p=")); Serial.println(p);
   while (p = Mfetch(p)) {
-    //Serial.print("_toName comparing"); Serial.print(na2xt(p)),Serial.print(" "); Serial.println(xt);
+    //Serial.print(F("_toName comparing")); Serial.print(na2xt(p)),Serial.print(F(" ")); Serial.println(xt);
     if (na2xt(p) == xt) {
       //Serial.println("_toName: Got it");
       return p;
@@ -314,9 +318,9 @@ void tokenDefer() {
 
 // Leaves an address in the user area, note it doesnt compile the actual address since UP will change when multi-tasking
 void tokenUser() {
-  //Serial.print("tokenUser payload="); Serial.print(PAYLOAD); Serial.print(" @payload="); Serial.print(Mfetch(PAYLOAD));
+  //Serial.print(F("tokenUser payload=")); Serial.print(PAYLOAD); Serial.print(F(" @payload=")); Serial.print(Mfetch(PAYLOAD));
   SPpush(FROMRAMADDR((Mfetch(PAYLOAD) + ramUP)));
-  //Serial.print(" result="); Serial.print(SPfetch()); Serial.print(" @="); Serial.println(Mfetch(SPfetch()));
+  //Serial.print(F(" result=")); Serial.print(SPfetch()); Serial.print(F(" @=")); Serial.println(Mfetch(SPfetch()));
 }
 void tokenValue() {
     // Get content of Payload which is offset in cells past ramUP, read that value and push it
@@ -366,29 +370,33 @@ void tokenVar() {
 
 void debugThreadToken(const CELLTYPE tok) {
   const CELLTYPE xt = PAYLOAD-CELLL;
-  Serial.print(IP-CELLL); Serial.print(F(":"));
+  Serial.print(F("IP-=")); Serial.print(IP-CELLL); Serial.print(F("XT=:"));
   //if (CELLTYPE p = _toName(xt)) {
   //  printCounted(p);
   //} else {
     Serial.print(xt);
   //}
-  Serial.print(F(":")); Serial.print(tok); Serial.print(F("  "));
+  Serial.print(F(" tok=")); Serial.print(tok); Serial.print(F("  "));
 }
 
 void threadtoken(const CELLTYPE xt) {
   // console.assert(xt >= CODEE && xt < NAMEE); // Uncomment to catch bizarre xt values earlier
   // This next section is only done while testing, and outputs a trace, so set it on (with testing3) immediately before a likely error.
   //debugThread(xt);
-  //Serial.print("Threading token at XT="); Serial.println(xt); delay(1000);
+  //Serial.print(F("XXX  threadtoken: xt=")); Serial.print(xt);
   const CELLTYPE tok = Mfetch(xt);
-  //Serial.print("XXX tok="); Serial.println(tok); delay(1000);
+  //Serial.print(F(" tok=")); Serial.println(tok); // delay(1000);
   PAYLOAD = xt + CELLL;
   // console.assert(tok < jsFunctions.length); // commented out for efficiency, a fail will just break in the next line anyway.
   if ((tok < FUNCTIONSLENGTH) && f[tok]) {
     if (testing) { debugThreadToken(tok); }
+    //Serial.print(F("XXX going to f[tok]")); Serial.println(tok); delay(1000);
     f[tok](); // Run the token function - like tokenDoList or tokenVar - doesnt return - (JS returns null or a Promise)
+    //Serial.print(F("XXX return from f[tok]")); Serial.println(tok); delay(1000);
   } else {
-    Serial.print(F("Bad token:")); debugThreadToken(tok); delay(10000);
+    Serial.print(F("Cant thread")); debugThreadToken(tok);
+    if (!(tok < FUNCTIONSLENGTH)) { Serial.print(F("too big")); }
+    if (!(f[tok])) { Serial.print(F("No function")); }
   }
 }
 
@@ -612,11 +620,18 @@ void TwoDiv() {
   // TODO-28-MULTITASK will need to think carefully about how to move all, or part of the USER space to task-specific space.
   // TODO-28-MULTITASK this is non-trivial since somethings are clearly across all tasks (e.g. CP and NP)
 void userAreaInit() {
-  const CELLTYPE UromStart = UZERO / CELLL; // Should be zero
+  // There is a lot of debugging here, and it can be commented out, but its useful to have
+  // it available as this is run really early so its a test of a number of functions
+  const CELLTYPE UromStart = ROMADDR(UZERO); // Should be zero
+  //Serial.print(F("UromStart=")); Serial.println(UromStart); delay(1000);
   const uint8_t _USER = cellRomFetch(UromStart); // 0th item in user space is its size
+  //Serial.print(F("_USER="));
+  Serial.println(_USER); // Heisenbug Exception if delete this line. even if uncomment lone above or use UromStart as the variable
+  //delay(1000);
   for (uint8_t a = 0; a < _USER; a++) {
     Ustore(a, cellRomFetch(UromStart + a));
   }
+  //Serial.println(F("XXX userAreaInit: end")); delay(1000);
   //testing3();
 }
 
