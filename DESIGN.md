@@ -1,5 +1,5 @@
 # Forth for Javascript - Design criteria
-Mitra Ardron <mitra@mitra.biz> 27 December 2020
+Mitra Ardron <mitra@mitra.biz> 4th March 2021
 
 Welcome to my basic design document for WebForth.  
 
@@ -10,9 +10,9 @@ provide a linear reading order without needing to look ahead.
 
 TODO update this contents table
 
-* Based on eForth but not quite same
-* Javascript then Forth
-* Memory Handling
+* Based on eForth but extended to Forth2012
+* [Memory Handling](docs/Memory%20Handling.md)
+
 * Colon, Code and other words
 * I/O
 * Async
@@ -23,7 +23,7 @@ TODO update this contents table
 * Epromability
 * Earlier version notes
 
-#### Based on eForth but not quite same
+#### Based on eForth but extended to Forth2012
 This system is based on C.H. Ting's eForth, 
 I primarily used the version of eForth in "Zen and Forth", 
 but it has a not insignificant number of bugs,
@@ -31,71 +31,20 @@ some of the bugs are fixed in the `v5` version,
 and others in the version ported to `staapl`, 
 so I've picked and chosen and flagged the errors with "ERRATA" in the code. 
 
-I have tried, but failed to contact C.H.Ting (emails bounce) 
-so I don't have a constructive way to feed those bugs back to him.
+The code is then extended so that it meets the Forth2012 Standard, 
+or more specifically - since that standard has lots of ambiguity, 
+to pass the "core" parts of the Hayes test suite. 
+Mostly this is compatable with eForth except for: 
 
-#### Javascript then Forth
-There are several ways to bootstrap Forth. 
-A common way on bigger systems is Forth written in Forth and cross-compiled to an image.
-However this requires a Forth system to build it on. 
-eForth relies on a Macro-Assembler, but the code is only available in text form, 
-which you have to assemble by hand - and then figure out the numerous bugs.
+* Some USER variables are now unused, and removed
+* `CHARS` emits characters in eForth and is a multiplier in Forth2012
+* `<# # #S #>` operate on Doubles in Forth2012
+* THROW always throws in eForth but only when non-zero argument in Forth2012
 
-As an alternative this system bootstraps in Javascript, 
-* first some javascript functions are written - equivalent of the core code functions in eForth
-* then some JS functions that enable a simple interpreter, especially `find` which is a key efficiency enabler anyway.
-* that interpreter can compile a FORTH dictionary to bring up the rest of the language, 
-* at some point in the compilation process the interpreter switches so it is itself running in FORTH.  
+#### Memory Handling in WebForth
+Please see [docs/strings.md](../docs/strings.md)
 
-### Memory Handling
-The memory map almost follows the eForth model as defined on page 27 of eForth,
-Note that page 27 doesn't quite match the supplied code on page 26!
-The code that defines these is well commented inline.
-In Javascript, its in a pair of UintXXarray structures. In C, its a pair of arrays.
-
-## Epromability
-One challenge with eForth is that it puts data and code in the same space,
-meaning that to Eprom it requires copying the Eprom to Ram,
-and given that small chips have limited Ram that isn't smart.
-
-webFORTH allows for separation between the two. The dictionary is built in an area to be flashed,
-and then pointers are switched to a Ram area where further words can be built. The word `FORTH` and
-anything built with vCREATE will use memory in the Ram area, as do anything built with `VARIABLE`.
-
-In ROM goes: User Save; Code Dictionary; Name dictionary
-and in RAM (Stacks, TIB, PAD, User variables; data parts of CREATE DOES> words).
-
-A word "useRam" does the correct manipulation of pointers 
-so that the Flashed dictionaries point to Ram for a continuation. 
-
-#### Memory map to Javascript
-The primary memory, is a large area of (at least conceptually) contiguous memory.
-This area is conceptually split into a Rom portion, and a Ram portion. 
-
-There are two choices as to how that is used. 
-Whatever the choices, Forth addresses are always in Bytes.
-
-First choice is `CELLL` (cell length) which specifies how the size of the basic unit of data Forth processes.
-This is the size of each item on a stack, each field in the definition, each User variable etc. 
-This defaults to `2` bytes, i.e. 16 bits. 
-
-Secondly is `MEM` which specifies the width of memory slots.
-Addresses are translated on the fly from Forth's byte addresses, to the addresses in the MEM-width buffer, 
-and the top bit is tested to see if the address is in the Ram or Rom area.
-
-If CELLL and MEM are different, then cells have to be packed into memory slots, 
-for example if CELLL=2 and MEM = 32 then two 16 bit cells fit in each memory slot. 
-Usually an alignment is done, so that if CELLL is 2 then it always starts on an even border,
-but this depends on memory efficiency and (may) not be done if MEM=8.
-The actual packing and unpacking are done by a class that can be passed to the Forth constructor.
-
-For example Flash8_32 is a 8 bit wide memory array for holding 32 bit cells which uses a `Uint8array`.
-It splits memory into two areas as described above, so that one can be flashed on a device, 
-and the other is fully initialized at start up.
-
-There may be future experimentation to experiment with different ways of handling memory,
-or managing a large virtual memory space on a smaller device.
-This would be mediated by the memory class.
+=====REVIEWED DOWN TO HERE == 4th March 2021 ====
 
 ### Token Threaded
 The key to Forth is a threaded interpreter. 
@@ -212,7 +161,7 @@ The intention is to make this available for different situations,
 to date there is a Javascript and a C (for Arduino) version.
 
 ### Strings
-Please see [docs/strings.md](../docs/strings.md)
+Please see [docs/strings.md](docs/strings.md)
 
 ## Write More about
 
@@ -224,3 +173,5 @@ Please see [docs/strings.md](../docs/strings.md)
 ### Extensions
 ### Endian
 ### Anything else in https://github.com/mitra42/webForth/issues/25
+
+TODO Redo content table at the top ! 
