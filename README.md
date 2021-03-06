@@ -92,16 +92,21 @@ but the first thing I'm going to ask for is a copy of whatever appeared in the C
 or in Node.
 
 There are two useful Forth words you can insert in either a definition, or the code to help debug.
-* `testing3`: sets an internal flag to increase (significantly) debugging output, so we 
-    see stack condition before every forth word. 
-    Changing debugDepth can be useful to get more or less of it. (look for the variable)
-* `break`: Just calls a short routine that generates a console log, when working in my IDE 
+* `testFlags` is a Forth variable allowing different levels of debugging. Its binary:
+  * 0x01 trace the interpreter as it loads lines 
+  * 0x02 trace threading (slows it down a lot!)
+  * 0x04 enable any safety checks (currently there arent any)
+  * 0x08 run incremental tests during bootstrapping - good for catching bugs.
+* `testDepthOffset` can be set to change the number of levels deep that threading is traced
+* `Fbreak`: Just calls a short routine that generates a console log, when working in my IDE 
     I set a breakpoint here. 
+  
 ## Arduino Support
 
 Support for Arduino is still early stage, 
-but it runs to flash (standard Arduino process, this does NOT clobber your bootloader),
-there is an OK prompt with full forth support including defining words, 
+but it runs to flash using the standard Arduino process, i.e. in the standar Arduino IDE
+Note - this does NOT clobber your bootloader unlike some Forths.
+There is an OK prompt with full forth support including defining words, 
 though any words you define interactively will not be saved to flash.
 
 To rebuild the repo, in either arduino or esp8266 folders run
@@ -114,8 +119,7 @@ node --experimental-modules ./build_xc.mjs
 * Support for the Wi-Fi & TCP/IP [issue#73](https://github.com/mitra42/webForth/issues/73)
 
 ## File support
-File support is in its early days but works.
-How to test it will probably change as it evolves
+It supports the Forth2012 file extension words `REQUIRE` `INCLUDE` etc
 
 Because browsers don't have access to `fs` it uses a separate class
 that imports `fs`.
@@ -127,6 +131,8 @@ webFORTH V0.00.15
 REQUIRE ../sandbox/tester.f
 \ This will load the forth in tester.f and anything that file INCLUDEs
 ```
+File support is in its early days but as I want to extend it to be web-aware.
+
 ## Contributing
 
 Yes please ! 

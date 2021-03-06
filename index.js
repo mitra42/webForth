@@ -1836,7 +1836,7 @@ T{ SEE >NAME -> }T
 ( ERRATA Zen uses CONSTANT but doesnt define it )
 ( === Signon Message Zen pg105 VER hi )
 
-17 CONSTANT VER ( Return the version number of this implementation.)
+100 CONSTANT VER ( Return the version number of this implementation.)
 
 : version CR ." webFORTH V" BASE @ DECIMAL VER 0 <# # # 46 HOLD # # 46 HOLD # #> TYPE ( display sign-on text and version )  BASE ! CR ;
 

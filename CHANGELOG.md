@@ -1,6 +1,31 @@
-* 2021-01-XX: v0.0.17
+* 2021-03-06: v0.1.0
+  * Major changes to support Forth2012 standard - see [Issue#83](https://github.com/mitra42/webForth/issues/83)
+    * Passes core, coreext, coreplus except for ENVIRONMENT?
   * Fix bitrot (RAMSIZE, ROMSIZE) in console.js 
   * Use String output for TYPE instead of CHAR (issue#52)
+  * Add: DO ?DO I I-MAX J J-MAX LEAVE UNLOOP LOOP +LOOP
+  * Add: RDROP >RESOLVES IMMEDIATE? ALIGN >BODY CHAR+ C, ['] BIN
+  * Add: MOVE CMOVE> 2* POSTPONE MARKER BUFFER ROLL UNUSED TUCK SAVE-INPUT RESTORE-INPUT
+  * More math: 0<> FM/MOD SM/REM 2/ <> > U> 0<>
+  * Add" SOURCE SOURCE-ID and a stack to manage them
+  * NUMBER? now uses >NUMBER and handles $ # % and 'x'
+  * Support :NONAME DEFER DEFER! DEFER@ IS ACTION-OF and refactor JS routines to use it 
+  * Replace some of the vectored User variables with DEFERs
+  * Support VALUE and TO
+  * Add CASE OF ENDOF ENDCASE
+  * Refactor strings to support Forth2012 S" C" /STRING and eForth $"
+  * Add T{ -> }T and replace tests with it
+  * CHARS is now Forth2012 (pointer increment) rather than eForth (output)
+  * <# # #S #> HOLDS now work on double numbers (Forth2012) not single (eForth)
+  * Replace testing3 with testFlags
+  * Add Double handling: D0= 2OVER 2SWAP S>D 2RDROP D0< DABS
+  * Refactor FIND to FIND-NAME and FIND-NAME-IN, NAME?  (Forth2012)
+  * Better error handling in Javascript (not perfect yet)
+  * Most console.log should be funnelled through logAndTrace for breakpointing
+  * Rename some words to align with Forth2012 conventions for non-alpha characters
+  * Test 8,24,32 bit versions on different size arrays and test Console
+  * Port new material to Arduino, ESP8266 and test
+
 * 2021-01-19: v0.0.16
   * Added support for files (REQUIRE, INCLUDE etc)
   * ANS: Replace 'EVAL with STATE
