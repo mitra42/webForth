@@ -1,5 +1,4 @@
 # Memory Handling in WebForth
-
 The memory map follows the concepts of the traditional & eForth model as defined on page 27 of eForth Zen,
 Note that page 27 doesn't quite match the supplied code on page 26!
 The code that defines this is well commented inline.

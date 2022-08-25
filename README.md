@@ -101,6 +101,8 @@ There are two useful Forth words you can insert in either a definition, or the c
 * `Fbreak`: Just calls a short routine that generates a console log, when working in my IDE 
     I set a breakpoint here. 
   
+TODO - document how to run ANS tests from separate repo
+  
 ## Arduino Support
 
 Support for Arduino is still early stage, 
