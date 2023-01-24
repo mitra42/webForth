@@ -3,7 +3,7 @@ import { ForthXC, extensions } from '../xc.js';
 
 /*
  * This script builds a javascript version of forth, then cross compiles to two files in this (or some specified) directory.
- * Its written in Javascript - it could be written in Forth, but there is some significant string handling going on.
+ * It is written in Javascript - it could be written in Forth, but there is some significant string handling going on.
  *
  * To use this, see README.md and search for "Arduino support"
  */
@@ -16,7 +16,7 @@ import { ForthXC, extensions } from '../xc.js';
   Specify size of areas for ROM and RAM;
   ROMSIZE:  Used for UserVariable save area; and Dictionary (code and names) until useRam() is called
             Typically 0x1000 * CELL covers the dictionary with some spare.
-  RAMSIZE:  Used for UserVariables, stacks, TIB, PAD etc and Dictionary (code and names) after useRam() is called
+  RAMSIZE:  Used for UserVariables, stacks, TIB, PAD etc. and Dictionary (code and names) after useRam() is called
             Size depends on the processor, 0x200 * 2 is about the max on Arduino Uno, ESP8266 works ok at 0x2800 * 4
             Too high and the C functionality might run out of memory for stacks etc.
   memClass  Normally undefined, but can override default memory class for esoteric or experimental requirements

@@ -60,7 +60,7 @@ There are three common ways to implement the interpreters.
 We are using Token threading 
 because we can't easily mix javascript code into the byte-array of Forth.
 The first word of each definition contains an index into a table of code. 
-This code table is used for both defining words (colon, constant etc) 
+This code table is used for both defining words (colon, constant etc.) 
 and for any word implemented in pure javascript (would be CODE words in most Forths).
 
 #### Threaded Interpreter - detail

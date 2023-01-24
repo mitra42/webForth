@@ -42,7 +42,7 @@ but this depends on memory efficiency and (may) not be done if MEM=8.
 The actual packing and unpacking are done by a class that, the defaults are in `index.js`
 but alternatives can be passed to the Forth constructor for special needs.
 
-For example Flash8_32 is an 8 bit wide memory array for holding 32 bit cells which uses a `Uint8array`.
+For example Flash8_32 is an 8-bit wide memory array for holding 32 bit cells which uses a `Uint8array`.
 
 There may be future experimentation to experiment with different ways of handling memory,
 or managing a large virtual memory space on a smaller device.

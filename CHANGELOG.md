@@ -7,10 +7,10 @@
   * Add: RDROP >RESOLVES IMMEDIATE? ALIGN >BODY CHAR+ C, ['] BIN
   * Add: MOVE CMOVE> 2* POSTPONE MARKER BUFFER ROLL UNUSED TUCK SAVE-INPUT RESTORE-INPUT
   * More math: 0<> FM/MOD SM/REM 2/ <> > U> 0<>
-  * Add" SOURCE SOURCE-ID and a stack to manage them
+  * Add: SOURCE SOURCE-ID and a stack to manage them
   * NUMBER? now uses >NUMBER and handles $ # % and 'x'
   * Support :NONAME DEFER DEFER! DEFER@ IS ACTION-OF and refactor JS routines to use it 
-  * Replace some of the vectored User variables with DEFERs
+  * Replace some vectored User variables with DEFERs
   * Support VALUE and TO
   * Add CASE OF ENDOF ENDCASE
   * Refactor strings to support Forth2012 S" C" /STRING and eForth $"

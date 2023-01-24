@@ -22,8 +22,8 @@ And some links I have still to research.
 * http://web.archive.org/web/20090311031548/http://www.fig-uk.org/
 * 
 
-Some github projects (maybe) of note
-* https://github.com/larsbrinkhoff/lbForth - seems to have a lot of code, cross compiler etc
+Some GitHub projects (maybe) of note
+* https://github.com/larsbrinkhoff/lbForth - seems to have a lot of code, cross-compiler etc
 * https://github.com/philburk/pforth/blob/master/fth/strings.fth
 * https://github.com/zeroflag/punyforth ESP forth-like
 * https://github.com/ForthHub/forth Forth in JS as node module

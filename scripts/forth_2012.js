@@ -1,20 +1,20 @@
 // eslint-disable-next-line import/extensions
+import { Forth_with_fs, ForthNodeExtensions } from '../forth_with_fs.js';
 /*
     This version is used for testing compliance with forth_2012
     I built it long enough ago that I'm not sure how, other than that it defines things like {T which
     then run during the load of the interpreter to test each definition.
     TODO - check that assumption
  */
-import { Forth_with_fs, ForthNodeExtensions } from '../forth_with_fs.js';
 // Normally this would be: import Forth from 'webforth';
 
 // Valid choices for CELL:MEM are 2:8 2:16 2:32 3:8 4:8 4:16 4:32
 const CELLL = 2; // 2 bytes for CELLL
-const MEM = 16; // Use 16 bit memory
+const MEM = 16; // Use 16-bit memory
 // Specify areas for ROM and RAM, currently they have to be specified separately as there is a bug with setting ROMSIZE = 0;
 // ROM: Used for UserVariable save area and Dictionary (code and names) until useRam() is called
 const ROMSIZE = 0x4000 * CELLL;
-// RAM: Used for UserVariables, stacks, TIB, PAD etc and Dictionary (code and names) after useRam() is called
+// RAM: Used for UserVariables, stacks, TIB, PAD etc. and Dictionary (code and names) after useRam() is called
 const RAMSIZE = 0x2000 * CELLL; // Make it larger will use
 const extensions = ForthNodeExtensions; // Only current case is Node for running fs but that could change
 const memClass = undefined; // Define to override default based on CELLL and MEM

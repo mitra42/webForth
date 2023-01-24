@@ -7,7 +7,7 @@ const extensions = ForthNodeExtensions;
 
 /*
  * This is a first cut at a dictionary dumper aka cross-compiler for Arduino
- * Its written in Javascript - it could be written in Forth, but there is some significant string handling going on.
+ * It is written in Javascript - it could be written in Forth, but there is some significant string handling going on.
  *
  * To use this, see README.md and search for "Arduino support"
  */

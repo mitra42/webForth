@@ -75,7 +75,7 @@ Open `http://localhost:8080/console.html` in a browser.
 The HTML uses Web Components and TextEncoders, so they should work in any modern browsers such as:
 Firefox, Chrome, Opera, Edge, Android, iOS. It runs in Safari on OSX but slowly.
 
-The phone experience of console.html is sub-optimal, 
+The phone experience of console.html is suboptimal, 
 I might get around to doing a mobile friendly version eventually, 
 but if someone else does then I'll be happy to apply a PR.
 
@@ -97,7 +97,7 @@ There are two useful Forth words you can insert in either a definition, or the c
 * `testFlags` is a Forth variable allowing different levels of debugging. Its binary:
   * 0x01 trace the interpreter as it loads lines 
   * 0x02 trace threading (slows it down a lot!)
-  * 0x04 enable any safety checks (currently there arent any)
+  * 0x04 enable any safety checks (currently there are not any)
   * 0x08 run incremental tests during bootstrapping - good for catching bugs.
 * `testDepthOffset` can be set to change the number of levels deep that threading is traced
 * `Fbreak`: Just calls a short routine that generates a console log, when working in my IDE 

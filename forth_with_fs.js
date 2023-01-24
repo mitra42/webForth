@@ -1,5 +1,5 @@
-// eslint-disable-next-line import/extensions
 import fs from 'fs';
+// eslint-disable-next-line import/extensions
 import { Forth, ForthNodeExtensions } from './index.js';
 // Normally this would be: import Forth from 'webforth';
 
@@ -117,7 +117,7 @@ const fsExtensions = [
   { n: 'READ-FILE', //  ( c-addr u1 fileid -- u2 ior )  https://forth-standard.org/standard/file/READ-FILE
     f() {
       const fd = this.SPpop(); const len = this.SPpop(); const caddr = this.SPpop();
-      const buf = this.m.buff8(caddr, len); // THis is exposing something that probably shouldnt be
+      const buf = this.m.buff8(caddr, len); // This is exposing something that probably should not be
       return new Promise((resolve) => fs.read(fd, buf, 0, len, fsDescriptors[fd].position,
         (err, bytesRead, unusedBuf) => {
           if (!err) { fsDescriptors[fd].position += bytesRead; }

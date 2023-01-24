@@ -83,10 +83,10 @@ const tokenValue = 8;
 // ported to Arduino below to L.115
 // === Memory Map - Zen pg26
 const l = {}; // Constants that will get compiled into the dictionary
-l.COMP = 0x40; // bit in first char of name field to indicate 'COMPILE-ONLY'  ERRATA Zen uses this but its not defined
-l.IMED = 0x80; // bit in first char of name field to indicate 'immediate' ERRATA Zen uses this but its not defined
+l.COMP = 0x40; // bit in first char of name field to indicate 'COMPILE-ONLY'  ERRATA Zen uses this but it is not defined
+l.IMED = 0x80; // bit in first char of name field to indicate 'immediate' ERRATA Zen uses this but it is not defined
 const bitsSPARE = 0x20; // Unused spare bit in names
-l.BYTEMASK = 0xFF - l.COMP - l.IMED - bitsSPARE; // bits to mask out of a call with count and first char. ERRATA Zen uses this but its not defined
+l.BYTEMASK = 0xFF - l.COMP - l.IMED - bitsSPARE; // bits to mask out of a call with count and first char. ERRATA Zen uses this but it is not defined
 //l.TRUE = (2 ** (l.CELLL * 8)) - 1; // Also used to mask numbers
 l.TRUE = -1; // Not quite correct, should be masked BUT when pushed that it is done underneath
 l.FALSE = 0;
@@ -95,7 +95,7 @@ console.assert(nameMaxLength === l.BYTEMASK); // If this isn't true then check e
 l.BL = 32;
 
 // === Data table used to build users.
-// later the FORTH word 'USER' is defined but unlike this function it doesn't setup initialization, nor does it auto-increment to next available user slot.
+// later the FORTH word 'USER' is defined but unlike this function it does not set up initialization, nor does it auto-increment to next available user slot.
 // These definitions can refer to v: 'foo' to be initialized to a Forth word (which must be in jsFunctionAttributes)
 // or the contents of a property of the forth instance (e.g. Forth.prototype.TIB0
 const jsUsers = []; // Note 4 cells skipped for multitasking but that is in init of _USER to 4*CELLL
@@ -108,7 +108,7 @@ const SP0offset = USER('SP0', undefined);      // (--a) Pointer to bottom of the
 const RP0offset = USER('RP0', undefined);      // (--a) Pointer to bottom of the return stack.
 USER("'?KEY", '?RX');    // Execution vector of ?KEY. Default to ?rx.
 USER("'EMIT", 'TX!');  // Execution vector of EMIT. Default to TX!
-// eForth difference - this next one is 'EXPECT in EFORTH )
+// eForth difference - this next one is 'EXPECT in EFORTH
 USER('SPARE', 0);
 // TODO-34-FILES consider if still want vectored I/O or prefer decision based on SOURCE-ID
 USER("'TAP", 0);       // Execution vector of TAP. Default to kTAP.
@@ -127,7 +127,7 @@ USER('SPARE2', 0);
 USER('HLD', 0);        // Hold a pointer in building a numeric output string.
 USER('HANDLER', 0);    // Hold the return stack pointer for error handling.
 // this is set to result of currentFetch
-const CONTEXToffset = USER('CONTEXT', undefined); // A area to specify vocabulary search order. Default to FORTH. Vocabulary stack, 8 cells following CONTEXT.
+const CONTEXToffset = USER('CONTEXT', undefined); // An area to specify vocabulary search order. Default to FORTH. Vocabulary stack, 8 cells following CONTEXT.
 USER(undefined, 0);
 USER(undefined, 0);
 USER(undefined, 0);
@@ -140,8 +140,8 @@ const CURRENToffset = USER('CURRENT', undefined); // Point to the vocabulary to 
 // this is set to result of currentFetch
 USER(undefined, undefined); // Vocabulary link uses one cell after CURRENT (not clear how this is used)
 // Not e there is a (hidden) assumption that CP and NP are consecutive - used to check free space
-const CPoffset = USER('CP', undefined);  // eForth initializes to CTOP but we have to use this during compilation
-const NPoffset = USER('NP', undefined);  // normally set on Zen pg106 but we are using it live. Its the bottom of what compiled in name space.
+const CPoffset = USER('CP', undefined);  // eForth initializes to CTOP, but we have to use this during compilation
+const NPoffset = USER('NP', undefined);  // normally set on Zen pg106, but we are using it live. It is the bottom of what compiled in name space.
 const LASToffset = USER('LAST', undefined); // normally set on Zen pg106 but using live
 const VPoffset = USER('VP', undefined);  // not part of eForth, pointer into Data space for EPROMability
 USER('source-id', 0);  // Variable holding 0 for terminal, -1 for string, fd for files
@@ -2277,7 +2277,7 @@ class Forth {
     // === Memory layout
     // Memory may be aligned to a boundary depending on underlying mem store (which may or may not match CELLL), this assumption should be confined to ALIGNED
     // Now the memory map itself, starting at the top of memory.
-    // ERRATA In Zen the definitions on Zen pg26 dont come close to matching the addresses given as the example below. In particular UPP and RPP(RP0) overlap !
+    // ERRATA In Zen the definitions on Zen pg26 do not come close to matching the addresses given as the example below. In particular UPP and RPP(RP0) overlap !
     // Arbitrary address to use for RAM - but must be power of 2 and note avoiding 0x80000000 for CELLL=4 as hits math issues in JS with negative addresses
     this.RAM0 = 0;
     this.ROMSIZE = ROMSIZE;
@@ -2313,9 +2313,9 @@ class Forth {
     }
     this.rqFiles = rqFiles;
 
-    // Get a instance of a class to store in
+    // Get an instance of a class to store in
     this.m = new (memClass || MemClasses[`${MEM}_${this.CELLbits}`])({ ramSize: this.RAMSIZE, romSize: this.ROMSIZE, rom0: this.ROM0 });
-    this.jsFunctions = [];  // Maps tokens to executable functions - first is zero as a invalid token
+    this.jsFunctions = [];  // Maps tokens to executable functions - first is zero as an invalid token
 
     // Needs to be after the call to create this.m, its endian dependent as lowest address byte is always the count
     if (this.m.littleEndian) {
@@ -2398,7 +2398,7 @@ class Forth {
   buildConstant(name, val) {
     // Defining function for constants, Replaced by CONSTANT in FORTH
     this.CODE(name);
-    // Note assumption that token for constants is 1, i.e. its the 2nd tokenFunction defined
+    // Note assumption that token for constants is 1, i.e. it is the 2nd tokenFunction defined
     this.DW(tokenNextVal, val);
     this.OVERT();
   }
@@ -2447,9 +2447,9 @@ class Forth {
   // b: after dictionary is built, when need to add to, or replace, in jsFunctions
   extensionAdd(e) {
     this.extensionExpandDefaults(e); // Expand "foo" to {n: "foo"}
-    this.extensionAddFunction(e); // If its a function, add it to the instance
-    this.extensionAddConstant(e); // If its a constant add to dictionary (or to "l" if not yet build dictionary
-    if (e.n && this.extensionFindFunction(e)) { // Have a forth name for this and its a function
+    this.extensionAddFunction(e); // If it is a function, add it to the instance
+    this.extensionAddConstant(e); // If it is a constant add to dictionary (or to "l" if not yet build dictionary
+    if (e.n && this.extensionFindFunction(e)) { // Have a forth name for this and it is a function
       // Add to or replace jsFunctionAttributes for dictionary building.
       const i = jsFunctionAttributes.findIndex((j) => j.n === e.n);
       if (i === -1) { // Not found and have a name (forth name) for it.
@@ -2458,7 +2458,7 @@ class Forth {
           this.extensionAddToJSFunctions(e); // Add into JSFunctions
         }
       } else {
-        Object.keys(e).forEach((k) => jsFunctionAttributes[i][k] = e[k]); // Copy over attributes as may not define all of the options
+        Object.keys(e).forEach((k) => jsFunctionAttributes[i][k] = e[k]); // Copy over attributes as may not define all the options
         if (this.jsFunctions.length) { // Have we built it already
           this.extensionReplaceInJSFunctions(e, i);
         }
@@ -2485,8 +2485,8 @@ class Forth {
       }
     }
   }
-  // Add a JS function (or token?) to make it available to the dictionary (see extensionAddFunction for where its added to the instance)
-  // It is an error to call this if don't have a function (unless e is 0)
+  // Add a JS function (or token?) to make it available to the dictionary (see extensionAddFunction for where it is added to the instance)
+  // It is an error to call this if do not have a function (unless e is 0)
   extensionAddToJSFunctions(e) {
     if (e === 0) {
       this.jsFunctions.push(e); // Intentionally invalid pointer in slot 0
@@ -2528,7 +2528,7 @@ class Forth {
   }
 
   cleanupBootstrap() {
-    // Cleanup - remove routines that shouldnt be being used
+    // Cleanup - remove routines that should not be being used
     jsFunctionAttributes.forEach((attribs, i) => {
       // noinspection JSUnresolvedVariable
       if (attribs.defer) {
@@ -2607,7 +2607,7 @@ class Forth {
   }
 
   // === Functions to simplify storing and retrieving 16 bit values into 8 bit stacks etc.
-  // These aren't part of eForth, but are here to simplify storing multi-byte words into 8 bit bytes in the Buffer.
+  // These aren't part of eForth, but are here to simplify storing multibyte words into 8 bit bytes in the Buffer.
   Mfetch(a) { return this.m.fetchCell(a); }
   Mstore(a, v) { this.m.storeCell(a, v); }  // Store at address a
   // 8 bit equivalents
@@ -2829,7 +2829,7 @@ class Forth {
       this.Ustore(NPoffset, a); // ca=CP ;
     } else {                    // THEN $" name" THROW ;
       this.ramSP++;// DROP
-      logAndTrap('name error'); // This is an error - in FORTH equivalent its a THROW
+      logAndTrap('name error'); // This is an error - in FORTH equivalent it is a THROW
     }
   }
   // Make the most recent definition available in the directory. This is part of closing every 'defining word'
@@ -2884,7 +2884,7 @@ class Forth {
     const xt = this.Mfetch(this.PAYLOAD);
     if (xt) this.threadtoken(xt);
   }
-  // Leaves an address in the user area, note it doesnt compile the actual address since UP will change when multi-tasking
+  // Leaves an address in the user area, note it does not compile the actual address since UP will change when multitasking
   tokenUser() { this.SPpush(this.m.fromRamAddr(this.Mfetch(this.PAYLOAD) + this.ramUP)); }
 
   tokenValue() {
@@ -2935,7 +2935,7 @@ class Forth {
   }
 
   // This is not re-entrant, normally its threadtoken you want ....
-  // In particular you cannot use this to nest forth in code in forth
+  // In particular, you cannot use this to nest forth in code in forth
   // If that becomes necessary, it MIGHT work to save IP (where?) and restore after while loop
   // Cant use R or S for it as words use that across calls to the 'EVAL
   async runXT(xt) {
@@ -3001,7 +3001,7 @@ class Forth {
    * KEY loop till ?KEY
    * ACCEPT read a line via KEY, processing control chars via 'TAP  to kTAP
    * QUERY read a line via REFILL to ACCEPT into TIB and reset >IN
-   * que read an evaluate a line
+   * que read and evaluate a line
    * QUIT loop over que, handling errors
    *
    * See https://github.com/mitra42/webForth/issues/17 for strategy for async version
@@ -3018,8 +3018,8 @@ class Forth {
     }
   }
 
-  // Low level TX!, output one character to stdout, inefficient, but not likely to be bottleneck.
-  // Use TXstoreS if know its a string
+  // Low level TX!, output one character to stdout, inefficient, but not likely to bottleneck.
+  // Use TXstoreS if know it is a string
   TXstoreC(c) { // noinspection JSUnresolvedFunction
     this.TXstoreS(String.fromCharCode(c)); } // TXstoreS is passed in by node and console.js
   TXstore() { this.TXstoreC(this.SPpop()); }
@@ -3036,7 +3036,7 @@ class Forth {
   // The XT of this is stored in this.doLit
   literal() { this.SPpush(this.IPnext()); }
 
-  // See DOES> and CREATE, this patches the field after the token compiled by the create to point to the code following the DOES>
+  // See DOES> and CREATE, this patches the field after the token compiled by the CREATE to point to the code following the DOES>
   // : DOES> R> LAST @ 2 CELLS - @ CELLL + ! ; // Untested Forth version, note side effect of the R> of doing an exit.
   DOES() {
     this.Mstore(
@@ -3210,13 +3210,13 @@ class Forth {
   }
 
   // JS version of TOKEN - same signature
-  TOKEN() { // -- a; <string>; copy blank delimited string to name buffer, immediately below name dictionary (location is important as ':' take a shortcut in eForth.
+  TOKEN() { // -- a; <string>; copy blank delimited string to name buffer, immediately below name dictionary (location is important as ':' takes a shortcut in eForth.)
     this.SPpush(l.BL);
     this.PARSE();   // b u (counted string, adjusts >IN)
     const u = Math.min(this.SPpop(), nameMaxLength); // length of string
     const b = this.SPpop(); // start of string
     const np = this.m.cellAlign(this.npFetch() - u - this.CELLL); // Enough space in Name Directory to copy string optionally with one zero after
-    // Careful if edit next formula, m.align doesnt change if mem=8, AND in this case np may not be on a cell boundary
+    // Careful if edit next formula, m.align does not change if mem=8, AND in this case np may not be on a cell boundary
     this.Mstore(np + ((u / this.CELLL) >> 0) * this.CELLL, 0); // Write a zero in the last cell where the last letter of word will be written
     this.m.copyWithin(np + 1, b, b + u);
     this.Mstore8(np, u);  // 1 byte count
@@ -3308,7 +3308,7 @@ class Forth {
     }
   }
 
-  async EVAL() { // Same signature as Forth EVAL, reads tokens from TIB and interprets )
+  async EVAL() { // Same signature as Forth EVAL, (reads tokens from TIB and interprets)
     // EVAL and $COMPILE and $INTERPRET are redefined in FORTH below
     while (this.Ufetch(INoffset) < this.Ufetch(nTIBoffset)) {
       this.TOKEN(); // a ; pointing to word in Name Buffer (NB)
@@ -3373,7 +3373,7 @@ class Forth {
   // : : TOKEN $,n [ ' doLIST ] LITERAL ] ; see Zen pg96
   _colon(tok) {
     this.TOKEN();  // a; (counted string in named space)
-    this.dollarCommaN(); // setup name dictionary headers, with aligned CP)
+    this.dollarCommaN(); // setup name dictionary headers, with aligned CP
     this.DW(tok); // Must be after creating the name and links etc
   }
 
@@ -3460,7 +3460,7 @@ const ForthNodeExtensions = [
     } },
 ];
 export { Forth,
-  ForthNodeExtensions, jsUsers, // Needed by example_node_api.js and test_dump.mjs (XC Cross compiler)
+  ForthNodeExtensions, jsUsers, // Needed by example_node_api.js and test_dump.mjs (XC Cross-compiler)
   Flash8_16, Flash8_24, Flash8_32, Flash16_16, Flash32_32, // Needed by console.js
-  jsFunctionAttributes, RP0offset, // Needed by test_dump.mjs (XC Cross compiler)
+  jsFunctionAttributes, RP0offset, // Needed by test_dump.mjs (XC Cross-compiler)
 };

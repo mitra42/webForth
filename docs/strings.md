@@ -3,7 +3,7 @@
 ## Overview
 
 Forth handles strings as characters stored in sequential bytes of its normal memory space.
-Typically there is no heap, or automatically allocated memory as found in more abstract languages.
+Typically, there is no heap, or automatically allocated memory as found in more abstract languages.
 
 Historically strings were always stored with the first byte being a count,
 immediately followed by the first character, 
@@ -65,7 +65,7 @@ and as a result there are assumptions about characters being single bytes,
 and lengths being synonymous with byte counts. 
 
 webForth tries to tackle this, while remaining Forth2012 compliant. 
-Specifically `TYPE` and words that use it `.(` `."` etc, use the underlying system's 
+Specifically `TYPE` and words that use it `.(` `."` etc. use the underlying system's 
 STRING output routine rather than iterating over a string, passes single characters to the OS.
 This also has the advantage of being faster, but it means that implementations need to define
 both character and string output routines `TXstoreC` and `TXstoreS`
