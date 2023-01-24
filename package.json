@@ -31,8 +31,8 @@
     "url": "git://github.com/mitra42/webforth.git"
   },
   "scripts": {
-    "build": "for i in esp8266_webforth arduino_webforth; do cd $i; node --experimental-modules ./build_xc.mjs; cd .. ; done"
+    "build": "for i in esp8266_webforth arduino_webforth; do cd $i; node ./build_xc.mjs; cd .. ; done"
   },
   "type": "module",
-  "version": "0.1.0"
+  "version": "0.1.1"
 }

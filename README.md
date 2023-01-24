@@ -24,7 +24,7 @@ If you only want to host the web version, then cloning the git repo should be su
 ```
 const {Forth, ForthNodeExtensions} = require('webforth');
 ```
-Or alternatively if running node v13, or `node --experimental-modules`
+Or alternatively
 ```
 import {Forth, ForthNodeExtensions} from 'webforth';
 ```
@@ -73,9 +73,11 @@ http-server &
 Open `http://localhost:8080/console.html` in a browser. 
 
 The HTML uses Web Components and TextEncoders, so they should work in any modern browsers such as:
-Firefox, Chrome, Opera, Edge, Android. 
-It will not work in IE or Safari on IOS or OSX, and there are no plans to support those browsers, 
-however I'll be happy to add PRs if someone else does.
+Firefox, Chrome, Opera, Edge, Android, iOS. It runs in Safari on OSX but slowly.
+
+The phone experience of console.html is sub-optimal, 
+I might get around to doing a mobile friendly version eventually, 
+but if someone else does then I'll be happy to apply a PR.
 
 It should compile Forth (you can verify in the web console) and present a console and entry box
 in which you can type any Forth. 
@@ -113,7 +115,7 @@ though any words you define interactively will not be saved to flash.
 
 To rebuild the repo, in either arduino or esp8266 folders run
 ```
-node --experimental-modules ./build_xc.mjs
+node ./build_xc.js
 ```
 * I am working on the extension mechanism. [issue#72](https://github.com/mitra42/webForth/issues/72);
 * a way to output via the Web UI [issue#61](https://github.com/mitra42/webForth/issues/61);
@@ -127,13 +129,13 @@ Because browsers don't have access to `fs` it uses a separate class
 that imports `fs`.
 ```
 cd scripts
-./forth_console_with_fs_via_node.mjs
+node /forth_console_with_fs_via_node.js
 ...
 webFORTH V0.00.15
 REQUIRE ../sandbox/tester.f
 \ This will load the forth in tester.f and anything that file INCLUDEs
 ```
-File support is in its early days but as I want to extend it to be web-aware.
+File support is in its early days and I want to extend it to be web-aware.
 
 ## Contributing
 

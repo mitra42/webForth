@@ -1,4 +1,10 @@
 // eslint-disable-next-line import/extensions
+/*
+    This version is used for testing compliance with forth_2012
+    I built it long enough ago that I'm not sure how, other than that it defines things like {T which
+    then run during the load of the interpreter to test each definition.
+    TODO - check that assumption
+ */
 import { Forth_with_fs, ForthNodeExtensions } from '../forth_with_fs.js';
 // Normally this would be: import Forth from 'webforth';
 
