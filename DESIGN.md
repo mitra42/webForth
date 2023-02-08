@@ -44,6 +44,10 @@ Mostly this is compatible with eForth except for:
 #### Memory Handling in WebForth
 Please see [docs/strings.md](docs/strings.md)
 
+#### Cross Compiling 
+See [docs/Cross Compiling.md](docs/Cross Compiling.md) for details of support for different platforms
+such as Arduino and ESP8266
+
 =====REVIEWED DOWN TO HERE == 4th March 2021 ====
 
 ### Token Threaded

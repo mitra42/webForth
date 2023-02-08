@@ -39,7 +39,7 @@ when a string is compiled the dictionary contains.
 
 In addition `S"` is state-sensitive, when used in interpretive mode, it moves the 
 string to `stringbuffer` and leaves the address on the stack. 
-I *may* change ." and $" to behave the same way.
+I *may* change ." and $" to behave the same way. (TODO)
 
 #### Escaped strings
 `S\"` (one slash) works like `S"` but interprets `\` (one slash) as an escape. 

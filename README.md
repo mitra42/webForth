@@ -106,21 +106,7 @@ There are two useful Forth words you can insert in either a definition, or the c
 TODO - document how to run ANS tests from separate repo
   
 ## Arduino Support
-
-Support for Arduino is still early stage, 
-but it runs to flash using the standard Arduino process, i.e. in the standar Arduino IDE
-Note - this does NOT clobber your bootloader unlike some Forths.
-There is an OK prompt with full forth support including defining words, 
-though any words you define interactively will not be saved to flash.
-
-To rebuild the repo, in either arduino or esp8266 folders run
-```
-node ./build_xc.js
-```
-* I am working on the extension mechanism. [issue#72](https://github.com/mitra42/webForth/issues/72);
-* a way to output via the Web UI [issue#61](https://github.com/mitra42/webForth/issues/61);
-* Support for pins and interrupts [issue#63](https://github.com/mitra42/webForth/issues/63)
-* Support for the Wi-Fi & TCP/IP [issue#73](https://github.com/mitra42/webForth/issues/73)
+See [docs/Cross Compiling.md](docs/Cross Compiling.md)
 
 ## File support
 It supports the Forth2012 file extension words `REQUIRE` `INCLUDE` etc
