@@ -50,19 +50,28 @@ if in doubt, esp8266_webforth is probably good.
 Edit the line close to the bottom that defines the following:
 * CELLL cell length in bytes 2 is standard forth, 
   but some are 4 bytes (32 bits). 
-  3 (24 bits) should work on most platforms but is not guarranteed!
+  3 (24 bits) should work on most platforms but is not guaranteed!
 * MEM is the size in bits of a single memory slots. 
-  Typically this will be 8*CELLL for efficiency. 
+  Typically, this will be 8*CELLL for efficiency. 
   (e.g. Arduino is CELLL=2 MEM=16, and ESP8266 is CELLL=4 MEM=32).
   Other combinations should work, but no promises! 
 * ROMCELLS and RAMCELLS define the size of the memory the forth will use, 
   the C has to use memory outside this for its stacks etc.
+* extensions shouldn't need changing - 
+  note these are like writing extra code words. 
+  The defaults are I/O hookups.
+  Note these apply to the the cross-compilation, not for the target.
+  see [forth_with_fs.js](../forth_with_fs.js) for an example of usage
+  to implement ability to read from file system.
+
+Copy and edit `webforth_functions.cpp` this may require no changes, 
+(Arduino and ESP8266 are currently the same)
 
 Look at [xc.js](../xc.js), there are a couple of places where "processor" specific 
-changes are made, for example on the ESP8266 it is necesary to specify "PROGMEM" to define an 
+changes are made, for example on the ESP8266 it is neccesary to specify "PROGMEM" to define an 
 array in Program Memory (aka flash).
 
-If you succeed in porting to a new platform please submit a PR to Github so it can be shared by others.
+If you succeed in porting to a new platform please submit a PR to GitHub so it can be shared by others.
 
 #### Future work includes:
 * The extension mechanism. [issue#72](https://github.com/mitra42/webForth/issues/72);

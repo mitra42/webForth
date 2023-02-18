@@ -34,24 +34,36 @@ CREATE testResults 20 CELLS ALLOT
 ;
 
 :NONAME \\ Different from tester, allows stack to be non-empty and treats as comment if testFlags!&8  : T{
-  testFlags @ 8 AND IF [COMPILE] ?\\ THEN ;
+  testFlags @ 8 AND [COMPILE] ?\\ ;
 ' T{ DEFER!
 :NONAME \\ ( ... -- ) Record depth and content of stack : ->
    DEPTH DUP testActualDepth ! \\ RECORD DEPTH since T{
    ?DUP IF 0 DO testResults I CELLS + ! LOOP THEN ;
 ' -> DEFER! 
-:NONAME }T \\ ( ... -- ) COMPARE STACK (EXPECTED) CONTENTS WITH SAVED (ACTUAL) CONTENTS.
+:NONAME \\ ( ... -- ) COMPARE STACK (EXPECTED) CONTENTS WITH SAVED (ACTUAL) CONTENTS. : }T
    DEPTH testActualDepth @ = IF      \\ IF DEPTHS MATCH
       DEPTH ?DUP IF         \\ IF THERE IS SOMETHING ON THE STACK
          0  DO            \\ FOR EACH STACK ITEM
            testResults I CELLS + @   \\ COMPARE ACTUAL WITH EXPECTED
            = 0= IF S" INCORRECT RESULT: " testError LEAVE THEN
          LOOP
-      THEN
+     THEN
    ELSE               \\ DEPTH MISMATCH
       S" WRONG NUMBER OF RESULTS: " testError
-   THEN ;
+   THEN 
+;
 ' }T DEFER!
+
+VARIABLE VERBOSE
+   FALSE VERBOSE !
+   TRUE VERBOSE !
+
+: TESTING   \\ ( -- ) TALKING COMMENT.
+  SOURCE VERBOSE @
+   IF DUP >R TYPE CR R> >IN !
+   ELSE >IN ! DROP [CHAR] * EMIT
+   THEN ;
+
 `;
 
 const forth = new Forth_with_fs({ CELLL, MEM, ROMSIZE, RAMSIZE, extensions, testFlags, memClass });

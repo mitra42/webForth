@@ -83,7 +83,7 @@ const tokenValue = 8;
 // ported to Arduino below to L.115
 // === Memory Map - Zen pg26
 const l = {}; // Constants that will get compiled into the dictionary
-l.COMP = 0x40; // bit in first char of name field to indicate 'COMPILE-ONLY'  ERRATA Zen uses this but it is not defined
+l.COMP = 0x40; // bit in first char of name field to indicate 'COMPILE-ONLY'  ERRATA Zen uses this, but it is not defined
 l.IMED = 0x80; // bit in first char of name field to indicate 'immediate' ERRATA Zen uses this but it is not defined
 const bitsSPARE = 0x20; // Unused spare bit in names
 l.BYTEMASK = 0xFF - l.COMP - l.IMED - bitsSPARE; // bits to mask out of a call with count and first char. ERRATA Zen uses this but it is not defined
@@ -1831,7 +1831,8 @@ T{ BL WORD DUP NAME? SWAP >NAME = -> -1 }T
   THEN
   DROP ;
 
-T{ SEE >NAME -> }T
+( commented out cos slow )
+\\ T{ SEE >NAME -> }T
 
 ( ERRATA Zen uses CONSTANT but doesnt define it )
 ( === Signon Message Zen pg105 VER hi )
@@ -1899,7 +1900,7 @@ class FlashXX_XX {
   cellRomFetch(cellAddr) {
     if (cellAddr >= this.romCells) {
       logAndTrap('Attempt to read above top of Rom at', cellAddr);
-    } // TODO-OP TIMIZE comment out
+    } // TODO-OPTIMIZE comment out
     return this.rom[cellAddr];
   }
   cellRamFetch(cellAddr) {
