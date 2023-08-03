@@ -123,6 +123,31 @@ REQUIRE ../sandbox/tester.f
 ```
 File support is in its early days and I want to extend it to be web-aware.
 
+## Standard support
+
+This is intended to be standards compliant, but then Forth has multiple standards!
+
+Its status, and progress to passing the FORTH2012 test suite is visible in 
+[issue#83](https://github.com/mitra42/webForth/issues/83), 
+as of now (Aug 2023):
+* it implements and passes: core, coreplus, coreext 
+* The following are in theory fully implemented but fail at least one test:
+  [exceptions](https://github.com/mitra42/webForth/issues/106);
+  [files](https://github.com/mitra42/webForth/issues/97);
+* The following extensions are partially implemented so fail on unimplemented words:
+  [strings](https://github.com/mitra42/webForth/issues/94);
+  [double](https://github.com/mitra42/webForth/issues/93);
+* there has been no attempt to implement so the following Hayes tests fail:
+  [block](https://github.com/mitra42/webForth/issues/80);
+  Vocabularies so [searchordertest](https://github.com/mitra42/webForth/issues/95);
+* Unclear on the status of:
+  [locals](https://github.com/mitra42/webForth/issues/50);
+  [memory allocation](https://github.com/mitra42/webForth/issues/96);
+  [tools](https://github.com/mitra42/webForth/issues/95);
+  [facilitytest](https://github.com/mitra42/webForth/issues/107)
+
+In addition it does not implement (not tested by Hayes) the Forth2012 word: ENVIRONMENT?
+
 ## Contributing
 
 Yes please ! 

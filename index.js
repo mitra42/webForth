@@ -1152,11 +1152,13 @@ T{ S" foo" TUCK + 1- C@ -> 3 CHAR o }T
 
 ( === Error Handling Zen pg80-82 NULL$ ABORT abort" ?STACK )
 
-CREATE NULL$ 0 , ( EFORTH-ZEN-ERRATA inserts a string "coyote" after this, no idea why! )
+( EFORTH DIFFERENCE - 2012 says that ABORT should leave -1 on the stack, eForth leaves the address of a 0 byte )
+( its unclear how, if ever, this is used by eForth so following 2012 convention )
+\\ CREATE NULL$ 0 , ( EFORTH-ZEN-ERRATA inserts a string "coyote" after this, no idea why! )
 
 : ABORT ( -- )
   ( Reset data stack and jump to QUIT.)
-  NULL$   ( take address of NULL$ )
+  -1 ( https://forth-standard.org/standard/exception/ABORT says return -1)
   THROW ; ( and give it to current CATCH )
 
 : (abort") ( f -- )
@@ -1668,7 +1670,7 @@ DEFER READ-LINE
   ;
 : quitError ( f -- )
   ( Handle a possible error returned by EVAL - common to QUIT and quit1 )
-      NULL$ OVER XOR      ( is error address=NULL$ ? )
+      -1 OVER XOR      ( is error address=-1 as returned from Abort - was NULL$ in eForth)
     ( V5, ZEN and Staapl differ, prefer Staapl I think)
     IF                  ( its not NULL$ )
       CR TIB #TIB @ TYPE ( Display line in TIB )
